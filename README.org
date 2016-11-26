@@ -1,0 +1,77 @@
+** Rest api server
+*** Entities
+**** Users
+**** Feeds
+**** Posts
+**** UserPosts
+**** UserFeeds
+**** Queries
+**** Tags
+*** Query
+*** Endpoints
+**** Definition
+|---------+------------+----------+-----------------------------------------------------------------|
+| Method  | Scope      | Example  | Semantics                                                       |
+|---------+------------+----------+-----------------------------------------------------------------|
+| GET     | collection | /users   | retrieve all resources in a collection                          |
+| GET     | resource   | /users/3 | retrieve a single resource                                      |
+| HEAD    | collection | /users   | retrieve all resources in a collection (header only)            |
+| HEAD    | resource   | /users/3 | retrieve a single resource (header only)                        |
+| POST    | collection | /users   | create one or more resources in a collection                    |
+| PUT     | collection | /users   | replace one or more resource (missing fields are deleted)       |
+| PUT     | resource   | /users/3 | replace a resource (missing fields are deleted)                 |
+| PATCH   | collection | /users   | update one or more resource (missing fields are left untouched) |
+| PATCH   | resource   | /users/3 | update a resource (missing fields are left untouched)           |
+| DELETE  | resources  | /users/3 | delete a resource                                               |
+| OPTIONS | any        | /        | return available HTTP methods and other options                 |
+|---------+------------+----------+-----------------------------------------------------------------|
+**** Supported Verbs
+|------------------------------------+-----+------+-----+-------+--------+------+---------+----------------|
+| Endpoint                           | GET | POST | PUT | PATCH | DELETE | HEAD | OPTIONS | Bulk Supported |
+|------------------------------------+-----+------+-----+-------+--------+------+---------+----------------|
+| /apps/                             |   1 |    1 |   0 |     0 |      0 |    1 |       1 |              0 |
+| /apps/:id                          |   1 |    0 |   1 |     1 |      1 |    1 |       1 |              0 |
+| /users/                            |   1 |    1 |   0 |     0 |      0 |    1 |       1 |              0 |
+| /users/:id                         |   1 |    0 |   1 |     1 |      1 |    1 |       1 |              0 |
+| /apps/:id/users/                   |   1 |    1 |   0 |     0 |      0 |    1 |       1 |              0 |
+| /apps/:id/users/:id                |   1 |    0 |   1 |     1 |      1 |    1 |       1 |              0 |
+| /feeds/                            |   1 |    1 |   1 |     1 |      0 |    1 |       1 |              1 |
+| /feeds/:id                         |   1 |    0 |   1 |     1 |      1 |    1 |       1 |              0 |
+| /posts/                            |   1 |    1 |   1 |     1 |      0 |    1 |       1 |              1 |
+| /posts/:id                         |   1 |    0 |   1 |     1 |      1 |    1 |       1 |              0 |
+| /user-posts/                       |   1 |    1 |   1 |     1 |      1 |    1 |       1 |              1 |
+| /user-posts/:id                    |   1 |    0 |   1 |     1 |      1 |    1 |       1 |              0 |
+| /user-feeds/                       |   1 |    1 |   1 |     1 |      1 |    1 |       1 |              1 |
+| /user-feeds/:id                    |   1 |    0 |   1 |     1 |      1 |    1 |       1 |              0 |
+| /users/:id/user-feeds              |   1 |    1 |   1 |     1 |      1 |    1 |       1 |              1 |
+| /users/:id/user-feeds/:id          |   1 |    0 |   1 |     1 |      1 |    1 |       1 |              0 |
+| /apps/:id/users/:id/user-feeds     |   1 |    1 |   1 |     1 |      1 |    1 |       1 |              1 |
+| /apps/:id/users/:id/user-feeds/:id |   1 |    0 |   1 |     1 |      1 |    1 |       1 |              0 |
+| /queries/                          |   1 |    1 |   0 |     0 |      0 |    1 |       1 |              0 |
+| /queries/:id                       |   1 |    0 |   1 |     1 |      1 |    1 |       1 |              0 |
+| /apps/:id/queries/                 |   1 |    1 |   0 |     0 |      0 |    1 |       1 |              0 |
+| /apps/:id/queries/:id              |   1 |    0 |   1 |     1 |      1 |    1 |       1 |              0 |
+| /tags/                             |   1 |    1 |   1 |     1 |      1 |    1 |       1 |              1 |
+| /tags/:id                          |   1 |    0 |   1 |     1 |      1 |    1 |       1 |              0 |
+| /apps/:id/tags/                    |   1 |    1 |   1 |     1 |      1 |    1 |       1 |              1 |
+| /apps/:id/tags/:id                 |   1 |    0 |   1 |     1 |      1 |    1 |       1 |              0 |
+| /users/:id/tags                    |   1 |    1 |   1 |     1 |      1 |    1 |       1 |              1 |
+| /users/:id/tags/:id                |   1 |    0 |   1 |     1 |      1 |    1 |       1 |              0 |
+| /users/:id/queries                 |   1 |    1 |   1 |     1 |      1 |    1 |       1 |              1 |
+| /users/:id/queries/:id             |   1 |    0 |   1 |     1 |      1 |    1 |       1 |              0 |
+| /apps/:id/users/:id/tags           |   1 |    1 |   1 |     1 |      1 |    1 |       1 |              1 |
+| /apps/:id/users/:id/tags/:id       |   1 |    0 |   1 |     1 |      1 |    1 |       1 |              0 |
+| /apps/:id/users/:id/queries        |   1 |    1 |   1 |     1 |      1 |    1 |       1 |              1 |
+| /apps/:id/users/:id/queries/:id    |   1 |    0 |   1 |     1 |      1 |    1 |       1 |              0 |
+|------------------------------------+-----+------+-----+-------+--------+------+---------+----------------|
+**** Notes
+***** Bulk operations
+      - Bulk operations are performed by sending an array of objects at the collection level
+      - The same endpoints accept an array or an object
+      - Bulk operations never fail but will return an array responses (possibly containing errors)
+***** Indempotency
+****** All GET, PUT, DELETE, HEAD, and OPTIONS requests are indempotent
+*** Resources
+**** http://restcookbook.com
+**** http://restful-api-design.readthedocs.io/en/latest
+**** http://restlet.com/blog/2015/05/18/implementing-bulk-updates-within-restful-services
