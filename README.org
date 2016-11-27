@@ -1,4 +1,4 @@
-** Rest api server
+** Rest API server
 *** Entities
 **** Users
 **** Feeds
@@ -7,7 +7,106 @@
 **** UserFeeds
 **** Queries
 **** Tags
-*** Query
+*** Meta attributes (shared by all entities)
+**** _type  : the type of resource
+**** _id    : a unique identifier for a resource
+**** _href  : the URL of the current resource
+**** _links : an array of relationship URLs
+     - each link is an object containing =rel= and =href= fields
+     #+BEGIN_SRC json
+       { "rel": "user", "href": "http://apiserver/users/12"  }
+     #+END_SRC
+*** Content types
+    - Content-Type: application/json; charset=utf-8
+    - Content-Type: application/yaml; charset=utf-8
+*** Response status codes
+    - http://www.restapitutorial.com/httpstatuscodes.html
+**** Success
+|---------+-------------+--------------+------------------|
+|         | Status Code | Status       | Notes            |
+|---------+-------------+--------------+------------------|
+| other   |         200 | ok           |                  |
+| POST    |         201 | created      |                  |
+| async   |         202 | accepted     |                  |
+| DELETE  |         204 | no content   |                  |
+| OPTIONS |         204 | no content   |                  |
+| GET     |         304 | not modified | with ETag header |
+|---------+-------------+--------------+------------------|
+**** Failure
+     - all error codes should be accompanied by an error payload that explains the error
+     #+BEGIN_SRC json
+     { "message": "error reason", "documentationUrl": "http://api/documentation" }
+     #+END_SRC
+|-------------+------------------------+----------------------------------------------------------------|
+| Status Code | Status                 | Description                                                    |
+|-------------+------------------------+----------------------------------------------------------------|
+|         400 | bad request            | the request was invalid or cannot be server                    |
+|         401 | unauthorized           |                                                                |
+|         403 | forbidden              | the server understood the request but is refusing it           |
+|         404 | not found              |                                                                |
+|         405 | method not allowed     | the requested URL exists but the HTTP method is not applicable |
+|         409 | conflict               | signals a duplicate entries attempt                           |
+|         422 | unprocessable entity   | the server cannot process the entity, entity is invalid        |
+|         415 | unsupported media type | the accepted media type is not supported                       |
+|-------------+------------------------+----------------------------------------------------------------|
+**** Per HTTP method
+|--------+---------+---------------------+-----------------------|
+| Method | Action  | Collection (/users) | Resource (/users/3)   |
+|--------+---------+---------------------+-----------------------|
+| POST   | Create  |                 201 | 405, 409              |
+| GET    | Read    |                 200 | 200, 404 (invalid id) |
+| PUT    | Replace |                 405 | 200, 204, 404         |
+| PATCH  | Modify  |                 405 | 200, 204, 404         |
+| DELETE | Delete  |                 405 | 200, 204, 404         |
+|--------+---------+---------------------+-----------------------|
+*** Headers
+|---------------+-------------------------------+------------------|
+| Header        |                               | Returned On      |
+|---------------+-------------------------------+------------------|
+| Allow         | GET,PUT,...                   | 405 response     |
+| Location      | resource-url                  | creation         |
+| Link          | pagination                    | collection query |
+| X-Total-Count | total count during pagination | collection query |
+|---------------+-------------------------------+------------------|
+**** Examples
+     - Link: <https://blog.mwaysolutions.com/sample/api/v1/cars?offset=15&limit=5>; rel="next", 
+             <https://blog.mwaysolutions.com/sample/api/v1/cars?offset=50&limit=3>; rel="last", 
+             <https://blog.mwaysolutions.com/sample/api/v1/cars?offset=0&limit=5>; rel="first",
+             <https://blog.mwaysolutions.com/sample/api/v1/cars?offset=5&limit=5>; rel="prev"
+*** Query and filtering
+**** Via query string parameters
+     - GET /users?name=joe&createdAt=123
+     - GET /users?where(name eq 'joe') and (createdAt lt 123)
+***** Filtering operators
+|-------------+-----------------------+-------------------------|
+| Operator    | Description           | Example                 |
+|-------------+-----------------------+-------------------------|
+| eq          | equal                 | name eq 'Tom'           |
+| ne          | not equal             | name ne 'Tom'           |
+| gt          | greater than          |                         |
+| ge          | greater than or equal | version ge 1.0          |
+| lt          | less than             |                         |
+| le          | less than or equal    |                         |
+| in          | in list               | id in (1,2,3)           |
+| contains    | contains              | name contains 'the'     |
+| is null     | is null               | version is null         |
+| is not null | is not null           | description is not null |
+|-------------+-----------------------+-------------------------|
+**** Via query object for custom queries
+     - objects that support queries should be query-able via a query id like so ~?q=<query-id>~
+*** Fields
+    - by default all fields are included for all objects returned via a GET endpoint
+    - only a subset of fields can be returned instead when necessary
+    - GET /users?fields=createdAt,name,id,profile.address,profile.phone
+*** Sorting
+    - sort is allowed over multiple fields, -desc, +asc (optional)
+    - GET /users?sort=-createdAt,+name
+*** Pagination
+    - all collection endpoints will accept =start= and =limit= parameters
+    - GET /users?start=3&limit=10
+*** Validation
+    - http://json-schema.org/
+    - http://stackoverflow.com/questions/23853626/best-practice-for-validating-json-requests-with-yesod
 *** Endpoints
 **** Definition
 |---------+------------+----------+-----------------------------------------------------------------|
@@ -25,7 +124,8 @@
 | DELETE  | resources  | /users/3 | delete a resource                                               |
 | OPTIONS | any        | /        | return available HTTP methods and other options                 |
 |---------+------------+----------+-----------------------------------------------------------------|
-**** Supported Verbs
+**** Supported verbs per endpoint
+     - there should be an /apps/:id/.. for every resource except apps
 |------------------------------------+-----+------+-----+-------+--------+------+---------+----------------|
 | Endpoint                           | GET | POST | PUT | PATCH | DELETE | HEAD | OPTIONS | Bulk Supported |
 |------------------------------------+-----+------+-----+-------+--------+------+---------+----------------|
@@ -47,9 +147,9 @@
 | /users/:id/user-feeds/:id          |   1 |    0 |   1 |     1 |      1 |    1 |       1 |              0 |
 | /apps/:id/users/:id/user-feeds     |   1 |    1 |   1 |     1 |      1 |    1 |       1 |              1 |
 | /apps/:id/users/:id/user-feeds/:id |   1 |    0 |   1 |     1 |      1 |    1 |       1 |              0 |
-| /queries/                          |   1 |    1 |   0 |     0 |      0 |    1 |       1 |              0 |
+| /queries/                          |   1 |    1 |   0 |     0 |      0 |    1 |       1 |              1 |
 | /queries/:id                       |   1 |    0 |   1 |     1 |      1 |    1 |       1 |              0 |
-| /apps/:id/queries/                 |   1 |    1 |   0 |     0 |      0 |    1 |       1 |              0 |
+| /apps/:id/queries/                 |   1 |    1 |   0 |     0 |      0 |    1 |       1 |              1 |
 | /apps/:id/queries/:id              |   1 |    0 |   1 |     1 |      1 |    1 |       1 |              0 |
 | /tags/                             |   1 |    1 |   1 |     1 |      1 |    1 |       1 |              1 |
 | /tags/:id                          |   1 |    0 |   1 |     1 |      1 |    1 |       1 |              0 |
@@ -68,10 +168,16 @@
 ***** Bulk operations
       - Bulk operations are performed by sending an array of objects at the collection level
       - The same endpoints accept an array or an object
-      - Bulk operations never fail but will return an array responses (possibly containing errors)
-***** Indempotency
-****** All GET, PUT, DELETE, HEAD, and OPTIONS requests are indempotent
+      - Bulk operations never fail but will return an array of responses (including error and success results)
+***** Idempotency
+****** All GET, PUT, DELETE, HEAD, and OPTIONS requests are idempotent
+*** Store specific
+**** Elastic-search
+     - elastic search documents will be indexed when modified
 *** Resources
 **** http://restcookbook.com
 **** http://restful-api-design.readthedocs.io/en/latest
 **** http://restlet.com/blog/2015/05/18/implementing-bulk-updates-within-restful-services
+**** http://amundsen.com/media-types/collection/format/
+**** http://www.restapitutorial.com/lessons/restquicktips.html
+**** http://www.restapitutorial.com/lessons/httpmethods.html
