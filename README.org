@@ -1,4 +1,4 @@
-** Rest API server
+** Rest API server (spec)
 *** Entities
 **** Users
 **** Feeds
@@ -16,9 +16,8 @@
      #+BEGIN_SRC json
        { "rel": "user", "href": "http://apiserver/users/12"  }
      #+END_SRC
-*** Content types
+*** Suported content types
     - Content-Type: application/json; charset=utf-8
-    - Content-Type: application/yaml; charset=utf-8
 *** Response status codes
     - http://www.restapitutorial.com/httpstatuscodes.html
 **** Success
@@ -76,31 +75,40 @@
 *** Query and filtering
 **** Via query string parameters
      - GET /users?name=joe&createdAt=123
-     - GET /users?where(name eq 'joe') and (createdAt lt 123)
+     - GET /users?where=(name eq 'joe') and (createdAt lt '123')
+     - GET /users?where=profile.phone eq '112-332-4423'
 ***** Filtering operators
-|-------------+-----------------------+-------------------------|
-| Operator    | Description           | Example                 |
-|-------------+-----------------------+-------------------------|
-| eq          | equal                 | name eq 'Tom'           |
-| ne          | not equal             | name ne 'Tom'           |
-| gt          | greater than          |                         |
-| ge          | greater than or equal | version ge 1.0          |
-| lt          | less than             |                         |
-| le          | less than or equal    |                         |
-| in          | in list               | id in (1,2,3)           |
-| contains    | contains              | name contains 'the'     |
-| is null     | is null               | version is null         |
-| is not null | is not null           | description is not null |
-|-------------+-----------------------+-------------------------|
+|-------------+--------------------------------+-------------------------------------------|
+| Operator    | Description                    | Example                                   |
+|-------------+--------------------------------+-------------------------------------------|
+| eq          | equal                          | name eq 'Tom'                             |
+| ne          | not equal                      | name ne 'Tom'                             |
+| gt          | greater than                   |                                           |
+| ge          | greater than or equal          | version ge '1.0'                          |
+| lt          | less than                      |                                           |
+| le          | less than or equal             |                                           |
+| in          | in list                        | id in (1,2,3)                             |
+| contains    | contains                       | name contains 'the'                       |
+| is null     | is null                        | version is null                           |
+| is not null | is not null                    | description is not null                   |
+| and         | combine two conditions via AND | (active eq 'true') and (version ge '1.1') |
+| or          | combine two conditions via OR  | (active eq 'false') or (version ge '1.1') |
+|-------------+--------------------------------+-------------------------------------------|
 **** Via query object for custom queries
      - objects that support queries should be query-able via a query id like so ~?q=<query-id>~
 *** Fields
-    - by default all fields are included for all objects returned via a GET endpoint
-    - only a subset of fields can be returned instead when necessary
-    - GET /users?fields=createdAt,name,id,profile.address,profile.phone
+    - all fields used in query, filtering, sorting, can target nested entities (e.g. user.profile)
 *** Sorting
-    - sort is allowed over multiple fields, -desc, +asc (optional)
-    - GET /users?sort=-createdAt,+name
+    - sort is allowed over multiple fields, -desc, +asc (default) by using the =sort= query parameter
+    - GET /users?sort=-createdAt,+name,+profile.address
+*** Partial response
+    - by default the server returns a full entity with all the nested entities
+    - a subset of fields can be requested when necessary by using the =include= query parameter
+    - one or more fields can be excluded using the =exclude= query parameter
+    - only an =include= or an =exclude= parameter is allowed
+    - a request containing both an =include= and an =exclude= parameter will result in a 400 error
+    - GET /users?include=createdAt,name,id,profile.address,profile.phone
+    - GET /posts?exclude=description
 *** Pagination
     - all collection endpoints will accept =start= and =limit= parameters
     - GET /users?start=3&limit=10
@@ -167,10 +175,14 @@
 **** Notes
 ***** Bulk operations
       - Bulk operations are performed by sending an array of objects at the collection level
-      - The same endpoints accept an array or an object
+      - Some collection resources accept both a single element and a collection for methods such as PUT,POST,PATCH 
+        and according to the input payload the server will detect if a single or bulk operation is requested
       - Bulk operations never fail but will return an array of responses (including error and success results)
+      - Bulk creations will return a list of =Link= headers instead of the =Location= header
+      - Bulk creations will return a 200 status instead of 201 since not all requested items may succeed in being created
+        but the operation as a whole will always succeed
 ***** Idempotency
-****** All GET, PUT, DELETE, HEAD, and OPTIONS requests are idempotent
+      - All GET, PUT, DELETE, HEAD, and OPTIONS requests for single operations are idempotent
 *** Store specific
 **** Elastic-search
      - elastic search documents will be indexed when modified
@@ -181,3 +193,5 @@
 **** http://amundsen.com/media-types/collection/format/
 **** http://www.restapitutorial.com/lessons/restquicktips.html
 **** http://www.restapitutorial.com/lessons/httpmethods.html
+**** https://www.targetprocess.com/guide/integrations/rest-api/rest-api-response-paging-sorting-filters-partial-get/
+** Rest API server (implementation)
