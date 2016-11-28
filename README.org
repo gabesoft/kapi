@@ -16,21 +16,21 @@
      #+BEGIN_SRC json
        { "rel": "user", "href": "http://apiserver/users/12"  }
      #+END_SRC
-*** Suported content types
+*** Supported content types
     - Content-Type: application/json; charset=utf-8
 *** Response status codes
     - http://www.restapitutorial.com/httpstatuscodes.html
 **** Success
-|---------+-------------+--------------+------------------|
-|         | Status Code | Status       | Notes            |
-|---------+-------------+--------------+------------------|
-| other   |         200 | ok           |                  |
-| POST    |         201 | created      |                  |
-| async   |         202 | accepted     |                  |
-| DELETE  |         204 | no content   |                  |
-| OPTIONS |         204 | no content   |                  |
-| GET     |         304 | not modified | with ETag header |
-|---------+-------------+--------------+------------------|
+|-------------+--------------+----------------+------------------|
+| Status Code | Status       | Used With      | Notes            |
+|-------------+--------------+----------------+------------------|
+|         200 | OK           | PUT,PATCH      |                  |
+|         201 | Created      | POST           |                  |
+|         202 | Accepted     | Async requests |                  |
+|         204 | No Content   | DELETE         |                  |
+|         204 | No Content   | OPTIONS        |                  |
+|         304 | Not Modified | GET            | with ETag header |
+|-------------+--------------+----------------+------------------|
 **** Failure
      - all error codes should be accompanied by an error payload that explains the error
      #+BEGIN_SRC json
@@ -39,14 +39,14 @@
 |-------------+------------------------+----------------------------------------------------------------|
 | Status Code | Status                 | Description                                                    |
 |-------------+------------------------+----------------------------------------------------------------|
-|         400 | bad request            | the request was invalid or cannot be server                    |
-|         401 | unauthorized           |                                                                |
-|         403 | forbidden              | the server understood the request but is refusing it           |
-|         404 | not found              |                                                                |
-|         405 | method not allowed     | the requested URL exists but the HTTP method is not applicable |
-|         409 | conflict               | signals a duplicate entries attempt                           |
-|         422 | unprocessable entity   | the server cannot process the entity, entity is invalid        |
-|         415 | unsupported media type | the accepted media type is not supported                       |
+|         400 | Bad Request            | the request was invalid or cannot be server                    |
+|         401 | Unauthorized           |                                                                |
+|         403 | Forbidden              | the server understood the request but is refusing it           |
+|         404 | Not Found              |                                                                |
+|         405 | Method Not Allowed     | the requested URL exists but the HTTP method is not applicable |
+|         409 | Conflict               | signals a duplicate entries attempt                           |
+|         422 | Unprocessable Entity   | the server cannot process the entity, entity is invalid        |
+|         415 | Unsupported Media Type | the accepted media type is not supported                       |
 |-------------+------------------------+----------------------------------------------------------------|
 **** Per HTTP method
 |--------+---------+---------------------+-----------------------|
@@ -194,4 +194,5 @@
 **** http://www.restapitutorial.com/lessons/restquicktips.html
 **** http://www.restapitutorial.com/lessons/httpmethods.html
 **** https://www.targetprocess.com/guide/integrations/rest-api/rest-api-response-paging-sorting-filters-partial-get/
+**** https://raw.githubusercontent.com/wiki/Webmachine/webmachine/images/http-headers-status-v3.png
 ** Rest API server (implementation)
