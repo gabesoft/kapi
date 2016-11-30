@@ -36,18 +36,19 @@
      #+BEGIN_SRC json
      { "message": "error reason", "documentationUrl": "http://api/documentation" }
      #+END_SRC
-|-------------+------------------------+----------------------------------------------------------------|
-| Status Code | Status                 | Description                                                    |
-|-------------+------------------------+----------------------------------------------------------------|
-|         400 | Bad Request            | the request was invalid or cannot be server                    |
-|         401 | Unauthorized           |                                                                |
-|         403 | Forbidden              | the server understood the request but is refusing it           |
-|         404 | Not Found              |                                                                |
-|         405 | Method Not Allowed     | the requested URL exists but the HTTP method is not applicable |
-|         409 | Conflict               | signals a duplicate entries attempt                           |
-|         422 | Unprocessable Entity   | the server cannot process the entity, entity is invalid        |
-|         415 | Unsupported Media Type | the accepted media type is not supported                       |
-|-------------+------------------------+----------------------------------------------------------------|
+|-------------+------------------------+--------------------------------------------------------------------------------------|
+| Status Code | Status                 | Description                                                                          |
+|-------------+------------------------+--------------------------------------------------------------------------------------|
+|         400 | Bad Request            | the request was invalid or cannot be served                                          |
+|         401 | Unauthorized           |                                                                                      |
+|         403 | Forbidden              | the server understood the request but is refusing it                                 |
+|         404 | Not Found              |                                                                                      |
+|         405 | Method Not Allowed     | the requested URL exists but the HTTP method is not applicable                       |
+|         406 | Not Acceptable         | the request has accept headers incompatible with what the server is able to generate |
+|         409 | Conflict               | signals a duplicate entries attempt                                                  |
+|         422 | Unprocessable Entity   | the server cannot process the entity, entity is invalid                              |
+|         415 | Unsupported Media Type | the accepted media type is not supported                                             |
+|-------------+------------------------+--------------------------------------------------------------------------------------|
 **** Per HTTP method
 |--------+---------+---------------------+-----------------------|
 | Method | Action  | Collection (/users) | Resource (/users/3)   |
