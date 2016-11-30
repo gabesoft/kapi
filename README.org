@@ -194,5 +194,7 @@
 **** http://www.restapitutorial.com/lessons/restquicktips.html
 **** http://www.restapitutorial.com/lessons/httpmethods.html
 **** https://www.targetprocess.com/guide/integrations/rest-api/rest-api-response-paging-sorting-filters-partial-get/
-**** https://raw.githubusercontent.com/wiki/Webmachine/webmachine/images/http-headers-status-v3.png
+**** Diagrams
+***** https://raw.githubusercontent.com/wiki/Webmachine/webmachine/images/http-headers-status-v3.png
+***** https://camo.githubusercontent.com/4e15cccf2a9277dcca2c8824092547dee7058744/68747470733a2f2f7261776769746875622e636f6d2f666f722d4745542f687474702d6465636973696f6e2d6469616772616d2f6d61737465722f6874747064642e706e67
 ** Rest API server (implementation)
