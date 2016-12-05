@@ -65,10 +65,10 @@ instance ToParam (QueryParams "include" String) where
   toParam _ = DocQueryParam "include" [ "name", "profile.description" ] "a list of fields to be included in the objects returned" List
 
 instance ToParam (QueryParam "where" String) where
-  toParam _ = DocQueryParam "where" [ "(name eq 'Sherlock') or (profile.date lt 12999888)"] "record filters" Normal
+  toParam _ = DocQueryParam "where" [ "(name eq 'Sherlock') or (profile.date lt '12999888')"] "record filters" Normal
 
 instance ToParam (QueryParams "sort" String) where
-  toParam _ = DocQueryParam "sort" [ "+name", "-createdAt" ] "sort fields (prefix with '-' for descending sort)" List
+  toParam _ = DocQueryParam "sort" [ "+name", "-createdAt" ] "sort fields +ascending or -descending" List
 
 instance ToParam (QueryParam "start" Int) where
   toParam _ = DocQueryParam "start" ["0"] "start index for pagination" Normal

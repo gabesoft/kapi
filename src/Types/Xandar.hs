@@ -49,12 +49,14 @@ deriveJSON
     }
     ''User
 
-data ModelOrError a = Fail Error | Succ a
+data ModelOrError a
+    = Fail Error
+    | Succ a
 
-instance (ToJSON a) => ToJSON (ModelOrError a) where
-  toJSON (Fail e) = toJSON e
-  toJSON (Succ a) = toJSON a
-
+instance (ToJSON a) =>
+         ToJSON (ModelOrError a) where
+    toJSON (Fail e) = toJSON e
+    toJSON (Succ a) = toJSON a
 
 u1 = User "123" True "milky@way.com" Nothing
 
