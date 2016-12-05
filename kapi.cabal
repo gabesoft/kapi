@@ -17,8 +17,8 @@ library
   exposed-modules:     Types.Xandar
                      , Api.Xandar
   build-depends:       base >= 4.7 && < 5
-                     , aeson
-                     , servant >= 0.8
+                     , aeson >= 1.0.2
+                     , servant >= 0.9
                      , servant-docs
                      , QuickCheck >= 2.8
                      , quickcheck-text
