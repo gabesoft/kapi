@@ -5,14 +5,11 @@
 -- | Models for xandar
 module Types.Xandar where
 
--- TODO: move arbitrary instances to spec and remove quickcheck imports
 import Data.Aeson
 import Data.Aeson.TH
 import Data.Char
 import Data.Text (Text)
-import Data.Text.Arbitrary
 import GHC.Generics
-import Test.QuickCheck
 
 type UserId = Text
 
@@ -28,9 +25,6 @@ data User = User
     , _userEmail :: Text
     , _userPassword :: Maybe Text
     } deriving (Eq,Show,Generic)
-
-instance Arbitrary User where
-    arbitrary = User <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
 
 data Feed = Feed
     { _feedAuthor :: Maybe Text
