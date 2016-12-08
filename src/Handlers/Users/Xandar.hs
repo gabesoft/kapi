@@ -25,6 +25,12 @@ server =
   optionsSingle :<|>
   optionsMultiple
 
+api :: Proxy XandarApi
+api = Proxy
+
+app :: Application
+app = serve api server
+
 -- getMultiple
 --   :: (KnownSymbol a, KnownSymbol b)
 --   => String
