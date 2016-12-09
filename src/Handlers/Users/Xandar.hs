@@ -2,7 +2,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
 
--- | Handlers for xandar endpoints
+-- | Handlers for Xandar endpoints
 module Handlers.Users.Xandar where
 
 import Api.Xandar
@@ -12,6 +12,8 @@ import Servant
 import Servant.API
 import Types.Xandar
 
+-- |
+-- Server definition for the Xandar api
 server :: Server XandarApi
 server =
   getMultiple :<|> getSingle :<|> deleteSingle :<|> createSingle :<|>
@@ -25,11 +27,8 @@ server =
   optionsSingle :<|>
   optionsMultiple
 
-api :: Proxy XandarApi
-api = Proxy
-
 app :: Application
-app = serve api server
+app = serve (Proxy :: Proxy XandarApi) server
 
 -- getMultiple
 --   :: (KnownSymbol a, KnownSymbol b)

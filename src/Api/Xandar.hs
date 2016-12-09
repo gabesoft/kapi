@@ -5,7 +5,8 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE OverloadedStrings #-}
 
--- | Endpoint declarations
+-- |
+-- Declaration for all endpoints used by the Xandar app
 module Api.Xandar (XandarApi)where
 
 import Data.Text (Text)
@@ -24,6 +25,8 @@ type GetMultiple = QueryParams "include" String
 type HeadNoContent = Verb HEAD 204
 type OptionsNoContent = Verb OPTIONS 204
 
+-- |
+-- User api description
 type UserApi = GetMultiple
           :<|> Capture "id" UserId :> Get '[JSON] User
           -- delete
