@@ -40,7 +40,7 @@ app = serve (Proxy :: Proxy XandarApi) server
 --   -> String
 --   -> Handler (Headers '[Header a String, Header b String] [User])
 getMultiple fields query sort start limit =
-  return $ addHeader "abcd" (addHeader "10" [u1, u2])
+  return $ addHeader "pagination links" (addHeader "10" [u1, u2])
 
 getSingle :: Text -> Handler User
 getSingle uid =
