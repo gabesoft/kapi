@@ -30,18 +30,14 @@ server =
 app :: Application
 app = serve (Proxy :: Proxy XandarApi) server
 
--- getMultiple
---   :: (KnownSymbol a, KnownSymbol b)
---   => String
---   -> String
---   -> String
---   -> String
---   -> String
---   -> String
---   -> Handler (Headers '[Header a String, Header b String] [User])
+-- |
+-- Handler for getting multiple users
+getMultiple :: Server GetMultiple
 getMultiple fields query sort start limit =
   return $ addHeader "pagination links" (addHeader "10" [u1, u2])
 
+-- |
+-- Handler for returning a single user by id
 getSingle :: Text -> Handler User
 getSingle uid =
   if uid == "1"
@@ -49,8 +45,13 @@ getSingle uid =
     else throwError $
          err404 {errBody = "A user matching the input id was not found"}
 
-deleteSingle = undefined
+-- |
+-- Handler for deleting a single user
+deleteSingle :: Text -> Handler NoContent
+deleteSingle uid = return NoContent
 
+-- |
+-- Handler for creating a single user
 createSingle = undefined
 
 createMultiple = undefined
