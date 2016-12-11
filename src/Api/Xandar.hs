@@ -28,23 +28,23 @@ type OptionsNoContent = Verb OPTIONS 204
 -- |
 -- User api description
 type UserApi =
-  -- | get
+  -- get
        GetMultiple
   :<|> Capture "id" UserId :> Get '[JSON] User
-  -- | delete
+  -- delete
   :<|> Capture "id" UserId :> DeleteNoContent '[JSON] NoContent
-  -- | create
+  -- create
   :<|> ReqBody '[JSON] User :> PostCreated '[JSON] (Headers '[Header "Location" String] User)
   :<|> ReqBody '[JSON] [User] :> Post '[JSON] (Headers '[Header "Link" String] [ModelOrError User])
-  -- | update (replace)
+  -- update (replace)
   :<|> Capture "id" UserId :> ReqBody '[JSON] User :> Put '[JSON] User
   :<|> ReqBody '[JSON] [User] :> Put '[JSON] [ModelOrError User]
-  -- | update (modify)
+  -- update (modify)
   :<|> Capture "id" UserId :> ReqBody '[JSON] User :> Patch '[JSON] User
   :<|> ReqBody '[JSON] [User] :> Patch '[JSON] [ModelOrError User]
-  -- | head
+  -- head
   :<|> Capture "id" UserId :>  HeadNoContent '[JSON] (Headers '[Header "ETag" String, Header "Last-Modified" String] NoContent)
   :<|> HeadNoContent '[JSON] (Headers '[Header "ETag" String] NoContent)
-  -- | options
+  -- options
   :<|> Capture "id" UserId :> OptionsNoContent '[JSON] (Headers '[Header "Allow" String] NoContent)
   :<|> OptionsNoContent '[JSON] (Headers '[Header "Allow" String] NoContent)

@@ -20,9 +20,9 @@ data Error = Error
 instance ToJSON Error
 
 data User = User
-    { _userId :: UserId
-    , _userIsAdmin :: Bool
+    { _userId :: Maybe UserId
     , _userEmail :: Text
+    , _userIsAdmin :: Maybe Bool
     , _userPassword :: Maybe Text
     } deriving (Eq,Show,Generic)
 
@@ -44,14 +44,14 @@ deriveJSON
     ''User
 
 data ModelOrError a
-    = Fail Error
-    | Succ a
+    = Fail Error -- ^ Error case
+    | Succ a     -- ^ Success case containing a value
 
 instance (ToJSON a) =>
          ToJSON (ModelOrError a) where
     toJSON (Fail e) = toJSON e
     toJSON (Succ a) = toJSON a
 
-u1 = User "123" True "milky@way.com" Nothing
+u1 = User (Just "123") "milky@way.com" (Just True) Nothing
 
-u2 = User "998" False "super@nova.com" (Just "top-secret")
+u2 = User (Just "998") "super@nova.com" (Just False) (Just "top-secret")
