@@ -18,12 +18,16 @@ library
                      , Api.Xandar
                      , Doc.Xandar
                      , Handlers.Users.Xandar
+                     , Persistence.Users.Xandar
   build-depends:       base >= 4.7 && < 5
                      , aeson >= 1.0.2
+                     , containers >= 0.5
+                     , mongoDB >= 2.1
                      , servant >= 0.9
                      , servant-server
                      , servant-docs
                      , text >= 1.2
+                     , time >= 1.6
   default-language:    Haskell2010
 
 executable kapi-exe

@@ -10,6 +10,7 @@ import Data.Aeson.TH
 import Data.Char
 import Data.Text (Text)
 import GHC.Generics
+import Data.Time
 
 type UserId = Text
 
@@ -23,8 +24,18 @@ data User = User
     { _userId :: Maybe UserId
     , _userEmail :: Text
     , _userIsAdmin :: Maybe Bool
-    , _userPassword :: Maybe Text
+    , _userIsDisabled :: Maybe Bool
+    , _userCreatedAt :: Maybe UTCTime
+    , _userUpdatedAt :: Maybe UTCTime
+    , _githubAvatar :: Maybe Text
+    , _githubUrl :: Maybe Text
+    , _githubLogin :: Maybe Text
     } deriving (Eq,Show,Generic)
+
+u1 = User (Just "123") "milky@way.com" (Just True) Nothing Nothing Nothing Nothing Nothing Nothing
+
+u2 = User (Just "998") "super@nova.com" (Just False) Nothing Nothing Nothing Nothing Nothing Nothing
+
 
 data Feed = Feed
     { _feedAuthor :: Maybe Text
@@ -51,7 +62,3 @@ instance (ToJSON a) =>
          ToJSON (ModelOrError a) where
     toJSON (Fail e) = toJSON e
     toJSON (Succ a) = toJSON a
-
-u1 = User (Just "123") "milky@way.com" (Just True) Nothing
-
-u2 = User (Just "998") "super@nova.com" (Just False) (Just "top-secret")
