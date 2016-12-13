@@ -3,8 +3,12 @@
 -- | Persistence layer for users
 module Persistence.Users.Xandar where
 
+import Control.Lens ((^.))
 import Control.Applicative ((<|>))
 import Data.Aeson
+import Data.AesonBson
+import Data.Bson
+import Data.Bson.Lens
 import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import Data.Time
@@ -35,6 +39,9 @@ data FieldDefinitionSum
 
 data RecordDefinition =
   RecordDefinition (Map.Map Label FieldDefinitionSum)
+
+indices :: [Index]
+indices = []
 
 userDefinition :: RecordDefinition
 userDefinition =
@@ -78,6 +85,12 @@ u3 =
     , ("email", FieldValueText "blue@swan.com")
     , ("githubUrl", FieldValueText "/api/users/blue")
     ]
+
+u4 =
+  [ "_id" =: (read "584e58195984185eb8000005" :: ObjectId)
+  , "email" =: ("blue@leaf.com" :: String)
+  , "githubUrl" =: ("https://github.com/api/users/mrleaf" :: String)
+  ]
 
 setValue values (label, FieldDefinitionId def) =
   case Map.lookup label values of

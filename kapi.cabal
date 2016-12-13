@@ -19,15 +19,24 @@ library
                      , Doc.Xandar
                      , Handlers.Users.Xandar
                      , Persistence.Users.Xandar
+                     , Data.AesonBson
+                     , Data.AesonBson.Instances
   build-depends:       base >= 4.7 && < 5
                      , aeson >= 1.0.2
+                     , attoparsec >= 0.13
+                     , bson
+                     , bson-lens
                      , containers >= 0.5
+                     , lens >= 4.15
                      , mongoDB >= 2.1
+                     , scientific >= 0.3
                      , servant >= 0.9
                      , servant-server
                      , servant-docs
                      , text >= 1.2
                      , time >= 1.6
+                     , unordered-containers >= 0.2
+                     , vector >= 0.11
   default-language:    Haskell2010
 
 executable kapi-exe
