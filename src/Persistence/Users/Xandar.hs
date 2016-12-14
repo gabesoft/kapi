@@ -46,6 +46,10 @@ data Record =
 instance ToJSON Record where
   toJSON (Record r) = Object (aesonify r)
 
+instance FromJSON Record where
+  parseJSON (Object obj) = return $ Record (bsonify obj)
+  -- parseJSON _ = empty
+
 indices :: [Index]
 indices = []
 

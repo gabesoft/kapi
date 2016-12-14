@@ -21,7 +21,7 @@ type GetMultiple = QueryParams "include" String
                 :> QueryParams "sort" String
                 :> QueryParam "start" Int
                 :> QueryParam "limit" Int
-                :> Get '[JSON] (Headers '[Header "Link" String, Header "X-Total-Count" String] [User])
+                :> Get '[JSON] (Headers '[Header "Link" String, Header "X-Total-Count" String] [Record])
 
 type HeadNoContent = Verb HEAD 204
 type OptionsNoContent = Verb OPTIONS 204
@@ -35,14 +35,14 @@ type UserApi =
   -- delete
   :<|> Capture "id" UserId :> DeleteNoContent '[JSON] NoContent
   -- create
-  :<|> ReqBody '[JSON] User :> PostCreated '[JSON] (Headers '[Header "Location" String] User)
-  :<|> ReqBody '[JSON] [User] :> Post '[JSON] (Headers '[Header "Link" String] [ModelOrError User])
+  :<|> ReqBody '[JSON] Record :> PostCreated '[JSON] (Headers '[Header "Location" String] Record)
+  :<|> ReqBody '[JSON] [Record] :> Post '[JSON] (Headers '[Header "Link" String] [ModelOrError Record])
   -- update (replace)
-  :<|> Capture "id" UserId :> ReqBody '[JSON] User :> Put '[JSON] User
-  :<|> ReqBody '[JSON] [User] :> Put '[JSON] [ModelOrError User]
+  :<|> Capture "id" UserId :> ReqBody '[JSON] Record :> Put '[JSON] Record
+  :<|> ReqBody '[JSON] [Record] :> Put '[JSON] [ModelOrError Record]
   -- update (modify)
-  :<|> Capture "id" UserId :> ReqBody '[JSON] User :> Patch '[JSON] User
-  :<|> ReqBody '[JSON] [User] :> Patch '[JSON] [ModelOrError User]
+  :<|> Capture "id" UserId :> ReqBody '[JSON] Record :> Patch '[JSON] Record
+  :<|> ReqBody '[JSON] [Record] :> Patch '[JSON] [ModelOrError Record]
   -- head
   :<|> Capture "id" UserId :>  HeadNoContent '[JSON] (Headers '[Header "ETag" String, Header "Last-Modified" String] NoContent)
   :<|> HeadNoContent '[JSON] (Headers '[Header "ETag" String] NoContent)

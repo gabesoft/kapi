@@ -38,7 +38,7 @@ app = serve (Proxy :: Proxy XandarApi) server
 -- Get multiple users
 getMultiple :: Server GetMultiple
 getMultiple fields query sort start limit =
-  return $ addHeader "pagination links" (addHeader "10" [u1, u2])
+  return $ addHeader "pagination links" (addHeader "10" [u4, u4])
 
 -- |
 -- Get a single user by id
@@ -56,42 +56,42 @@ deleteSingle uid = return NoContent
 
 -- |
 -- Create a single user
-createSingle :: User -> Handler (Headers '[Header "Location" String] User)
+createSingle :: Record -> Handler (Headers '[Header "Location" String] Record)
 createSingle input =
-  return $ addHeader "/users/123" (input {_userId = Just "123"})
+  return $ addHeader "/users/123" input
 
 -- |
 -- Create multiple users
-createMultiple :: [User]
-               -> Handler (Headers '[Header "Link" String] [ModelOrError User])
+createMultiple :: [Record]
+               -> Handler (Headers '[Header "Link" String] [ModelOrError Record])
 createMultiple users = return $ addHeader "user links" (mkResult <$> users)
-  where mkResult user = Succ (user {_userId = Just "123"})
+  where mkResult user = Succ user
 
 -- |
 -- Replace a single user
-replaceSingle :: Text -> User -> Handler User
+replaceSingle :: Text -> Record -> Handler Record
 replaceSingle uid user =
   if uid == "123"
-    then return $ u1 {_userEmail = _userEmail user}
+    then return $ u4
     else throwError $ err404 {errBody = "A user matching the input id was not found"}
 
 -- |
 -- Update (replace) multiple users
-replaceMultiple :: [User] -> Handler [ModelOrError User]
+replaceMultiple :: [Record] -> Handler [ModelOrError Record]
 replaceMultiple users = return (mkResult <$> users)
-  where mkResult user = Succ (user {_userId = Just "123"})
+  where mkResult user = Succ user
 
 -- |
 -- Update (modify) a single user
-modifySingle :: Text -> User -> Handler User
+modifySingle :: Text -> Record -> Handler Record
 modifySingle uid user =
   if uid == "123"
-    then return $ u1 {_userEmail = _userEmail user}
+    then return $ u4
     else throwError $ err404 {errBody = "A user matching the input id was not found"}
 
 -- |
 -- Update (modify) multiple users
-modifyMultiple :: [User] -> Handler [ModelOrError User]
+modifyMultiple :: [Record] -> Handler [ModelOrError Record]
 modifyMultiple = undefined
 
 -- |
