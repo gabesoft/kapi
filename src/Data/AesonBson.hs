@@ -4,7 +4,7 @@
 -- AesonBson
 -- original location https://github.com/nh2/aesonbson/blob/master/Data/AesonBson.hs
 --
--- | Convert JSON to BSON and the other way around.
+-- Convert JSON to BSON and the other way around.
 --
 -- Note that BSON has more data types than JSON,
 -- so some BSON to JSON conversions are not bijective and somewhat arbitrary.
@@ -31,7 +31,8 @@ import Data.Scientific
 import Data.Text.Encoding
 import qualified Data.Vector as Vector (fromList, toList)
 
--- | Converts a JSON value to BSON.
+-- |
+-- Converts a JSON value to BSON.
 bsonifyValue :: AESON.Value -> BSON.Value
 bsonifyValue (Object obj) = Doc $ bsonify obj
 bsonifyValue (AESON.Array array) =
@@ -43,7 +44,8 @@ bsonifyValue (Number n)
 bsonifyValue (AESON.Bool b) = BSON.Bool b
 bsonifyValue AESON.Null = BSON.Null
 
--- | Converts a BSON value to JSON.
+-- |
+-- Converts a BSON value to JSON.
 aesonifyValue :: BSON.Value -> AESON.Value
 aesonifyValue (Float f) = toJSON f
 aesonifyValue (BSON.String s) = toJSON s
@@ -73,10 +75,12 @@ aesonifyValue (MinMax mm) =
     MinKey -> toJSON (-1 :: Int)
     MaxKey -> toJSON (1 :: Int)
 
--- | Converts an AESON object to a BSON document.
+-- |
+-- Converts an AESON object to a BSON document.
 bsonify :: AESON.Object -> BSON.Document
 bsonify = map (\(t, v) -> t := bsonifyValue v) . HashMap.toList
 
--- | Converts a BSON document to an AESON object.
+-- |
+-- Converts a BSON document to an AESON object.
 aesonify :: BSON.Document -> AESON.Object
 aesonify = HashMap.fromList . map (\(l := v) -> (l, aesonifyValue v))

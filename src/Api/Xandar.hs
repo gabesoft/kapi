@@ -10,6 +10,7 @@
 module Api.Xandar (XandarApi, GetMultiple)where
 
 import Data.Text (Text)
+import Persistence.Users.Xandar
 import Servant.API
 import Types.Xandar
 
@@ -30,7 +31,7 @@ type OptionsNoContent = Verb OPTIONS 204
 type UserApi =
   -- get
        GetMultiple
-  :<|> Capture "id" UserId :> Get '[JSON] User
+  :<|> Capture "id" UserId :> Get '[JSON] Record
   -- delete
   :<|> Capture "id" UserId :> DeleteNoContent '[JSON] NoContent
   -- create

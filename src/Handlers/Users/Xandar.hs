@@ -8,6 +8,7 @@ module Handlers.Users.Xandar where
 import Api.Xandar
 import Data.Text (Text)
 import GHC.TypeLits
+import Persistence.Users.Xandar
 import Servant
 import Servant.API
 import Types.Xandar
@@ -41,10 +42,10 @@ getMultiple fields query sort start limit =
 
 -- |
 -- Get a single user by id
-getSingle :: Text -> Handler User
+getSingle :: Text -> Handler Record
 getSingle uid =
   if uid == "123"
-    then return u1
+    then return u4
     else throwError $
          err404 {errBody = "A user matching the input id was not found"}
 

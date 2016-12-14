@@ -9,7 +9,8 @@ module Doc.Xandar
 
 import Api.Xandar
 import Data.Proxy
-import Data.Text (Text)
+import Data.Text (Text, pack)
+import Persistence.Users.Xandar
 import Servant.API
 import Servant.Docs
 import Types.Xandar
@@ -17,8 +18,8 @@ import Types.Xandar
 instance ToSample User where
   toSamples _ = singleSample u1
 
-instance ToSample Error where
-  toSamples _ = singleSample (Error "something bad happened")
+instance ToSample ApiError where
+  toSamples _ = singleSample (ApiError "something bad happened")
 
 instance ToSample (ModelOrError User) where
   toSamples _ = singleSample (Succ u1)
@@ -66,6 +67,9 @@ instance ToSample Char where
 
 instance ToSample Int where
   toSamples _ = singleSample 0
+
+instance ToSample Record where
+  toSamples _ = singleSample (Record [])
 
 markdownDoc :: String
 markdownDoc = markdown $ docs (Proxy :: Proxy XandarApi)
