@@ -5,6 +5,7 @@
 -- | Handlers for Xandar endpoints
 module Handlers.Users.Xandar where
 
+import Data.Function ((&))
 import Api.Xandar
 import Data.Text (Text)
 import GHC.TypeLits
@@ -39,14 +40,14 @@ app = serve (Proxy :: Proxy XandarApi) server
 -- Get multiple users
 getMultiple :: Server GetMultiple
 getMultiple fields query sort start limit =
-  return $ addHeader "pagination links" (addHeader "10" [u4, u4])
+  return $ addHeader "pagination links" (addHeader "10" [u1, u2])
 
 -- |
 -- Get a single user by id
 getSingle :: Text -> Handler Record
 getSingle uid =
   if uid == "123"
-    then return u4
+    then return u1
     else throwError $
          err404 {errBody = "A user matching the input id was not found"}
 
@@ -73,7 +74,7 @@ createMultiple users = return $ addHeader "user links" (mkResult <$> users)
 replaceSingle :: Text -> Record -> Handler Record
 replaceSingle uid user =
   if uid == "123"
-    then return u4
+    then return (user & "_id" .=~ ("584e58195984185eb8000005" :: Text))
     else throwError $ err404 {errBody = "A user matching the input id was not found"}
 
 -- |
@@ -87,7 +88,7 @@ replaceMultiple users = return (mkResult <$> users)
 modifySingle :: Text -> Record -> Handler Record
 modifySingle uid user =
   if uid == "123"
-    then return u4
+    then return u1
     else throwError $ err404 {errBody = "A user matching the input id was not found"}
 
 -- |

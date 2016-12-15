@@ -3,6 +3,7 @@
 -- | Persistence layer for users
 module Persistence.Users.Xandar where
 
+import Data.Function ((&))
 import Control.Applicative ((<|>))
 import Control.Lens ((^.))
 import Control.Monad (fail)
@@ -10,7 +11,7 @@ import Data.Aeson
 import Data.AesonBson
 import Data.Bson
 import qualified Data.Map.Strict as Map
-import Data.Text (Text)
+import Data.Text (Text, unpack)
 import Data.Time
 import Database.MongoDB
 import Types.Common
@@ -58,6 +59,9 @@ userDefinition =
     , mkDefinitionText "githubUrl" False Nothing
     , mkDefinitionText "githubLogin" False Nothing
     ]
+
+-- TODO: create typed lenses
+_id f v = f ("_id" :: Text) (read (unpack v) :: ObjectId)
 
 instance ToJSON RecordDefinition where
   toJSON (RecordDefinition record) = object (toField <$> Map.elems record)

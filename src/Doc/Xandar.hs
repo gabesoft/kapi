@@ -16,14 +16,11 @@ import Servant.Docs
 import Types.Common
 import Types.Xandar
 
-instance ToSample User where
-  toSamples _ = singleSample u1
-
 instance ToSample ApiError where
   toSamples _ = singleSample (ApiError "something bad happened")
 
 instance ToSample (ApiItem Record) where
-  toSamples _ = singleSample (Succ u4)
+  toSamples _ = singleSample (Succ u1)
 
 instance ToCapture (Capture "id" Text) where
   toCapture _ = DocCapture "id" "user identifier"

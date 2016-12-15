@@ -42,11 +42,13 @@ recLens l f r =
 -- |
 -- Get the value of a field in a record
 -- For non-existent fields a value of @Null@ will be returned
+(^=.) :: Record -> Label -> BSON.Value
 (^=.) r l = value $ view (recLens l) r
 
 -- |
 -- Set the value of a field in a record
 -- Existing fields are overwritten and non-existent ones are added
+(.=~) :: Val v => Label -> v -> Record -> Record
 (.=~) l v = over (recLens l) (const (l =: v))
 
 -- |
@@ -69,13 +71,20 @@ getField :: Record -> Label -> Maybe Field
 getField (Record xs) l = find ((== l) . label) xs
 
 -- |
--- Sample record. TO BE REMOVED
+-- Sample records. TO BE REMOVED.
 -- "_id" =: (read "584e58195984185eb8000005" :: ObjectId)
-u4 =
+u1 =
   Record
     [ "_id" =: ("584e58195984185eb8000005" :: String)
     , "email" =: ("blue@leaf.com" :: String)
-    , "githubUrl" =: ("https://github.com/api/users/mrleaf" :: String)
+    , "githubUrl" =: ("https://github.com/api/users/mrblue" :: String)
+    ]
+
+u2 =
+  Record
+    [ "_id" =: ("584e58195984185eb8000006" :: String)
+    , "email" =: ("green@leaf.com" :: String)
+    , "githubUrl" =: ("https://github.com/api/users/mrgreen" :: String)
     ]
 
 -- |

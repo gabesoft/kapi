@@ -26,30 +26,6 @@ data User = User
   , _githubLogin :: Maybe Text
   } deriving (Eq, Show, Generic)
 
-u1 =
-  User
-    (Just "123")
-    "milky@way.com"
-    (Just True)
-    Nothing
-    Nothing
-    Nothing
-    Nothing
-    Nothing
-    Nothing
-
-u2 =
-  User
-    (Just "998")
-    "super@nova.com"
-    (Just False)
-    Nothing
-    Nothing
-    Nothing
-    Nothing
-    Nothing
-    Nothing
-
 data Feed = Feed
   { _feedAuthor :: Maybe Text
   , _feedDescription :: Maybe Text
