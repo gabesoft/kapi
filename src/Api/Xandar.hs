@@ -35,13 +35,13 @@ type UserApi =
   :<|> Capture "id" Text :> DeleteNoContent '[JSON] NoContent
   -- create
   :<|> ReqBody '[JSON] Record :> PostCreated '[JSON] (Headers '[Header "Location" String] Record)
-  :<|> ReqBody '[JSON] [Record] :> Post '[JSON] (Headers '[Header "Link" String] [ModelOrError Record])
+  :<|> ReqBody '[JSON] [Record] :> Post '[JSON] (Headers '[Header "Link" String] [ApiItem Record])
   -- update (replace)
   :<|> Capture "id" Text :> ReqBody '[JSON] Record :> Put '[JSON] Record
-  :<|> ReqBody '[JSON] [Record] :> Put '[JSON] [ModelOrError Record]
+  :<|> ReqBody '[JSON] [Record] :> Put '[JSON] [ApiItem Record]
   -- update (modify)
   :<|> Capture "id" Text :> ReqBody '[JSON] Record :> Patch '[JSON] Record
-  :<|> ReqBody '[JSON] [Record] :> Patch '[JSON] [ModelOrError Record]
+  :<|> ReqBody '[JSON] [Record] :> Patch '[JSON] [ApiItem Record]
   -- head
   :<|> Capture "id" Text :>  HeadNoContent '[JSON] (Headers '[Header "ETag" String, Header "Last-Modified" String] NoContent)
   :<|> HeadNoContent '[JSON] (Headers '[Header "ETag" String] NoContent)

@@ -22,7 +22,7 @@ instance ToSample User where
 instance ToSample ApiError where
   toSamples _ = singleSample (ApiError "something bad happened")
 
-instance ToSample (ModelOrError Record) where
+instance ToSample (ApiItem Record) where
   toSamples _ = singleSample (Succ u4)
 
 instance ToCapture (Capture "id" Text) where

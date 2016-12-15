@@ -9,7 +9,6 @@ import Control.Monad (fail)
 import Data.Aeson
 import Data.AesonBson
 import Data.Bson
-import Data.Bson.Lens
 import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import Data.Time
@@ -86,13 +85,6 @@ u3 =
     [ ("_id", FieldValueId (read "584e58195984185eb8000005"))
     , ("email", FieldValueText "blue@swan.com")
     , ("githubUrl", FieldValueText "/api/users/blue")
-    ]
-
-u4 =
-  Record
-    [ "_id" =: (read "584e58195984185eb8000005" :: ObjectId)
-    , "email" =: ("blue@leaf.com" :: String)
-    , "githubUrl" =: ("https://github.com/api/users/mrleaf" :: String)
     ]
 
 setValue values (label, FieldDefinitionId def) =

@@ -26,7 +26,6 @@ library
                      , aeson >= 1.0.2
                      , attoparsec >= 0.13
                      , bson
-                     , bson-lens
                      , containers >= 0.5
                      , lens >= 4.15
                      , mongoDB >= 2.1

@@ -64,7 +64,7 @@ createSingle input =
 -- |
 -- Create multiple users
 createMultiple :: [Record]
-               -> Handler (Headers '[Header "Link" String] [ModelOrError Record])
+               -> Handler (Headers '[Header "Link" String] [ApiItem Record])
 createMultiple users = return $ addHeader "user links" (mkResult <$> users)
   where mkResult = Succ
 
@@ -78,7 +78,7 @@ replaceSingle uid user =
 
 -- |
 -- Update (replace) multiple users
-replaceMultiple :: [Record] -> Handler [ModelOrError Record]
+replaceMultiple :: [Record] -> Handler [ApiItem Record]
 replaceMultiple users = return (mkResult <$> users)
   where mkResult = Succ
 
@@ -92,7 +92,7 @@ modifySingle uid user =
 
 -- |
 -- Update (modify) multiple users
-modifyMultiple :: [Record] -> Handler [ModelOrError Record]
+modifyMultiple :: [Record] -> Handler [ApiItem Record]
 modifyMultiple = undefined
 
 -- |
