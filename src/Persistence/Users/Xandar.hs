@@ -5,6 +5,7 @@ module Persistence.Users.Xandar where
 
 import Control.Applicative ((<|>))
 import Control.Lens ((^.))
+import Control.Monad (fail)
 import Data.Aeson
 import Data.AesonBson
 import Data.Bson
@@ -13,6 +14,7 @@ import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import Data.Time
 import Database.MongoDB
+import Types.Common
 import Types.Xandar
 
 data FieldDefinition a = FieldDefinition
@@ -39,16 +41,6 @@ data FieldDefinitionSum
 
 data RecordDefinition =
   RecordDefinition (Map.Map Label FieldDefinitionSum)
-
-data Record =
-  Record [Field]
-
-instance ToJSON Record where
-  toJSON (Record r) = Object (aesonify r)
-
-instance FromJSON Record where
-  parseJSON (Object obj) = return $ Record (bsonify obj)
-  -- parseJSON _ = empty
 
 indices :: [Index]
 indices = []

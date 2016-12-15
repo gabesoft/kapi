@@ -11,6 +11,7 @@ import GHC.TypeLits
 import Persistence.Users.Xandar
 import Servant
 import Servant.API
+import Types.Common
 import Types.Xandar
 
 -- |
@@ -65,28 +66,28 @@ createSingle input =
 createMultiple :: [Record]
                -> Handler (Headers '[Header "Link" String] [ModelOrError Record])
 createMultiple users = return $ addHeader "user links" (mkResult <$> users)
-  where mkResult user = Succ user
+  where mkResult = Succ
 
 -- |
 -- Replace a single user
 replaceSingle :: Text -> Record -> Handler Record
 replaceSingle uid user =
   if uid == "123"
-    then return $ u4
+    then return u4
     else throwError $ err404 {errBody = "A user matching the input id was not found"}
 
 -- |
 -- Update (replace) multiple users
 replaceMultiple :: [Record] -> Handler [ModelOrError Record]
 replaceMultiple users = return (mkResult <$> users)
-  where mkResult user = Succ user
+  where mkResult = Succ
 
 -- |
 -- Update (modify) a single user
 modifySingle :: Text -> Record -> Handler Record
 modifySingle uid user =
   if uid == "123"
-    then return $ u4
+    then return u4
     else throwError $ err404 {errBody = "A user matching the input id was not found"}
 
 -- |

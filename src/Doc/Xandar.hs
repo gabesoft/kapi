@@ -13,6 +13,7 @@ import Data.Text (Text, pack)
 import Persistence.Users.Xandar
 import Servant.API
 import Servant.Docs
+import Types.Common
 import Types.Xandar
 
 instance ToSample User where

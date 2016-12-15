@@ -14,13 +14,14 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     Types.Xandar
-                     , Api.Xandar
+  exposed-modules:     Api.Xandar
+                     , Data.AesonBson
+                     , Data.AesonBson.Instances
                      , Doc.Xandar
                      , Handlers.Users.Xandar
                      , Persistence.Users.Xandar
-                     , Data.AesonBson
-                     , Data.AesonBson.Instances
+                     , Types.Common
+                     , Types.Xandar
   build-depends:       base >= 4.7 && < 5
                      , aeson >= 1.0.2
                      , attoparsec >= 0.13

@@ -14,12 +14,6 @@ import GHC.Generics
 
 type UserId = Text
 
-data ApiError = ApiError
-  { _message :: String
-  } deriving (Eq, Show, Generic)
-
-instance ToJSON ApiError
-
 data User = User
   { _userId :: Maybe UserId
   , _userEmail :: Text
@@ -70,12 +64,3 @@ deriveJSON
   defaultOptions
   {fieldLabelModifier = map toLower . drop 5, omitNothingFields = True}
   ''User
-
-data ModelOrError a
-  = Fail ApiError
-  | Succ a
-
-instance (ToJSON a) =>
-         ToJSON (ModelOrError a) where
-  toJSON (Fail e) = toJSON e
-  toJSON (Succ a) = toJSON a
