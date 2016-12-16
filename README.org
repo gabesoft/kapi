@@ -14,7 +14,7 @@
 **** _links : an array of relationship URLs
      - each link is an object containing =rel= and =href= fields
      #+BEGIN_SRC json
-       { "rel": "user", "href": "http://apiserver/users/12"  }
+       { "rel": "user", "href": "http://example.com/api/users/a123" }
      #+END_SRC
 *** Supported content types
     - Content-Type: application/json; charset=utf-8

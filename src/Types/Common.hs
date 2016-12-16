@@ -1,3 +1,4 @@
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -9,7 +10,7 @@ import Data.Aeson as AESON
 import Data.AesonBson (aesonify, bsonify)
 import Data.Bson as BSON
 import Data.List (find)
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, maybeToList)
 import Data.Text (Text)
 import GHC.Generics
 
@@ -32,7 +33,8 @@ instance FromJSON Record where
 
 -- |
 -- Lens for record objects
--- This must be used with existing fields for view
+-- Non-existent fields will yield @Null@ on @view@ and will
+-- cause a field to be added on @over@
 recLens
   :: Functor f
   => Label -> (Field -> f Field) -> Record -> f Record
@@ -40,30 +42,52 @@ recLens l f r =
   (\nf -> setField r <$> nf) (f $ fromMaybe (l =: BSON.Null) (getField r l))
 
 -- |
+-- Lens used for deleting fields from a record
+delLens
+  :: Functor f
+  => Label -> (Field -> f Field) -> Record -> f Record
+delLens l f r = (\nf -> const (delField r l) <$> nf) (f (l =: BSON.Null))
+
+-- |
 -- Get the value of a field in a record
 -- For non-existent fields a value of @Null@ will be returned
-(^=.) :: Record -> Label -> BSON.Value
-(^=.) r l = value $ view (recLens l) r
+(^=.)
+  :: Val a
+  => Record -> Label -> Maybe a
+(^=.) r l = BSON.cast (value $ view (recLens l) r)
 
 -- |
 -- Set the value of a field in a record
 -- Existing fields are overwritten and non-existent ones are added
-(.=~) :: Val v => Label -> v -> Record -> Record
+(.=~)
+  :: Val v
+  => Label -> v -> Record -> Record
 (.=~) l v = over (recLens l) (const (l =: v))
 
 -- |
 -- Delete the value of a field in a record
-(./~) r l = undefined
+(./~) :: Record -> Label -> Record
+(./~) r l = over (delLens l) (const (l =: BSON.Null)) r
 
 -- |
 -- Set a record field
 setField :: Record -> Field -> Record
-setField (Record xs) x = Record (set xs)
+setField r x = modField (label x) r (const $ Just x) (Just x)
+
+-- |
+-- Delete a record field
+delField :: Record -> Label -> Record
+delField r l = modField l r (const Nothing) Nothing
+
+-- |
+-- Modify a record field
+modField :: Label -> Record -> (Field -> Maybe Field) -> Maybe Field -> Record
+modField l (Record xs) f empty = Record (mod xs)
   where
-    set [] = [x]
-    set (a:as)
-      | label a == label x = x : as
-      | otherwise = a : set as
+    mod [] = maybeToList empty
+    mod (a:as)
+      | label a == l = maybeToList (f a) ++ as
+      | otherwise = a : mod as
 
 -- |
 -- Get a record field
