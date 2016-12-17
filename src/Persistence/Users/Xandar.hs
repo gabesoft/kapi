@@ -17,7 +17,6 @@ import Database.MongoDB (Index, Select, Collection, select)
 import Types.Common
 import Types.Xandar
 
-
 userIndices :: [Index]
 userIndices = []
 

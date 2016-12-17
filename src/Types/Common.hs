@@ -6,15 +6,16 @@
 -- | Common types
 module Types.Common where
 
-import Data.Function ((&))
-import qualified Data.Map.Strict as Map
 import Control.Lens (view, over)
 import Data.Aeson as AESON
 import Data.AesonBson (aesonify, bsonify)
 import Data.Bson as BSON
+import Data.Function ((&))
 import Data.List (find)
+import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.Text (Text)
+import Data.Time (getCurrentTime, UTCTime(..))
 import GHC.Generics
 
 -- |
@@ -187,3 +188,19 @@ setValue
   :: Val a
   => Text -> Record -> a -> Record
 setValue name r v = r & name .=~ v
+
+-- |
+-- Set the value of the updatedAt field
+setUpdatedAt :: Record -> IO Record
+setUpdatedAt r = do
+  time <- getCurrentTime
+  return (setValue "updatedAt" r time)
+
+-- |
+-- Set the value of the createdAt field
+setCreatedAt :: Record -> IO Record
+setCreatedAt r@(Record doc) = do
+  currentTime <- getCurrentTime
+  let oid = doc !? "_id" :: Maybe ObjectId
+  let time = maybe currentTime timestamp oid
+  return (setValue "createdAt" r time)

@@ -54,6 +54,7 @@ test-suite kapi-test
   hs-source-dirs:      test
   main-is:             Spec.hs
   build-depends:       base
+                     , hspec
                      , kapi
                      , QuickCheck >= 2.8
                      , quickcheck-text
