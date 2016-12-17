@@ -4,5 +4,9 @@ import qualified Handlers.Users.Xandar as XU
 import Network.Wai
 import Network.Wai.Handler.Warp
 
+port = 8001
+
 main :: IO ()
-main = run 8001 XU.app
+main = do
+  putStrLn $ "Server started on port " ++ show port
+  run port XU.app

@@ -3,53 +3,34 @@
 -- | Persistence layer for users
 module Persistence.Users.Xandar where
 
-import Data.Function ((&))
 import Control.Applicative ((<|>))
 import Control.Lens ((^.))
 import Control.Monad (fail)
 import Data.Aeson
 import Data.AesonBson
-import Data.Bson
+import Data.Bson as BSON
+import Data.Function ((&))
 import qualified Data.Map.Strict as Map
 import Data.Text (Text, unpack)
 import Data.Time
-import Database.MongoDB
+import Database.MongoDB (Index, Select, Collection, select)
 import Types.Common
 import Types.Xandar
 
-data FieldDefinition a = FieldDefinition
-  { _fieldToField :: a -> Field
-  , _fieldLabel :: Label
-  , _fieldRequired :: Bool
-  , _fieldDefault :: Maybe a
-  , _fieldValue :: Maybe a
-  }
 
-data FieldValue
-  = FieldValueId ObjectId
-  | FieldValueBool Bool
-  | FieldValueInt Int
-  | FieldValueText Text
-  | FieldValueTime UTCTime
+userIndices :: [Index]
+userIndices = []
 
-data FieldDefinitionSum
-  = FieldDefinitionId (FieldDefinition ObjectId)
-  | FieldDefinitionBool (FieldDefinition Bool)
-  | FieldDefinitionInt (FieldDefinition Int)
-  | FieldDefinitionText (FieldDefinition Text)
-  | FieldDefinitionTime (FieldDefinition UTCTime)
-
-data RecordDefinition =
-  RecordDefinition (Map.Map Label FieldDefinitionSum)
-
-indices :: [Index]
-indices = []
-
-getValue :: Val a => Text -> Record -> Maybe a
-getValue name r = r ^=. name
-
-setValue :: Val a => Text -> Record -> a -> Record
-setValue name r v = r & name .=~ v
+userDefinition :: RecordDefinition
+userDefinition =
+  Map.fromList
+    [ mkReqDef "email"
+    , mkDef "admin" False (Just False)
+    , mkDef "disabled" True (Just False)
+    , mkOptDef "githubAvatar"
+    , mkOptDef "githubUrl"
+    , mkOptDef "githubLogin"
+    ]
 
 getId :: Record -> Maybe Text
 getId = getValue "_id"
@@ -79,17 +60,29 @@ getUsers = undefined
 
 deleteUser = undefined
 
-data ValidationResult
-  = RecordValid
-  | ValidationErrors [String]
-
 -- |
 -- Validate a user
-validate :: User -> ValidationResult
-validate = undefined
-
+-- validate :: User -> ValidationResult
+-- validate = undefined
 -- TODO ensure `read oid` will not fail
 selectById
   :: Select a
   => Collection -> String -> a
 selectById coll oid = select ["_id" =: ObjId (read oid)] coll
+
+-- |
+-- Sample records. TO BE REMOVED.
+-- "_id" =: (read "584e58195984185eb8000005" :: ObjectId)
+u1 =
+  Record
+    [ "_id" =: ("584e58195984185eb8000005" :: String)
+    , "email" =: ("blue@leaf.com" :: String)
+    , "githubUrl" =: ("https://github.com/api/users/mrblue" :: String)
+    ]
+
+u2 =
+  Record
+    [ "_id" =: ("584e58195984185eb8000006" :: String)
+    , "email" =: ("green@leaf.com" :: String)
+    , "githubUrl" =: ("https://github.com/api/users/mrgreen" :: String)
+    ]
