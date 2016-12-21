@@ -52,6 +52,8 @@ data RecordData a =
   Record [a]
   deriving (Eq, Show)
 
+type RecordId = Text
+
 type Record = RecordData Field
 
 instance ToJSON (RecordData Field) where
@@ -63,6 +65,11 @@ instance FromJSON (RecordData Field) where
 
 instance Functor RecordData where
   fmap f (Record xs) = Record (f <$> xs)
+
+-- |
+-- Extract the record data contents
+recFields :: RecordData a -> [a]
+recFields (Record xs) = xs
 
 -- |
 -- Representation for an API error
@@ -204,3 +211,13 @@ setCreatedAt r@(Record doc) = do
   let oid = doc !? "_id" :: Maybe ObjectId
   let time = maybe currentTime timestamp oid
   return (setValue "createdAt" r time)
+
+-- |
+-- Modify the value of a field or remove it
+mapField
+  :: (Val a, Val b)
+  => Label -> (Maybe a -> Maybe b) -> Record -> Record
+mapField l f r =
+  case f (getValue l r) of
+    Nothing -> delField r l
+    Just v -> setValue l r v

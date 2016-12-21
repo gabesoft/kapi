@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 -- | Models for xandar
+-- TODO: remove
 module Types.Xandar where
 
 import Data.Aeson

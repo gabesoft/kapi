@@ -9,12 +9,11 @@ module Doc.Xandar
 
 import Api.Xandar
 import Data.Proxy
-import Data.Text (Text, pack)
+import Data.Text (Text)
 import Persistence.Users.Xandar
 import Servant.API
 import Servant.Docs
 import Types.Common
-import Types.Xandar
 
 instance ToSample ApiError where
   toSamples _ = singleSample (ApiError "something bad happened")

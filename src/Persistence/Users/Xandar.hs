@@ -3,22 +3,41 @@
 -- | Persistence layer for users
 module Persistence.Users.Xandar where
 
-import Control.Applicative ((<|>))
-import Control.Lens ((^.))
-import Control.Monad (fail)
-import Data.Aeson
-import Data.AesonBson
-import Data.Bson as BSON
-import Data.Function ((&))
+import Data.Text (Text)
+import Control.Monad.IO.Class
+import Data.Bson
 import qualified Data.Map.Strict as Map
-import Data.Text (Text, unpack)
-import Data.Time
-import Database.MongoDB (Index, Select, Collection, select)
+import Database.MongoDB
+import Persistence.MongoDB
 import Types.Common
-import Types.Xandar
+
+dbName :: Database
+dbName = "kapi-xandar"
+
+insertUser
+  :: MonadIO m
+  => Record -> Pipe -> m RecordId
+insertUser = dbInsert dbName userColl
+
+getUserById
+  :: MonadIO m
+  => Text -> Pipe -> m (Maybe Record)
+getUserById = dbGetById dbName userColl
+
+userColl :: Collection
+userColl = "users"
 
 userIndices :: [Index]
-userIndices = []
+userIndices =
+  [ Index
+    { iColl = userColl
+    , iKey = ["email" =: (1 :: Int)]
+    , iName = "email_unique"
+    , iUnique = True
+    , iDropDups = True
+    , iExpireAfterSeconds = Nothing
+    }
+  ]
 
 userDefinition :: RecordDefinition
 userDefinition =
@@ -31,10 +50,10 @@ userDefinition =
     , mkOptDef "githubLogin"
     ]
 
-getId :: Record -> Maybe Text
+getId :: Record -> Maybe RecordId
 getId = getValue "_id"
 
-setId :: Record -> Text -> Record
+setId :: Record -> RecordId -> Record
 setId = setValue "_id"
 
 delId :: Record -> Record
@@ -49,29 +68,10 @@ setEmail = setValue "email"
 delEmail :: Record -> Record
 delEmail r = delField r "email"
 
-createUser = undefined
-
-updateUser = undefined
-
-getUser = undefined
-
-getUsers = undefined
-
-deleteUser = undefined
-
--- |
--- Validate a user
--- validate :: User -> ValidationResult
--- validate = undefined
--- TODO ensure `read oid` will not fail
-selectById
-  :: Select a
-  => Collection -> String -> a
-selectById coll oid = select ["_id" =: ObjId (read oid)] coll
-
 -- |
 -- Sample records. TO BE REMOVED.
 -- "_id" =: (read "584e58195984185eb8000005" :: ObjectId)
+u1 :: Record
 u1 =
   Record
     [ "_id" =: ("584e58195984185eb8000005" :: String)
@@ -79,6 +79,7 @@ u1 =
     , "githubUrl" =: ("https://github.com/api/users/mrblue" :: String)
     ]
 
+u2 :: Record
 u2 =
   Record
     [ "_id" =: ("584e58195984185eb8000006" :: String)

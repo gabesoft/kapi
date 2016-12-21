@@ -8,12 +8,9 @@ module Handlers.Users.Xandar where
 import Data.Function ((&))
 import Api.Xandar
 import Data.Text (Text)
-import GHC.TypeLits
 import Persistence.Users.Xandar
 import Servant
-import Servant.API
 import Types.Common
-import Types.Xandar
 
 -- |
 -- Server definition for the Xandar api
