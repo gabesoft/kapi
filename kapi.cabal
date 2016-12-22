@@ -27,9 +27,11 @@ library
                      , aeson >= 1.0.2
                      , attoparsec >= 0.13
                      , bson
+                     , bytestring >= 0.10
                      , containers >= 0.5
                      , lens >= 4.15
                      , mongoDB >= 2.1
+                     , mtl >= 2.2
                      , network >= 2.6
                      , scientific >= 0.3
                      , servant >= 0.9

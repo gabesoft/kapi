@@ -26,7 +26,6 @@ import Data.Aeson.Types as AESON
 import Data.Bson as BSON
 import qualified Data.HashMap.Strict as HashMap (fromList, toList)
 import Data.Maybe (fromMaybe)
-import Data.Monoid
 import Data.Scientific
 import Data.Text.Encoding
 import qualified Data.Vector as Vector (fromList, toList)

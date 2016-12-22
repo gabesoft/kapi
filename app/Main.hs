@@ -8,8 +8,6 @@ import Network.Wai
 import Network.Wai.Handler.Warp
 import Types.Common
 
-port = 8001
-
 conf =
   ApiConfig
   { apiPort = 8001
@@ -20,5 +18,6 @@ conf =
 
 main :: IO ()
 main = do
+  let port = apiPort conf
   putStrLn $ "Server started on port " ++ show port
-  run port XU.app
+  run (fromIntegral port) (XU.app conf)

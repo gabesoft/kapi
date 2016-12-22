@@ -22,8 +22,8 @@ type GetMultiple = QueryParams "include" String
                 :> QueryParam "limit" Int
                 :> Get '[JSON] (Headers '[Header "Link" String, Header "X-Total-Count" String] [Record])
 
-type HeadNoContent = Verb HEAD 204
-type OptionsNoContent = Verb OPTIONS 204
+type HeadNoContent = Verb 'HEAD 204
+type OptionsNoContent = Verb 'OPTIONS 204
 
 -- |
 -- User api description
