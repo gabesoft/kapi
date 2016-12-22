@@ -42,6 +42,8 @@ dbInsert dbName collName doc =
   fmap (fromJust . objIdToRecId) <$>
   dbAccess dbName (insert collName $ recFields (mapIdToObjId doc))
 
+-- |
+-- Save an existing record or insert a new record into the db
 dbUpdate
   :: MonadIO m
   => Database -> Collection -> Record -> Pipe -> m ()

@@ -15,8 +15,10 @@ import Data.List (find)
 import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.Text (Text)
-import Data.Time (getCurrentTime, UTCTime(..))
+import Data.Time (getCurrentTime)
+import Database.MongoDB (Database)
 import GHC.Generics
+import Network.Socket (HostName, PortNumber)
 
 -- |
 -- Representation of a record schema
@@ -98,19 +100,31 @@ instance (ToJSON a) =>
   toJSON (Fail e) = object ["error" .= toJSON e]
   toJSON (Succ a) = toJSON a
 
+type AppName = Text
+
+-- |
+-- Api configuration data
+data ApiConfig = ApiConfig
+  { apiPort :: PortNumber
+  , mongoHost :: HostName
+  , mongoPort :: PortNumber
+  , mongoDbs :: Map.Map AppName Database
+  } deriving (Eq, Show)
+
 -- |
 -- Validate a data item against it's definition
 validate :: RecordDefinition -> Record -> ValidationResult
-validate def r = toResult (validateField def r <$> names)
+validate def r = toResult $ catMaybes (validateField def r <$> names)
   where
     names = Map.keys def ++ recordLabels r
     toResult [] = RecordValid
     toResult xs = ValidationErrors xs
 
-validateField :: RecordDefinition -> Record -> Label -> (Text, Text)
+validateField :: RecordDefinition -> Record -> Label -> Maybe (Text, Text)
 validateField def r name
-  | not (Map.member name def) = (name, "Field is not allowed")
-  | isRequired && not exists = (name, "Field is required")
+  | not (Map.member name def) = Just (name, "Field is not allowed")
+  | isRequired && not exists = Just (name, "Field is required")
+  | otherwise = Nothing
   where
     maybeField = getField r name
     isRequired = fieldRequired $ fromJust (Map.lookup name def)
@@ -170,12 +184,12 @@ delField r l = modField l r (const Nothing) Nothing
 -- |
 -- Modify a record field
 modField :: Label -> Record -> (Field -> Maybe Field) -> Maybe Field -> Record
-modField l (Record xs) f empty = Record (mod xs)
+modField l (Record xs) f empty = Record (modify xs)
   where
-    mod [] = maybeToList empty
-    mod (a:as)
+    modify [] = maybeToList empty
+    modify (a:as)
       | label a == l = maybeToList (f a) ++ as
-      | otherwise = a : mod as
+      | otherwise = a : modify as
 
 -- |
 -- Get a record field
