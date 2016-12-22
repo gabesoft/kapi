@@ -112,6 +112,12 @@ data ApiConfig = ApiConfig
   } deriving (Eq, Show)
 
 -- |
+-- Get the MongoDB database name for an app name
+-- from a configuration object
+confGetDb :: AppName -> ApiConfig -> Database
+confGetDb name = fromJust . Map.lookup name . mongoDbs
+
+-- |
 -- Validate a data item against it's definition
 validate :: RecordDefinition -> Record -> ValidationResult
 validate def r = toResult $ catMaybes (validateField def r <$> names)
