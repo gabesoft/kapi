@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 -- | Documentation generation for Xandar endpoints
+-- | TODO enable when the api is stable
 module Doc.Xandar
   ( markdownDoc
   ) where

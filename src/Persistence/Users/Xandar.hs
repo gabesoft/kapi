@@ -14,16 +14,6 @@ import Types.Common
 dbName :: Database
 dbName = "kapi-xandar"
 
-insertUser
-  :: MonadIO m
-  => Record -> Pipe -> m RecordId
-insertUser = dbInsert dbName userColl
-
-getUserById
-  :: MonadIO m
-  => Text -> Pipe -> m (Maybe Record)
-getUserById = dbGetById dbName userColl
-
 userColl :: Collection
 userColl = "users"
 

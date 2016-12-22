@@ -3,9 +3,12 @@
 module Main where
 
 import qualified Data.Map.Strict as Map
+import Data.Maybe
 import qualified Handlers.Users.Xandar as XU
 import Network.Wai
 import Network.Wai.Handler.Warp
+import Network.Wai.Middleware.RequestLogger
+import System.Environment
 import Types.Common
 
 conf =
@@ -18,6 +21,13 @@ conf =
 
 main :: IO ()
 main = do
+  env <- lookupEnv "KAPI_ENV"
   let port = apiPort conf
-  putStrLn $ "Server started on port " ++ show port
-  run (fromIntegral port) (XU.app conf)
+  let dev = fromMaybe False $ (== "development") <$> env
+  let env = if dev
+       then "development mode"
+       else "production mode"
+  putStrLn ("Server started on port " ++ show port ++ " in " ++ env)
+  if dev
+    then run (fromIntegral port) $ logStdoutDev (XU.app conf)
+    else run (fromIntegral port) (XU.app conf)

@@ -17,6 +17,7 @@ install: clean
 serve: build
 	stack exec kapi-exe
 
+serve-watch: export KAPI_ENV=development
 serve-watch:
 	find $(CURDIR)/src $(CURDIR)/app -name "*.hs" | entr -d -r sh -c 'make serve'
 

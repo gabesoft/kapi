@@ -7,13 +7,27 @@
 
 -- |
 -- Declaration for all endpoints used by the Xandar app
-module Api.Xandar (XandarApi, GetMultiple)where
+module Api.Xandar
+  ( XandarApi
+  , XandarApiPre
+  , UserApiPre
+  , GetMultiple
+  , GetSingle
+  , apiProxy
+  , mkGetSingleLink
+  ) where
 
 import Data.Text (Text)
+import Servant
 import Servant.API
+import Servant.Utils.Links
 import Types.Common
 
-type XandarApi = "xandar" :> "users" :> UserApi
+type UserApiPre = "users"
+
+type XandarApiPre = "xandar"
+
+type XandarApi = XandarApiPre :> UserApiPre :> UserApi
 
 type GetMultiple = QueryParams "include" String
                 :> QueryParam "where" String
@@ -21,6 +35,8 @@ type GetMultiple = QueryParams "include" String
                 :> QueryParam "start" Int
                 :> QueryParam "limit" Int
                 :> Get '[JSON] (Headers '[Header "Link" String, Header "X-Total-Count" String] [Record])
+
+type GetSingle = Capture "id" Text :> Get '[JSON] Record
 
 type HeadNoContent = Verb 'HEAD 204
 type OptionsNoContent = Verb 'OPTIONS 204
@@ -30,7 +46,7 @@ type OptionsNoContent = Verb 'OPTIONS 204
 type UserApi =
   -- get
        GetMultiple
-  :<|> Capture "id" Text :> Get '[JSON] Record
+  :<|> GetSingle
   -- delete
   :<|> Capture "id" Text :> DeleteNoContent '[JSON] NoContent
   -- create
@@ -48,3 +64,9 @@ type UserApi =
   -- options
   :<|> Capture "id" Text :> OptionsNoContent '[JSON] (Headers '[Header "Allow" String] NoContent)
   :<|> OptionsNoContent '[JSON] (Headers '[Header "Allow" String] NoContent)
+
+apiProxy = Proxy :: Proxy XandarApi
+
+apiProxyGetSingle = Proxy :: Proxy (XandarApiPre :> UserApiPre :> GetSingle)
+
+mkGetSingleLink = show . safeLink apiProxy apiProxyGetSingle

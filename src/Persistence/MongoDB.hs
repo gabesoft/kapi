@@ -1,8 +1,11 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 -- | Functionality for interacting with MongoDB
 module Persistence.MongoDB where
 
+import Control.Monad.Trans.Control
+import Control.Exception.Lifted (handleJust)
 import Control.Monad.IO.Class
 import Data.Maybe
 import Data.Text (unpack, pack)
@@ -37,10 +40,21 @@ dbAddIndex dbName idx = dbAccess dbName (createIndex idx)
 -- Insert a record into a database collection and return the _id value
 dbInsert
   :: MonadIO m
-  => Database -> Collection -> Record -> Pipe -> m RecordId
+  => Database -> Collection -> Record -> Pipe -> m (Maybe RecordId)
 dbInsert dbName collName doc =
-  fmap (fromJust . objIdToRecId) <$>
+  fmap objIdToRecId <$>
   dbAccess dbName (insert collName $ recFields (mapIdToObjId doc))
+
+dbInsertOrError
+  :: (MonadIO m, MonadBaseControl IO m)
+  => Database -> Collection -> Record -> Pipe -> m (Either Failure RecordId)
+dbInsertOrError dbName collName doc pipe =
+  handleJust handler (return . Left) $ do
+    maybeId <- dbInsert dbName collName doc pipe
+    maybe (error "Missing document") (return . Right) maybeId
+  where handler :: Failure -> Maybe Failure
+        handler err@WriteFailure{} = Just err
+        handler _ = Nothing
 
 -- |
 -- Save an existing record or insert a new record into the db
