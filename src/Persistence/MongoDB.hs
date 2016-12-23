@@ -49,12 +49,13 @@ dbInsertOrError
   :: (MonadIO m, MonadBaseControl IO m)
   => Database -> Collection -> Record -> Pipe -> m (Either Failure RecordId)
 dbInsertOrError dbName collName doc pipe =
-  handleJust handler (return . Left) $ do
-    maybeId <- dbInsert dbName collName doc pipe
-    maybe (error "Missing document") (return . Right) maybeId
-  where handler :: Failure -> Maybe Failure
-        handler err@WriteFailure{} = Just err
-        handler _ = Nothing
+  handleJust handler (return . Left) $
+  do maybeId <- dbInsert dbName collName doc pipe
+     maybe (error "Unexpected missing document") (return . Right) maybeId
+  where
+    handler :: Failure -> Maybe Failure
+    handler err@WriteFailure {} = Just err
+    handler _ = Nothing
 
 -- |
 -- Save an existing record or insert a new record into the db

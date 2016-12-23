@@ -15,6 +15,7 @@ import Data.List (find)
 import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.Text (Text)
+import qualified Data.Text as T
 import Data.Time (getCurrentTime)
 import Database.MongoDB (Database)
 import GHC.Generics
@@ -87,6 +88,12 @@ data ValidationResult
   = RecordValid
   | ValidationErrors [(Text, Text)]
 
+instance Show ValidationResult where
+  show RecordValid = mempty
+  show (ValidationErrors xs) = unlines $ showErr <$> xs
+    where
+      showErr (name, err) = show $ T.concat [name, ": ", err]
+
 -- |
 -- Representation for an API item result
 -- An item result could be an error or a record
@@ -129,13 +136,28 @@ validate def r = toResult $ catMaybes (validateField def r <$> names)
 validateField :: RecordDefinition -> Record -> Label -> Maybe (Text, Text)
 validateField def r name
   | not (Map.member name def) = Just (name, "Field is not allowed")
-  | isRequired && not exists = Just (name, "Field is required")
+  | isRequired && notFound && noDefault = Just (name, "Field is required")
   | otherwise = Nothing
   where
+    fieldDef = fromJust $ Map.lookup name def
     maybeField = getField r name
-    isRequired = fieldRequired $ fromJust (Map.lookup name def)
-    exists = isJust maybeField
+    isRequired = fieldRequired fieldDef
+    notFound = isNothing maybeField
+    noDefault = isNothing (fieldDefault fieldDef)
 
+-- |
+-- Populate defaults for all missing fields that have a default value
+populateDefaults :: RecordDefinition -> Record -> Record
+populateDefaults def r = Map.foldl populateDef r defaults
+  where
+    defaults = Map.filter (isJust . fieldDefault) def
+    populateDef acc field =
+      case getField acc (fieldLabel field) of
+        Nothing -> setField acc (fromJust $ fieldDefault field)
+        _ -> acc
+
+-- |
+-- Get the names of all fields in a record
 recordLabels :: Record -> [Label]
 recordLabels (Record xs) = label <$> xs
 

@@ -18,7 +18,7 @@ import Data.Text.Encoding
 import Database.MongoDB (Pipe)
 import Database.MongoDB.Query (Failure(..))
 import Persistence.MongoDB
-import Persistence.Users.Xandar (u1, u2)
+import Persistence.Users.Xandar (userDefinition, u1, u2)
 import Servant
 import Servant.Utils.Links
 import Types.Common
@@ -51,6 +51,10 @@ dbName = confGetDb appName
 
 dbPipe :: ApiConfig -> Api Pipe
 dbPipe cfg = liftIO $ mkPipe (mongoHost cfg) (mongoPort cfg)
+
+validateUser = validate userDefinition
+
+populateUserDefaults = populateDefaults userDefinition
 
 app :: ApiConfig -> Application
 app config = serve apiProxy (server config)
@@ -89,13 +93,21 @@ createSingle :: Record -> Api (Headers '[Header "Location" String] Record)
 createSingle input = do
   cfg <- ask
   pipe <- dbPipe cfg
-  -- TODO add validation
-  result <- dbInsertOrError (dbName cfg) userColl input pipe
-  case result of
-    Left err -> throwError (failureToServantErr err)
-    Right uid -> do
-      user <- dbGetById (dbName cfg) userColl uid pipe
-      return $ addHeader (mkGetSingleLink uid) (fromJust user)
+  let valResult = validateUser input
+  case validateUser input of
+    err@(ValidationErrors xs) ->
+      throwError
+        err400
+        { errBody = B.pack $ show err
+        }
+    _ -> do
+      insResult <-
+        dbInsertOrError (dbName cfg) userColl (populateUserDefaults input) pipe
+      case insResult of
+        Left err -> throwError (failureToServantErr err)
+        Right uid -> do
+          user <- dbGetById (dbName cfg) userColl uid pipe
+          return $ addHeader (mkGetSingleLink uid) (fromJust user)
 
 -- |
 -- Convert a MongoDB @Failure@ into a @ServantErr@
