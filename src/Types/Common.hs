@@ -77,19 +77,20 @@ recFields (Record xs) = xs
 -- |
 -- Representation for an API error
 data ApiError = ApiError
-  { _message :: String
+  { message :: String
   } deriving (Eq, Show, Generic)
 
-instance ToJSON ApiError
+instance ToJSON ApiError where
+  toJSON err = object ["message" .= message err, "error" .= toJSON True]
 
 -- |
 -- The result of a record validation
 data ValidationResult
-  = RecordValid
+  = RecordValid Record
   | ValidationErrors [(Text, Text)]
 
 instance Show ValidationResult where
-  show RecordValid = mempty
+  show (RecordValid r) = mempty
   show (ValidationErrors xs) = unlines $ showErr <$> xs
     where
       showErr (name, err) = show $ T.concat [name, ": ", err]
@@ -130,7 +131,7 @@ validate :: RecordDefinition -> Record -> ValidationResult
 validate def r = toResult $ catMaybes (validateField def r <$> names)
   where
     names = Map.keys def ++ recordLabels r
-    toResult [] = RecordValid
+    toResult [] = RecordValid r
     toResult xs = ValidationErrors xs
 
 validateField :: RecordDefinition -> Record -> Label -> Maybe (Text, Text)

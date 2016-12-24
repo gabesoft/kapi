@@ -7,9 +7,11 @@
 -- | Handlers for Xandar endpoints
 module Handlers.Users.Xandar where
 
+import Data.List (intercalate)
 import Api.Xandar
 import Control.Monad.Except
 import Control.Monad.Reader
+import Data.Aeson (encode)
 import Data.Bifunctor
 import qualified Data.ByteString.Lazy.Char8 as B
 import Data.Function ((&))
@@ -92,17 +94,21 @@ deleteSingle uid = do
 -- |
 -- Create a single user
 createSingle :: Record -> Api (Headers '[Header "Location" String] Record)
-createSingle input =
-  validateAndRun input ((uncurry addHeader <$>) . insertSingle)
+createSingle input = validateAndRun input (insertSingle >=> toResult)
+  where
+    toResult (link, Right r) = return $ addHeader link r
+    toResult (_, Left err) = throwFailed err
 
 -- |
 -- Insert a single valid user
-insertSingle :: Record -> Api (String, Record)
+insertSingle :: Record -> Api (String, Either Failure Record)
 insertSingle input = do
   cfg <- ask
   pipe <- dbPipe cfg
   result <- dbInsert (dbName cfg) userColl (populateUserDefaults input) pipe
-  either throwFailed ((second fromJust <$>) . getRecordAndLink) result
+  case result of
+    Left err -> return (mempty, Left err)
+    Right uid -> second (Right . fromJust) <$> getRecordAndLink uid
 
 -- |
 -- Get the record with @uid@ and its resource link
@@ -119,16 +125,30 @@ getRecordAndLink uid = do
 validateAndRun :: MonadError ServantErr m => Record -> (Record -> m a) -> m a
 validateAndRun record f = withValidation (f record) (validateUser record)
   where
-    withValidation _ err@(ValidationErrors _) = throw400 (B.pack $ show err)
+    withValidation _ err@(ValidationErrors _) = throw400 (show err)
     withValidation r _ = r
 
 -- |
 -- Create multiple users
 createMultiple :: [Record]
                -> Api (Headers '[Header "Link" String] [ApiItem Record])
-createMultiple inputs = return $ addHeader "user links" (mkResult <$> inputs)
+createMultiple inputs = do
+  results <- mapM insert (validate <$> inputs)
+  let links = fst <$> results
+  let users = snd <$> results
+  return $ addHeader (intercalate ";" links) (toApiItem <$> users)
   where
-    mkResult = Succ
+    validate = toEither . validateUser
+    toEither (RecordValid r) = Right r
+    toEither err@(ValidationErrors xs) = Left (toApiError err)
+    insert :: Either ApiError Record -> Api (String, Either ApiError Record)
+    insert = either (return . toTuple) (fmap convert . insertSingle)
+    toTuple err = (mempty, Left err)
+    convert (s, Left err) = (s, Left $ toApiError err)
+    convert (s, Right r) = (s, Right r)
+    toApiError err = ApiError (show err)
+    toApiItem (Left err) = Fail err
+    toApiItem (Right r) = Succ r
 
 -- |
 -- Replace a single user
@@ -191,21 +211,21 @@ optionsMultiple = undefined
 -- TODO parse the MongoDB error object
 -- https://docs.mongodb.com/manual/reference/command/getLastError/
 throwFailed :: MonadError ServantErr m => Failure -> m a
-throwFailed (WriteFailure _ msg) = throw400 (B.pack msg)
-throwFailed err = throw500 (B.pack $ show err)
+throwFailed (WriteFailure _ msg) = throw400 msg
+throwFailed err = throw500 (show err)
 
-throw400 :: MonadError ServantErr m => B.ByteString -> m a
+throw400 :: MonadError ServantErr m => String -> m a
 throw400 = throwErr err400
 
-throw404 :: MonadError ServantErr m => B.ByteString -> m a
+throw404 :: MonadError ServantErr m => String -> m a
 throw404 = throwErr err404
 
-throw500 :: MonadError ServantErr m => B.ByteString -> m a
+throw500 :: MonadError ServantErr m => String -> m a
 throw500 = throwErr err500
 
-throwErr :: MonadError ServantErr m => ServantErr -> B.ByteString -> m a
+throwErr :: MonadError ServantErr m => ServantErr -> String -> m a
 throwErr err msg =
   throwError
     err
-    { errBody = msg
+    { errBody = encode (ApiError msg)
     }
