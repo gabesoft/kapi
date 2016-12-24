@@ -7,7 +7,6 @@ module Persistence.MongoDB where
 import Control.Monad.Trans.Control
 import Control.Exception.Lifted (handleJust)
 import Control.Monad.IO.Class
-import Data.Maybe
 import Data.Text (unpack, pack)
 import Database.MongoDB
 import Network.Socket (HostName, PortNumber)
@@ -38,19 +37,19 @@ dbAddIndex dbName idx = dbAccess dbName (createIndex idx)
 
 -- |
 -- Insert a record into a database collection and return the _id value
-dbInsert
+dbInsert'
   :: MonadIO m
   => Database -> Collection -> Record -> Pipe -> m (Maybe RecordId)
-dbInsert dbName collName doc =
+dbInsert' dbName collName doc =
   fmap objIdToRecId <$>
   dbAccess dbName (insert collName $ recFields (mapIdToObjId doc))
 
-dbInsertOrError
+dbInsert
   :: (MonadIO m, MonadBaseControl IO m)
   => Database -> Collection -> Record -> Pipe -> m (Either Failure RecordId)
-dbInsertOrError dbName collName doc pipe =
+dbInsert dbName collName doc pipe =
   handleJust handler (return . Left) $
-  do maybeId <- dbInsert dbName collName doc pipe
+  do maybeId <- dbInsert' dbName collName doc pipe
      maybe (error "Unexpected missing document") (return . Right) maybeId
   where
     handler :: Failure -> Maybe Failure

@@ -4,11 +4,9 @@
 module Persistence.Users.Xandar where
 
 import Data.Text (Text)
-import Control.Monad.IO.Class
 import Data.Bson
 import qualified Data.Map.Strict as Map
 import Database.MongoDB
-import Persistence.MongoDB
 import Types.Common
 
 dbName :: Database
