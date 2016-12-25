@@ -50,8 +50,7 @@ type UserApi =
   -- delete
   :<|> Capture "id" Text :> DeleteNoContent '[JSON] NoContent
   -- create
-  :<|> ReqBody '[JSON] Record :> PostCreated '[JSON] (Headers '[Header "Location" String] Record)
-  :<|> ReqBody '[JSON] [Record] :> Post '[JSON] (Headers '[Header "Link" String] [ApiItem Record])
+  :<|> ReqBody '[JSON] (ApiData Record) :> PostCreated '[JSON] (Headers '[Header "Location" String, Header "Link" String] (ApiData (ApiItem Record)))
   -- update (replace)
   :<|> Capture "id" Text :> ReqBody '[JSON] Record :> Put '[JSON] Record
   :<|> ReqBody '[JSON] [Record] :> Put '[JSON] [ApiItem Record]
@@ -69,4 +68,4 @@ apiProxy = Proxy :: Proxy XandarApi
 
 apiProxyGetSingle = Proxy :: Proxy (XandarApiPre :> UserApiPre :> GetSingle)
 
-mkGetSingleLink = show . safeLink apiProxy apiProxyGetSingle
+mkGetSingleLink = ("/" ++) . show . safeLink apiProxy apiProxyGetSingle

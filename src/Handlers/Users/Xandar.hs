@@ -1,8 +1,8 @@
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TypeOperators #-}
 
 -- | Handlers for Xandar endpoints
 module Handlers.Users.Xandar where
@@ -32,8 +32,7 @@ handlers
   getMultiple :<|>
   getSingle :<|>
   deleteSingle :<|>
-  createSingle :<|>
-  createMultiple :<|>
+  createSingleOrMultiple :<|>
   replaceSingle :<|>
   replaceMultiple :<|>
   modifySingle :<|>
@@ -91,12 +90,21 @@ deleteSingle uid = do
   dbPipe cfg >>= dbDeleteById (dbName cfg) userColl uid
   return NoContent
 
+createSingleOrMultiple
+  :: ApiData Record
+  -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData (ApiItem Record)))
+createSingleOrMultiple (Single r) = createSingle r
+createSingleOrMultiple (Multiple rs) = createMultiple rs
+
 -- |
 -- Create a single user
-createSingle :: Record -> Api (Headers '[Header "Location" String] Record)
+createSingle
+  :: Record
+  -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData (ApiItem Record)))
 createSingle input = validateAndRun input (insertSingle >=> toResult)
   where
-    toResult (link, Right r) = return $ addHeader link r
+    toResult (link, Right r) =
+      return $ addHeader link $ addHeader mempty (Single (Succ r))
     toResult (_, Left err) = throwFailed err
 
 -- |
@@ -131,22 +139,24 @@ validateAndRun record f = withValidation (f record) (validateUser record)
 -- |
 -- Create multiple users
 createMultiple :: [Record]
-               -> Api (Headers '[Header "Link" String] [ApiItem Record])
+               -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData (ApiItem Record)))
 createMultiple inputs = do
   results <- mapM insert (validate <$> inputs)
-  let links = fst <$> results
+  let links = mkLink . fst <$> results
   let users = snd <$> results
-  return $ addHeader (intercalate ";" links) (toApiItem <$> users)
+  return $
+    addHeader mempty $
+    addHeader (intercalate ", " links) (Multiple $ toApiItem <$> users)
   where
+    mkLink path = "<" ++ path ++ ">"
     validate = toEither . validateUser
     toEither (RecordValid r) = Right r
-    toEither err@(ValidationErrors xs) = Left (toApiError err)
+    toEither err@(ValidationErrors xs) = Left (apiErrorWrap err)
     insert :: Either ApiError Record -> Api (String, Either ApiError Record)
-    insert = either (return . toTuple) (fmap convert . insertSingle)
-    toTuple err = (mempty, Left err)
-    convert (s, Left err) = (s, Left $ toApiError err)
-    convert (s, Right r) = (s, Right r)
-    toApiError err = ApiError (show err)
+    insert = either (return . (,) mempty . Left) (fmap convert . insertSingle)
+    convert :: (String, Either Failure Record)
+            -> (String, Either ApiError Record)
+    convert = second $ first apiErrorWrap
     toApiItem (Left err) = Fail err
     toApiItem (Right r) = Succ r
 
@@ -208,7 +218,7 @@ optionsMultiple = undefined
 
 -- |
 -- Convert a MongoDB @Failure@ into a @ServantErr@
--- TODO parse the MongoDB error object
+-- TODO parse the MongoDB error object (the error is in BSON format)
 -- https://docs.mongodb.com/manual/reference/command/getLastError/
 throwFailed :: MonadError ServantErr m => Failure -> m a
 throwFailed (WriteFailure _ msg) = throw400 msg
@@ -227,5 +237,5 @@ throwErr :: MonadError ServantErr m => ServantErr -> String -> m a
 throwErr err msg =
   throwError
     err
-    { errBody = encode (ApiError msg)
+    { errBody = encode (Fail $ ApiError msg :: ApiItem ())
     }

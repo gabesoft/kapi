@@ -49,6 +49,20 @@ mkReqDef name = mkDef name True (Nothing :: Maybe String)
 mkOptDef :: Label -> (Label, FieldDefinition)
 mkOptDef name = mkDef name False (Nothing :: Maybe String)
 
+data ApiData a
+  = Single a
+  | Multiple [a]
+  deriving (Eq, Show)
+
+instance ToJSON a => ToJSON (ApiData a) where
+  toJSON (Single x) = toJSON x
+  toJSON (Multiple xs) = toJSON xs
+
+instance FromJSON a => FromJSON (ApiData a) where
+  parseJSON o@(AESON.Object obj) = Single <$> parseJSON o
+  parseJSON a@(AESON.Array _) = Multiple <$> parseJSON a
+  parseJSON _ = fail "Could not parse ApiData"
+
 -- |
 -- Representation for a data item
 data RecordData a =
@@ -64,7 +78,7 @@ instance ToJSON (RecordData Field) where
 
 instance FromJSON (RecordData Field) where
   parseJSON (Object obj) = return $ Record (bsonify obj)
-  parseJSON _ = fail "empty"
+  parseJSON _ = fail "Could not parse Record"
 
 instance Functor RecordData where
   fmap f (Record xs) = Record (f <$> xs)
@@ -80,8 +94,12 @@ data ApiError = ApiError
   { message :: String
   } deriving (Eq, Show, Generic)
 
-instance ToJSON ApiError where
-  toJSON err = object ["message" .= message err, "error" .= toJSON True]
+instance ToJSON ApiError
+
+-- |
+-- Wrap an error into an @ApiError@
+apiErrorWrap :: Show a => a -> ApiError
+apiErrorWrap = ApiError . show
 
 -- |
 -- The result of a record validation

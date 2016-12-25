@@ -73,6 +73,7 @@
              <https://blog.mwaysolutions.com/sample/api/v1/cars?offset=50&limit=3>; rel="last", 
              <https://blog.mwaysolutions.com/sample/api/v1/cars?offset=0&limit=5>; rel="first",
              <https://blog.mwaysolutions.com/sample/api/v1/cars?offset=5&limit=5>; rel="prev"
+     - Link: <http://(...)/elements/generated-id1>, <http://(...)/elements/generated-id2>
 *** Query and filtering
 **** Via query string parameters
      - GET /users?name=joe&createdAt=123
