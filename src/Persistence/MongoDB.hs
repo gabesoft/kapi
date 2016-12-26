@@ -136,8 +136,8 @@ mapIdToObjId = mapField "_id" (>>= recIdToObjId)
 
 -- |
 -- Validate that a record has a valid id field
-validateHasId :: Record -> ValidationResult
-validateHasId r = ValidationErrors $ catMaybes [val]
+validateHasId :: Record -> (Record, ValidationResult)
+validateHasId r = (r, ValidationErrors $ catMaybes [val])
   where
-    val = validateField def (mapIdToObjId r) "_id"
+    val = validateField False def (mapIdToObjId r) "_id"
     def = Map.fromList [mkReqDef "_id"]

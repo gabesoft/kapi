@@ -6,15 +6,16 @@
 -- | Common types
 module Types.Common where
 
-import Data.Monoid
 import Control.Lens (view, over)
 import Data.Aeson as AESON
 import Data.AesonBson (aesonify, bsonify)
+import Data.Bifunctor
 import Data.Bson as BSON
 import Data.Function ((&))
 import Data.List (find)
 import qualified Data.Map.Strict as Map
 import Data.Maybe
+import Data.Monoid
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time (getCurrentTime)
@@ -107,13 +108,19 @@ apiErrorWrap :: Show a => a -> ApiError
 apiErrorWrap = ApiError . show
 
 -- |
+-- Convert an error into an @ApiError@
+apiErrorMap :: (Bifunctor p, Show e) => p e a -> p ApiError a
+apiErrorMap = first apiErrorWrap
+
+-- |
 -- The result of a record validation
 data ValidationResult =
   ValidationErrors [Field]
+  deriving (Eq, Show)
 
-instance Show ValidationResult where
-  show (ValidationErrors []) = mempty
-  show (ValidationErrors xs) = show $ AESON.encode (Record xs)
+-- instance Show ValidationResult where
+--   show (ValidationErrors []) = mempty
+--   show (ValidationErrors xs) = show $ AESON.encode (Record xs)
 
 instance Monoid ValidationResult where
   mempty = ValidationErrors mempty
@@ -121,18 +128,44 @@ instance Monoid ValidationResult where
     ValidationErrors (xs <> ys)
 
 -- |
+-- Convert the result of a validation to an @Either@ value
+vResultToEither :: (a, ValidationResult) -> Either ApiError a
+vResultToEither (a, ValidationErrors []) = Right a
+vResultToEither (_, err) = Left (apiErrorWrap err)
+
+-- |
 -- Representation for an API item result
 -- An item result could be an error or a record
-data ApiItem a
-  = Fail ApiError
+data ApiItem e a
+  = Fail e
   | Succ a
   deriving (Eq, Show)
 
+instance Bifunctor ApiItem where
+  first f (Fail e) = Fail (f e)
+  first _ (Succ a) = Succ a
+  second _ (Fail e) = Fail e
+  second f (Succ a) = Succ (f a)
+
 instance (ToJSON a) =>
-         ToJSON (ApiItem a) where
+         ToJSON (ApiItem ApiError a) where
   toJSON (Fail e) = object ["error" .= toJSON e]
   toJSON (Succ a) = toJSON a
 
+-- |
+-- Convert an @ApiItem@ to an @Either@
+apiItemToEither :: ApiItem e a -> Either e a
+apiItemToEither (Fail e) = Left e
+apiItemToEither (Succ a) = Right a
+
+-- |
+-- Convert an @Either@ to an @ApiItem@
+eitherToApiItem :: Either e a -> ApiItem e a
+eitherToApiItem (Left e) = Fail e
+eitherToApiItem (Right a) = Succ a
+
+-- |
+-- Application name
 type AppName = Text
 
 -- |
@@ -152,20 +185,17 @@ confGetDb name = fromJust . Map.lookup name . mongoDbs
 
 -- |
 -- Validate a data item against it's definition
-validate :: RecordDefinition -> Record -> ValidationResult
-validate def r =
-  ValidationErrors $ catMaybes (validateField def r <$> names)
+validate :: RecordDefinition -> Record -> (Record, ValidationResult)
+validate def r = (r, ValidationErrors $ catMaybes results)
   where
     names = Map.keys def ++ recordLabels r
+    results = validateField True def r <$> names
 
-vfield :: Label -> String -> Field
-vfield name msg = name =: msg
-
-validateField :: RecordDefinition -> Record -> Label -> Maybe Field
-validateField def r name
-  | name == "_id" = Nothing
-  | not (Map.member name def) = Just (vfield name "Field is not allowed")
-  | isRequired && notFound && noDefault = Just (vfield name "Field is required")
+validateField :: Bool -> RecordDefinition -> Record -> Label -> Maybe Field
+validateField ignoreId def r name
+  | ignoreId && name == "_id" = Nothing
+  | not (Map.member name def) = Just (mkField name "Field is not allowed")
+  | isRequired && notFound && noDefault = Just (mkField name "Field is required")
   | otherwise = Nothing
   where
     fieldDef = fromJust $ Map.lookup name def
@@ -173,6 +203,8 @@ validateField def r name
     isRequired = fieldRequired fieldDef
     notFound = isNothing maybeField
     noDefault = isNothing (fieldDefault fieldDef)
+    mkField :: Label -> String -> Field
+    mkField name msg = name =: msg
 
 -- |
 -- Populate defaults for all missing fields that have a default value

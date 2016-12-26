@@ -55,9 +55,18 @@ userColl = "users"
 dbPipe :: ApiConfig -> Api Pipe
 dbPipe cfg = liftIO $ mkPipe (mongoHost cfg) (mongoPort cfg)
 
+-- |
+-- Validate a user record
 validateUser :: Record -> (Record, ValidationResult)
-validateUser r = (r, validate userDefinition r)
+validateUser = validate userDefinition
 
+-- |
+-- Validate a user record and ensure that it contains a valid id
+validateUserWithId :: Record -> (Record, ValidationResult)
+validateUserWithId u = second (mappend . snd $ validateHasId u) (validateUser u)
+
+-- |
+-- Populate all missing fields of a user record with default values
 populateUserDefaults :: Record -> Record
 populateUserDefaults = populateDefaults userDefinition
 
@@ -98,7 +107,7 @@ deleteSingle uid = do
 -- Create one or more users
 createSingleOrMultiple
   :: ApiData Record
-  -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData (ApiItem Record)))
+  -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData (ApiItem ApiError Record)))
 createSingleOrMultiple (Single r) = createSingle r
 createSingleOrMultiple (Multiple rs) = createMultiple rs
 
@@ -106,7 +115,7 @@ createSingleOrMultiple (Multiple rs) = createMultiple rs
 -- Create a single user
 createSingle
   :: Record
-  -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData (ApiItem Record)))
+  -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData (ApiItem ApiError Record)))
 createSingle input = validateAndRun input (insertSingle >=> mkResult)
   where
     mkResult (link, Right r) = return $ addHeader link $ noHeader (mkData r)
@@ -114,44 +123,21 @@ createSingle input = validateAndRun input (insertSingle >=> mkResult)
     mkData = Single . Succ
 
 -- |
--- Get the record with @uid@ and its resource link
-getRecordAndLink :: RecordId -> Api (String, Maybe Record)
-getRecordAndLink uid = do
-  cfg <- ask
-  pipe <- dbPipe cfg
-  user <- dbGetById (dbName cfg) userColl uid pipe
-  return (mkGetSingleLink uid, user)
-
--- |
--- Validate a record and run an action on it if valid.
--- Otherwise, throw an error
-validateAndRun :: MonadError ServantErr m => Record -> (Record -> m a) -> m a
-validateAndRun record f = withValidation (f record) (validateUser record)
-  where
-    withValidation r (_, ValidationErrors []) = r
-    withValidation _ (_, err) = throw400 (show err)
-
--- |
 -- Create multiple users
 createMultiple :: [Record]
-               -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData (ApiItem Record)))
+               -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData (ApiItem ApiError Record)))
 createMultiple inputs = do
-  results <- mapM insert (toEither . validateUser <$> inputs)
+  results <- mapM insert (vResultToEither . validateUser <$> inputs)
   let links = mkLink . fst <$> results
   let users = snd <$> results
   return . noHeader $
-    addHeader (intercalate ", " links) (Multiple $ toApiItem <$> users)
+    addHeader (intercalate ", " links) (Multiple $ eitherToApiItem <$> users)
   where
     mkLink path = "<" ++ path ++ ">"
-    toEither (r, ValidationErrors []) = Right r
-    toEither (_, err) = Left (apiErrorWrap err)
-    insert :: Either ApiError Record -> Api (String, Either ApiError Record)
-    insert = either (return . (,) mempty . Left) (fmap convert . insertSingle)
-    convert :: (String, Either Failure Record)
-            -> (String, Either ApiError Record)
-    convert = second $ first apiErrorWrap
-    toApiItem (Left err) = Fail err
-    toApiItem (Right r) = Succ r
+    insert =
+      either
+        (return . (,) mempty . Left)
+        (fmap (second apiErrorMap) . insertSingle)
 
 -- |
 -- Update (replace) a single user
@@ -165,10 +151,12 @@ replaceSingle uid input =
 
 -- |
 -- Update (replace) multiple users
-replaceMultiple :: [Record] -> Api [ApiItem Record]
-replaceMultiple users = return (mkResult <$> users)
+replaceMultiple :: [Record] -> Api [ApiItem ApiError Record]
+replaceMultiple input = do
+  results <- mapM update (vResultToEither . validateUserWithId <$> input)
+  return $ eitherToApiItem <$> results
   where
-    mkResult = Succ
+    update = either (return . Left) (fmap apiErrorMap . updateSingle)
 
 -- |
 -- Update (modify) a single user
@@ -179,8 +167,16 @@ modifySingle uid user = do
 
 -- |
 -- Update (modify) multiple users
-modifyMultiple :: [Record] -> Api [ApiItem Record]
-modifyMultiple = undefined
+modifyMultiple :: [Record] -> Api [ApiItem ApiError Record]
+modifyMultiple input = do
+  results <- mapM update (vResultToEither . validateHasId <$> input)
+  return $ eitherToApiItem <$> results
+  where
+    update = either (return . Left) modify
+    modify u = do
+      current <- getSingle (fromJust $ getIdValue u)
+      updated <- updateSingle (current <> u)
+      return $ apiErrorMap updated
 
 -- |
 -- Insert a single valid user
@@ -232,6 +228,24 @@ optionsMultiple :: Api (Headers '[Header "Allow" String] NoContent)
 optionsMultiple = undefined
 
 -- |
+-- Get the record with @uid@ and its resource link
+getRecordAndLink :: RecordId -> Api (String, Maybe Record)
+getRecordAndLink uid = do
+  cfg <- ask
+  pipe <- dbPipe cfg
+  user <- dbGetById (dbName cfg) userColl uid pipe
+  return (mkGetSingleLink uid, user)
+
+-- |
+-- Validate a record and run an action on it if valid.
+-- Otherwise, throw an error
+validateAndRun :: MonadError ServantErr m => Record -> (Record -> m a) -> m a
+validateAndRun record f = withValidation (f record) (validateUser record)
+  where
+    withValidation r (_, ValidationErrors []) = r
+    withValidation _ (_, err) = throw400 (show err)
+
+-- |
 -- Convert a MongoDB @Failure@ into a @ServantErr@
 -- TODO parse the MongoDB error object (the error is in BSON format)
 -- https://docs.mongodb.com/manual/reference/command/getLastError/
@@ -254,5 +268,5 @@ throwErr :: MonadError ServantErr m => ServantErr -> String -> m a
 throwErr err msg =
   throwError
     err
-    { errBody = encode (Fail $ ApiError msg :: ApiItem ())
+    { errBody = encode (Fail $ ApiError msg :: ApiItem ApiError ())
     }
