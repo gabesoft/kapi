@@ -4,9 +4,11 @@
 -- | Functionality for interacting with MongoDB
 module Persistence.MongoDB where
 
-import Control.Monad.Trans.Control
 import Control.Exception.Lifted (handleJust)
 import Control.Monad.IO.Class
+import Control.Monad.Trans.Control
+import qualified Data.Map.Strict as Map
+import Data.Maybe
 import Data.Text (unpack, pack)
 import Database.MongoDB
 import Network.Socket (HostName, PortNumber)
@@ -29,14 +31,14 @@ dbAccess
 dbAccess database action pipe = access pipe master database action
 
 -- |
--- Create an index on a database using the supplied pipe
+-- Create an index on the database using the supplied pipe
 dbAddIndex
   :: MonadIO m
   => Database -> Index -> Pipe -> m ()
 dbAddIndex dbName idx = dbAccess dbName (createIndex idx)
 
 -- |
--- Insert a record into a database collection and return the _id value
+-- Insert a record into a collection and return the _id value
 dbInsert'
   :: MonadIO m
   => Database -> Collection -> Record -> Pipe -> m (Maybe RecordId)
@@ -44,25 +46,48 @@ dbInsert' dbName collName doc =
   fmap objIdToRecId <$>
   dbAccess dbName (insert collName $ recFields (mapIdToObjId doc))
 
+-- |
+-- Insert a record into a collection and return the _id value or a @Failure@
 dbInsert
   :: (MonadIO m, MonadBaseControl IO m)
   => Database -> Collection -> Record -> Pipe -> m (Either Failure RecordId)
 dbInsert dbName collName doc pipe =
-  handleJust handler (return . Left) $
+  dbAction $
   do maybeId <- dbInsert' dbName collName doc pipe
      maybe (error "Unexpected missing document") (return . Right) maybeId
-  where
-    handler :: Failure -> Maybe Failure
-    handler err@WriteFailure {} = Just err
-    handler _ = Nothing
 
 -- |
--- Save an existing record or insert a new record into the db
-dbUpdate
+-- Save an existing record or insert a new record into the database
+dbUpdate'
   :: MonadIO m
   => Database -> Collection -> Record -> Pipe -> m ()
-dbUpdate dbName collName doc =
+dbUpdate' dbName collName doc =
   dbAccess dbName $ save collName (recFields $ mapIdToObjId doc)
+
+-- |
+-- Save an existing record or insert a new record into the database
+dbUpdate
+  :: (MonadIO m, MonadBaseControl IO m)
+  => Database -> Collection -> Record -> Pipe -> m (Either Failure ())
+dbUpdate dbName collName doc pipe =
+  dbAction $ Right <$> dbUpdate' dbName collName doc pipe
+
+-- |
+-- Perform a database action that could result in a @Failure@
+dbAction :: (MonadIO m, MonadBaseControl IO m) => m (Either Failure a) -> m (Either Failure a)
+dbAction = handleJust failureHandler (return . Left)
+
+-- |
+-- Handler for MongoDB errors
+failureHandler :: Failure -> Maybe Failure
+failureHandler err@WriteFailure {} = Just err
+failureHandler _ = Nothing
+
+-- |
+-- Select multiple records
+dbFind dbName collName pipe =
+  fmap (mapIdToRecId . Record) <$>
+  dbAccess dbName (find (select [] collName) >>= rest) pipe
 
 -- |
 -- Get a record by id
@@ -108,3 +133,11 @@ mapIdToRecId = mapField "_id" (>>= objIdToRecId)
 -- Convert the id within a record to an @ObjectId@
 mapIdToObjId :: Record -> Record
 mapIdToObjId = mapField "_id" (>>= recIdToObjId)
+
+-- |
+-- Validate that a record has a valid id field
+validateHasId :: Record -> ValidationResult
+validateHasId r = ValidationErrors $ catMaybes [val]
+  where
+    val = validateField def (mapIdToObjId r) "_id"
+    def = Map.fromList [mkReqDef "_id"]

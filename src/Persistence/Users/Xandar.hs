@@ -41,7 +41,7 @@ userDefinition =
 getId :: Record -> Maybe RecordId
 getId = getValue "_id"
 
-setId :: Record -> RecordId -> Record
+setId :: RecordId -> Record -> Record
 setId = setValue "_id"
 
 delId :: Record -> Record
@@ -50,7 +50,7 @@ delId r = delField r "_id"
 getEmail :: Record -> Maybe Text
 getEmail = getValue "email"
 
-setEmail :: Record -> Text -> Record
+setEmail :: Text -> Record -> Record
 setEmail = setValue "email"
 
 delEmail :: Record -> Record

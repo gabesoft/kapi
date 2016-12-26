@@ -6,6 +6,7 @@
 -- | Common types
 module Types.Common where
 
+import Data.Monoid
 import Control.Lens (view, over)
 import Data.Aeson as AESON
 import Data.AesonBson (aesonify, bsonify)
@@ -83,6 +84,10 @@ instance FromJSON (RecordData Field) where
 instance Functor RecordData where
   fmap f (Record xs) = Record (f <$> xs)
 
+instance Monoid (RecordData Field) where
+  mempty = Record mempty
+  mappend (Record xs) (Record ys) = Record (BSON.merge ys xs)
+
 -- |
 -- Extract the record data contents
 recFields :: RecordData a -> [a]
@@ -103,15 +108,19 @@ apiErrorWrap = ApiError . show
 
 -- |
 -- The result of a record validation
-data ValidationResult
-  = RecordValid Record
-  | ValidationErrors [(Text, Text)]
+data ValidationResult =
+  ValidationErrors [(Text, Text)]
 
 instance Show ValidationResult where
-  show (RecordValid r) = mempty
+  show (ValidationErrors []) = mempty
   show (ValidationErrors xs) = unlines $ showErr <$> xs
     where
       showErr (name, err) = show $ T.concat [name, ": ", err]
+
+instance Monoid ValidationResult where
+  mempty = ValidationErrors mempty
+  mappend (ValidationErrors xs) (ValidationErrors ys) =
+    ValidationErrors (xs <> ys)
 
 -- |
 -- Representation for an API item result
@@ -146,14 +155,14 @@ confGetDb name = fromJust . Map.lookup name . mongoDbs
 -- |
 -- Validate a data item against it's definition
 validate :: RecordDefinition -> Record -> ValidationResult
-validate def r = toResult $ catMaybes (validateField def r <$> names)
+validate def r =
+  ValidationErrors $ catMaybes (validateField def r <$> names)
   where
     names = Map.keys def ++ recordLabels r
-    toResult [] = RecordValid r
-    toResult xs = ValidationErrors xs
 
 validateField :: RecordDefinition -> Record -> Label -> Maybe (Text, Text)
 validateField def r name
+  | name == "_id" = Nothing
   | not (Map.member name def) = Just (name, "Field is not allowed")
   | isRequired && notFound && noDefault = Just (name, "Field is required")
   | otherwise = Nothing
@@ -251,18 +260,18 @@ getValue
 getValue name r = r ^=. name
 
 -- |
--- Set the value of a record field
+-- Set the @value@ of the @record@ field with @name@
 setValue
   :: Val a
-  => Text -> Record -> a -> Record
-setValue name r v = r & name .=~ v
+  => Text -> a -> Record -> Record
+setValue name value record = record & name .=~ value
 
 -- |
 -- Set the value of the updatedAt field
 setUpdatedAt :: Record -> IO Record
 setUpdatedAt r = do
   time <- getCurrentTime
-  return (setValue "updatedAt" r time)
+  return (setValue "updatedAt" time r)
 
 -- |
 -- Set the value of the createdAt field
@@ -271,7 +280,7 @@ setCreatedAt r@(Record doc) = do
   currentTime <- getCurrentTime
   let oid = doc !? "_id" :: Maybe ObjectId
   let time = maybe currentTime timestamp oid
-  return (setValue "createdAt" r time)
+  return (setValue "createdAt" time r)
 
 -- |
 -- Modify the value of a field or remove it
@@ -281,4 +290,4 @@ mapField
 mapField l f r =
   case f (getValue l r) of
     Nothing -> delField r l
-    Just v -> setValue l r v
+    Just v -> setValue l v r

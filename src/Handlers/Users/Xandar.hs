@@ -54,8 +54,8 @@ userColl = "users"
 dbPipe :: ApiConfig -> Api Pipe
 dbPipe cfg = liftIO $ mkPipe (mongoHost cfg) (mongoPort cfg)
 
-validateUser :: Record -> ValidationResult
-validateUser = validate userDefinition
+validateUser :: Record -> (Record, ValidationResult)
+validateUser r = (r, validate userDefinition r)
 
 populateUserDefaults :: Record -> Record
 populateUserDefaults = populateDefaults userDefinition
@@ -73,8 +73,11 @@ app config = serve apiProxy (server config)
 -- |
 -- Get multiple users
 getMultiple :: ServerT GetMultiple Api
-getMultiple fields query sort start limit =
-  return $ addHeader "pagination links" (addHeader "10" [u1, u2])
+getMultiple fields query sort start limit = do
+  -- TODO add sorting, pagination, etc
+  cfg <- ask
+  users <- dbPipe cfg >>= dbFind (dbName cfg) userColl
+  return $ addHeader "pagination links" (addHeader (show $ length users) users)
 
 -- |
 -- Get a single user by id
@@ -85,11 +88,13 @@ getSingle uid = snd <$> getRecordAndLink uid >>= maybe (throw404 mempty) return
 -- Delete a single user
 deleteSingle :: Text -> Api NoContent
 deleteSingle uid = do
-  cfg <- ask
   _ <- getSingle uid
+  cfg <- ask
   dbPipe cfg >>= dbDeleteById (dbName cfg) userColl uid
   return NoContent
 
+-- |
+-- Create one or more users
 createSingleOrMultiple
   :: ApiData Record
   -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData (ApiItem Record)))
@@ -101,11 +106,11 @@ createSingleOrMultiple (Multiple rs) = createMultiple rs
 createSingle
   :: Record
   -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData (ApiItem Record)))
-createSingle input = validateAndRun input (insertSingle >=> toResult)
+createSingle input = validateAndRun input (insertSingle >=> mkResult)
   where
-    toResult (link, Right r) =
-      return $ addHeader link $ addHeader mempty (Single (Succ r))
-    toResult (_, Left err) = throwFailed err
+    mkResult (link, Right r) = return $ addHeader link $ noHeader (mkData r)
+    mkResult (_, Left err) = throwFailed err
+    mkData = Single . Succ
 
 -- |
 -- Insert a single valid user
@@ -133,25 +138,24 @@ getRecordAndLink uid = do
 validateAndRun :: MonadError ServantErr m => Record -> (Record -> m a) -> m a
 validateAndRun record f = withValidation (f record) (validateUser record)
   where
-    withValidation _ err@(ValidationErrors _) = throw400 (show err)
-    withValidation r _ = r
+    withValidation r (_, ValidationErrors []) = r
+    withValidation _ (_, err) = throw400 (show err)
 
 -- |
 -- Create multiple users
 createMultiple :: [Record]
                -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData (ApiItem Record)))
 createMultiple inputs = do
-  results <- mapM insert (validate <$> inputs)
+  results <- mapM insert (toEither . validateUser <$> inputs)
   let links = mkLink . fst <$> results
   let users = snd <$> results
   return $
-    addHeader mempty $
+    noHeader $
     addHeader (intercalate ", " links) (Multiple $ toApiItem <$> users)
   where
     mkLink path = "<" ++ path ++ ">"
-    validate = toEither . validateUser
-    toEither (RecordValid r) = Right r
-    toEither err@(ValidationErrors xs) = Left (apiErrorWrap err)
+    toEither (r, ValidationErrors []) = Right r
+    toEither (_, err) = Left (apiErrorWrap err)
     insert :: Either ApiError Record -> Api (String, Either ApiError Record)
     insert = either (return . (,) mempty . Left) (fmap convert . insertSingle)
     convert :: (String, Either Failure Record)
@@ -161,15 +165,27 @@ createMultiple inputs = do
     toApiItem (Right r) = Succ r
 
 -- |
--- Replace a single user
+-- Update (replace) a single user
 replaceSingle :: Text -> Record -> Api Record
-replaceSingle uid user =
-  if uid == "123"
-    then return (user & "_id" .=~ ("584e58195984185eb8000005" :: Text))
-    else throwError $
-         err404
-         { errBody = "A user matching the input id was not found"
-         }
+replaceSingle uid input =
+  getSingle uid >> validateAndRun user (updateSingle >=> mkResult)
+  where
+    user = setValue "_id" uid input
+    mkResult (Left err) = throwFailed err
+    mkResult (Right r) = return r
+
+-- |
+-- Update an existing valid user
+updateSingle :: Record -> Api (Either Failure Record)
+updateSingle input = do
+  cfg <- ask
+  pipe <- dbPipe cfg
+  let uid = fromJust (getValue "_id" input)
+  let db = dbName cfg
+  result <- dbUpdate db userColl (populateUserDefaults input) pipe
+  case result of
+    Left err -> return (Left err)
+    Right _ -> Right . fromJust <$> dbGetById db userColl uid pipe
 
 -- |
 -- Update (replace) multiple users
