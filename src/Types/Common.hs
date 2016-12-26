@@ -109,13 +109,11 @@ apiErrorWrap = ApiError . show
 -- |
 -- The result of a record validation
 data ValidationResult =
-  ValidationErrors [(Text, Text)]
+  ValidationErrors [Field]
 
 instance Show ValidationResult where
   show (ValidationErrors []) = mempty
-  show (ValidationErrors xs) = unlines $ showErr <$> xs
-    where
-      showErr (name, err) = show $ T.concat [name, ": ", err]
+  show (ValidationErrors xs) = show $ AESON.encode (Record xs)
 
 instance Monoid ValidationResult where
   mempty = ValidationErrors mempty
@@ -160,11 +158,14 @@ validate def r =
   where
     names = Map.keys def ++ recordLabels r
 
-validateField :: RecordDefinition -> Record -> Label -> Maybe (Text, Text)
+vfield :: Label -> String -> Field
+vfield name msg = name =: msg
+
+validateField :: RecordDefinition -> Record -> Label -> Maybe Field
 validateField def r name
   | name == "_id" = Nothing
-  | not (Map.member name def) = Just (name, "Field is not allowed")
-  | isRequired && notFound && noDefault = Just (name, "Field is required")
+  | not (Map.member name def) = Just (vfield name "Field is not allowed")
+  | isRequired && notFound && noDefault = Just (vfield name "Field is required")
   | otherwise = Nothing
   where
     fieldDef = fromJust $ Map.lookup name def
@@ -265,6 +266,16 @@ setValue
   :: Val a
   => Text -> a -> Record -> Record
 setValue name value record = record & name .=~ value
+
+ -- |
+ -- Set the value of the id field
+setIdValue :: Val a => a -> Record -> Record
+setIdValue = setValue "_id"
+
+ -- |
+ -- Get the value of the id field
+getIdValue :: Val a => Record -> Maybe a
+getIdValue = getValue "_id"
 
 -- |
 -- Set the value of the updatedAt field

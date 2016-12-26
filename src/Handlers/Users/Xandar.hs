@@ -7,7 +7,6 @@
 -- | Handlers for Xandar endpoints
 module Handlers.Users.Xandar where
 
-import Data.List (intercalate)
 import Api.Xandar
 import Control.Monad.Except
 import Control.Monad.Reader
@@ -15,7 +14,9 @@ import Data.Aeson (encode)
 import Data.Bifunctor
 import qualified Data.ByteString.Lazy.Char8 as B
 import Data.Function ((&))
+import Data.List (intercalate)
 import Data.Maybe
+import Data.Monoid
 import Data.Text (Text)
 import Database.MongoDB (Pipe, Collection, Database)
 import Database.MongoDB.Query (Failure(..))
@@ -113,17 +114,6 @@ createSingle input = validateAndRun input (insertSingle >=> mkResult)
     mkData = Single . Succ
 
 -- |
--- Insert a single valid user
-insertSingle :: Record -> Api (String, Either Failure Record)
-insertSingle input = do
-  cfg <- ask
-  pipe <- dbPipe cfg
-  result <- dbInsert (dbName cfg) userColl (populateUserDefaults input) pipe
-  case result of
-    Left err -> return (mempty, Left err)
-    Right uid -> second (Right . fromJust) <$> getRecordAndLink uid
-
--- |
 -- Get the record with @uid@ and its resource link
 getRecordAndLink :: RecordId -> Api (String, Maybe Record)
 getRecordAndLink uid = do
@@ -149,8 +139,7 @@ createMultiple inputs = do
   results <- mapM insert (toEither . validateUser <$> inputs)
   let links = mkLink . fst <$> results
   let users = snd <$> results
-  return $
-    noHeader $
+  return . noHeader $
     addHeader (intercalate ", " links) (Multiple $ toApiItem <$> users)
   where
     mkLink path = "<" ++ path ++ ">"
@@ -170,22 +159,9 @@ replaceSingle :: Text -> Record -> Api Record
 replaceSingle uid input =
   getSingle uid >> validateAndRun user (updateSingle >=> mkResult)
   where
-    user = setValue "_id" uid input
+    user = setIdValue uid input
     mkResult (Left err) = throwFailed err
     mkResult (Right r) = return r
-
--- |
--- Update an existing valid user
-updateSingle :: Record -> Api (Either Failure Record)
-updateSingle input = do
-  cfg <- ask
-  pipe <- dbPipe cfg
-  let uid = fromJust (getValue "_id" input)
-  let db = dbName cfg
-  result <- dbUpdate db userColl (populateUserDefaults input) pipe
-  case result of
-    Left err -> return (Left err)
-    Right _ -> Right . fromJust <$> dbGetById db userColl uid pipe
 
 -- |
 -- Update (replace) multiple users
@@ -197,18 +173,41 @@ replaceMultiple users = return (mkResult <$> users)
 -- |
 -- Update (modify) a single user
 modifySingle :: Text -> Record -> Api Record
-modifySingle uid user =
-  if uid == "123"
-    then return u1
-    else throwError $
-         err404
-         { errBody = "A user matching the input id was not found"
-         }
+modifySingle uid user = do
+  existing <- getSingle uid
+  validateAndRun (existing <> user) (updateSingle >=> either throwFailed return)
 
 -- |
 -- Update (modify) multiple users
 modifyMultiple :: [Record] -> Api [ApiItem Record]
 modifyMultiple = undefined
+
+-- |
+-- Insert a single valid user
+-- populating any missing fields with default values
+insertSingle :: Record -> Api (String, Either Failure Record)
+insertSingle input = do
+  cfg <- ask
+  pipe <- dbPipe cfg
+  result <- dbInsert (dbName cfg) userColl (populateUserDefaults input) pipe
+  case result of
+    Left err -> return (mempty, Left err)
+    Right uid -> second (Right . fromJust) <$> getRecordAndLink uid
+
+-- |
+-- Update an existing valid user
+-- populating any missing fields with default values
+updateSingle :: Record -> Api (Either Failure Record)
+updateSingle input = do
+  cfg <- ask
+  pipe <- dbPipe cfg
+  let uid = fromJust (getIdValue input)
+  let db = dbName cfg
+  result <- dbUpdate db userColl (populateUserDefaults input) pipe
+  case result of
+    Left err -> return (Left err)
+    Right _ -> Right . fromJust <$> dbGetById db userColl uid pipe
+
 
 -- |
 -- Handle a head request for a single user endpoint
@@ -249,6 +248,8 @@ throw404 = throwErr err404
 throw500 :: MonadError ServantErr m => String -> m a
 throw500 = throwErr err500
 
+-- TODO accept ByteString instead of String for msg
+--      change the type of ApiError.msg to ByteString
 throwErr :: MonadError ServantErr m => ServantErr -> String -> m a
 throwErr err msg =
   throwError
