@@ -12,7 +12,7 @@ import Control.Monad.Except
 import Control.Monad.Reader
 import Data.Aeson (encode)
 import Data.Bifunctor
-import qualified Data.ByteString.Lazy.Char8 as B
+import qualified Data.ByteString.Lazy.Char8 as LBS
 import Data.Function ((&))
 import Data.List (intercalate)
 import Data.Maybe
@@ -137,7 +137,7 @@ createMultiple inputs = do
     insert =
       either
         (return . (,) mempty . Left)
-        (fmap (second apiErrorMap) . insertSingle)
+        (fmap (second (first toApiError)) . insertSingle)
 
 -- |
 -- Update (replace) a single user
@@ -156,7 +156,7 @@ replaceMultiple input = do
   results <- mapM update (vResultToEither . validateUserWithId <$> input)
   return $ eitherToApiItem <$> results
   where
-    update = either (return . Left) (fmap apiErrorMap . updateSingle)
+    update = either (return . Left) (fmap (first toApiError) . updateSingle)
 
 -- |
 -- Update (modify) a single user
@@ -176,7 +176,7 @@ modifyMultiple input = do
     modify u = do
       current <- getSingle (fromJust $ getIdValue u)
       updated <- updateSingle (current <> u)
-      return $ apiErrorMap updated
+      return $ (first toApiError) updated
 
 -- |
 -- Insert a single valid user
@@ -243,28 +243,26 @@ validateAndRun :: MonadError ServantErr m => Record -> (Record -> m a) -> m a
 validateAndRun record f = withValidation (f record) (validateUser record)
   where
     withValidation r (_, ValidationErrors []) = r
-    withValidation _ (_, err) = throw400 (show err)
+    withValidation _ (_, err) = throw400 (encode err)
 
 -- |
 -- Convert a MongoDB @Failure@ into a @ServantErr@
 -- TODO parse the MongoDB error object (the error is in BSON format)
 -- https://docs.mongodb.com/manual/reference/command/getLastError/
 throwFailed :: MonadError ServantErr m => Failure -> m a
-throwFailed (WriteFailure _ msg) = throw400 msg
-throwFailed err = throw500 (show err)
+throwFailed (WriteFailure _ msg) = throw400 (LBS.pack msg)
+throwFailed err = throw500 (LBS.pack $ show err)
 
-throw400 :: MonadError ServantErr m => String -> m a
+throw400 :: MonadError ServantErr m => LBS.ByteString -> m a
 throw400 = throwErr err400
 
-throw404 :: MonadError ServantErr m => String -> m a
+throw404 :: MonadError ServantErr m => LBS.ByteString -> m a
 throw404 = throwErr err404
 
-throw500 :: MonadError ServantErr m => String -> m a
+throw500 :: MonadError ServantErr m => LBS.ByteString -> m a
 throw500 = throwErr err500
 
--- TODO accept ByteString instead of String for msg
---      change the type of ApiError.msg to ByteString
-throwErr :: MonadError ServantErr m => ServantErr -> String -> m a
+throwErr :: MonadError ServantErr m => ServantErr -> LBS.ByteString -> m a
 throwErr err msg =
   throwError
     err

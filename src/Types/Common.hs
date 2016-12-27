@@ -11,6 +11,8 @@ import Data.Aeson as AESON
 import Data.AesonBson (aesonify, bsonify)
 import Data.Bifunctor
 import Data.Bson as BSON
+import qualified Data.ByteString.Lazy.Char8 as LBS
+import qualified Data.ByteString.Char8 as BS
 import Data.Function ((&))
 import Data.List (find)
 import qualified Data.Map.Strict as Map
@@ -97,20 +99,16 @@ recFields (Record xs) = xs
 -- |
 -- Representation for an API error
 data ApiError = ApiError
-  { message :: String
+  { apiErrorMessage :: LBS.ByteString
   } deriving (Eq, Show, Generic)
 
-instance ToJSON ApiError
-
--- |
--- Wrap an error into an @ApiError@
-apiErrorWrap :: Show a => a -> ApiError
-apiErrorWrap = ApiError . show
+instance ToJSON ApiError where
+  toJSON err = object [ "message" .= LBS.unpack (apiErrorMessage err)]
 
 -- |
 -- Convert an error into an @ApiError@
-apiErrorMap :: (Bifunctor p, Show e) => p e a -> p ApiError a
-apiErrorMap = first apiErrorWrap
+toApiError :: Show a => a -> ApiError
+toApiError = ApiError . LBS.pack . show
 
 -- |
 -- The result of a record validation
@@ -118,9 +116,9 @@ data ValidationResult =
   ValidationErrors [Field]
   deriving (Eq, Show)
 
--- instance Show ValidationResult where
---   show (ValidationErrors []) = mempty
---   show (ValidationErrors xs) = show $ AESON.encode (Record xs)
+instance ToJSON ValidationResult where
+  toJSON (ValidationErrors []) = object []
+  toJSON (ValidationErrors xs) = toJSON (Record xs)
 
 instance Monoid ValidationResult where
   mempty = ValidationErrors mempty
@@ -131,7 +129,7 @@ instance Monoid ValidationResult where
 -- Convert the result of a validation to an @Either@ value
 vResultToEither :: (a, ValidationResult) -> Either ApiError a
 vResultToEither (a, ValidationErrors []) = Right a
-vResultToEither (_, err) = Left (apiErrorWrap err)
+vResultToEither (_, err) = Left (ApiError $ encode err)
 
 -- |
 -- Representation for an API item result
