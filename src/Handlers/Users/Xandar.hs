@@ -7,6 +7,7 @@
 -- | Handlers for Xandar endpoints
 module Handlers.Users.Xandar where
 
+import Network.HTTP.Types.Status
 import Api.Xandar
 import Control.Monad.Except
 import Control.Monad.Reader
@@ -56,21 +57,6 @@ dbPipe :: ApiConfig -> Api Pipe
 dbPipe cfg = liftIO $ mkPipe (mongoHost cfg) (mongoPort cfg)
 
 -- |
--- Validate a user record
-validateUser :: Record -> (Record, ValidationResult)
-validateUser = validate userDefinition
-
--- |
--- Validate a user record and ensure that it contains a valid id
-validateUserWithId :: Record -> (Record, ValidationResult)
-validateUserWithId u = second (mappend . snd $ validateHasId u) (validateUser u)
-
--- |
--- Populate all missing fields of a user record with default values
-populateUserDefaults :: Record -> Record
-populateUserDefaults = populateDefaults userDefinition
-
--- |
 -- Create a application for providing the user functionality
 app :: ApiConfig -> Application
 app config = serve apiProxy (server config)
@@ -92,22 +78,26 @@ getMultiple fields query sort start limit = do
 -- |
 -- Get a single user by id
 getSingle :: Text -> Api Record
-getSingle uid = snd <$> getRecordAndLink uid >>= maybe (throw404 mempty) return
+getSingle uid = do
+  conf <- ask
+  pipe <- dbPipe conf
+  user <- dbGetById (dbName conf) userColl uid pipe
+  maybe (throwError err404) return user
 
 -- |
 -- Delete a single user
 deleteSingle :: Text -> Api NoContent
 deleteSingle uid = do
   _ <- getSingle uid
-  cfg <- ask
-  dbPipe cfg >>= dbDeleteById (dbName cfg) userColl uid
-  return NoContent
+  conf <- ask
+  pipe <- dbPipe conf
+  dbDeleteById (dbName conf) userColl uid pipe >> return NoContent
 
 -- |
 -- Create one or more users
 createSingleOrMultiple
   :: ApiData Record
-  -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData (ApiItem ApiError Record)))
+  -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData ApiResult))
 createSingleOrMultiple (Single r) = createSingle r
 createSingleOrMultiple (Multiple rs) = createMultiple rs
 
@@ -115,29 +105,25 @@ createSingleOrMultiple (Multiple rs) = createMultiple rs
 -- Create a single user
 createSingle
   :: Record
-  -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData (ApiItem ApiError Record)))
+  -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData ApiResult))
 createSingle input = validateAndRun input (insertSingle >=> mkResult)
   where
-    mkResult (link, Right r) = return $ addHeader link $ noHeader (mkData r)
-    mkResult (_, Left err) = throwFailed err
+    mkResult (Succ r) = return $ addHeader (getUserLink r) $ noHeader (mkData r)
+    mkResult (Fail e) = throwApiError e
     mkData = Single . Succ
 
 -- |
 -- Create multiple users
 createMultiple :: [Record]
-               -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData (ApiItem ApiError Record)))
+               -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData ApiResult))
 createMultiple inputs = do
-  results <- mapM insert (vResultToEither . validateUser <$> inputs)
-  let links = mkLink . fst <$> results
-  let users = snd <$> results
+  users <- mapM insert (validateUser <$> inputs)
+  let links = apiItem mempty (mkLink . getUserLink) <$> users
   return . noHeader $
-    addHeader (intercalate ", " links) (Multiple $ eitherToApiItem <$> users)
+    addHeader (intercalate ", " links) (Multiple users)
   where
     mkLink path = "<" ++ path ++ ">"
-    insert =
-      either
-        (return . (,) mempty . Left)
-        (fmap (second (first toApiError)) . insertSingle)
+    insert = chain insertSingle
 
 -- |
 -- Update (replace) a single user
@@ -146,64 +132,58 @@ replaceSingle uid input =
   getSingle uid >> validateAndRun user (updateSingle >=> mkResult)
   where
     user = setIdValue uid input
-    mkResult (Left err) = throwFailed err
-    mkResult (Right r) = return r
+    mkResult (Fail e) = throwApiError e
+    mkResult (Succ r) = return r
 
 -- |
 -- Update (replace) multiple users
-replaceMultiple :: [Record] -> Api [ApiItem ApiError Record]
-replaceMultiple input = do
-  results <- mapM update (vResultToEither . validateUserWithId <$> input)
-  return $ eitherToApiItem <$> results
-  where
-    update = either (return . Left) (fmap (first toApiError) . updateSingle)
+replaceMultiple :: [Record] -> Api [ApiResult]
+replaceMultiple input =
+  mapM (chain updateSingle) (validateUserWithId <$> input)
 
 -- |
 -- Update (modify) a single user
 modifySingle :: Text -> Record -> Api Record
 modifySingle uid user = do
   existing <- getSingle uid
-  validateAndRun (existing <> user) (updateSingle >=> either throwFailed return)
+  validateAndRun (existing <> user) (updateSingle >=> apiItem throwApiError return)
 
 -- |
 -- Update (modify) multiple users
-modifyMultiple :: [Record] -> Api [ApiItem ApiError Record]
-modifyMultiple input = do
-  results <- mapM update (vResultToEither . validateHasId <$> input)
-  return $ eitherToApiItem <$> results
+modifyMultiple :: [Record] -> Api [ApiResult]
+modifyMultiple input =
+  mapM (chain modify) (vResultToApiItem . validateHasId <$> input)
   where
-    update = either (return . Left) modify
+    modify :: Record -> Api ApiResult
     modify u = do
       current <- getSingle (fromJust $ getIdValue u)
-      updated <- updateSingle (current <> u)
-      return $ (first toApiError) updated
+      chain updateSingle (validateUser $ current <> u)
 
 -- |
 -- Insert a single valid user
 -- populating any missing fields with default values
-insertSingle :: Record -> Api (String, Either Failure Record)
-insertSingle input = do
-  cfg <- ask
-  pipe <- dbPipe cfg
-  result <- dbInsert (dbName cfg) userColl (populateUserDefaults input) pipe
-  case result of
-    Left err -> return (mempty, Left err)
-    Right uid -> second (Right . fromJust) <$> getRecordAndLink uid
+insertSingle :: Record -> Api ApiResult
+insertSingle = insertOrUpdateSingle dbInsert
 
 -- |
 -- Update an existing valid user
 -- populating any missing fields with default values
-updateSingle :: Record -> Api (Either Failure Record)
-updateSingle input = do
-  cfg <- ask
-  pipe <- dbPipe cfg
-  let uid = fromJust (getIdValue input)
-  let db = dbName cfg
-  result <- dbUpdate db userColl (populateUserDefaults input) pipe
-  case result of
-    Left err -> return (Left err)
-    Right _ -> Right . fromJust <$> dbGetById db userColl uid pipe
+updateSingle :: Record -> Api ApiResult
+updateSingle = insertOrUpdateSingle dbUpdate
 
+-- |
+-- Insert or update a valid @user@ record according to @action@
+insertOrUpdateSingle
+  :: (Database -> Collection -> Record -> Pipe -> Api (Either Failure RecordId))
+  -> Record
+  -> Api ApiResult
+insertOrUpdateSingle action user = do
+  conf <- ask
+  pipe <- dbPipe conf
+  result <- action (dbName conf) userColl (populateUserDefaults user) pipe
+  case result of
+    Left err -> return $ Fail (failedToApiError err)
+    Right uid -> Succ . fromJust <$> dbGetById (dbName conf) userColl uid pipe
 
 -- |
 -- Handle a head request for a single user endpoint
@@ -228,43 +208,57 @@ optionsMultiple :: Api (Headers '[Header "Allow" String] NoContent)
 optionsMultiple = undefined
 
 -- |
--- Get the record with @uid@ and its resource link
-getRecordAndLink :: RecordId -> Api (String, Maybe Record)
-getRecordAndLink uid = do
-  cfg <- ask
-  pipe <- dbPipe cfg
-  user <- dbGetById (dbName cfg) userColl uid pipe
-  return (mkGetSingleLink uid, user)
+-- Create a link for a user resource
+getUserLink :: Record -> String
+getUserLink = mkGetSingleLink . fromJust . getIdValue
 
 -- |
--- Validate a record and run an action on it if valid.
--- Otherwise, throw an error
+-- Validate a record and run an action if valid or throw an error
 validateAndRun :: MonadError ServantErr m => Record -> (Record -> m a) -> m a
-validateAndRun record f = withValidation (f record) (validateUser record)
-  where
-    withValidation r (_, ValidationErrors []) = r
-    withValidation _ (_, err) = throw400 (encode err)
+validateAndRun record act = apiItem throwApiError act (validateUser record)
 
 -- |
--- Convert a MongoDB @Failure@ into a @ServantErr@
+-- Validate a user record
+validateUser' :: Record -> (Record, ValidationResult)
+validateUser' = validate userDefinition
+
+-- |
+-- Validate a user record
+validateUser :: Record -> ApiResult
+validateUser = vResultToApiItem . validateUser'
+
+-- |
+-- Validate a user record and ensure that it contains a valid id
+validateUserWithId :: Record -> ApiResult
+validateUserWithId u = vResultToApiItem $ validate u
+  where validate u = second (mappend . snd $ validateHasId u) (validateUser' u)
+
+-- |
+-- Populate all missing fields of a user record with default values
+populateUserDefaults :: Record -> Record
+populateUserDefaults = populateDefaults userDefinition
+
+-- |
+-- Convert a MongoDB @Failure@ into an @ApiError@
 -- TODO parse the MongoDB error object (the error is in BSON format)
--- https://docs.mongodb.com/manual/reference/command/getLastError/
-throwFailed :: MonadError ServantErr m => Failure -> m a
-throwFailed (WriteFailure _ msg) = throw400 (LBS.pack msg)
-throwFailed err = throw500 (LBS.pack $ show err)
+--      https://docs.mongodb.com/manual/reference/command/getLastError/
+failedToApiError :: Failure -> ApiError
+failedToApiError (WriteFailure _ msg) = ApiError (LBS.pack msg) status400
+failedToApiError err = ApiError (LBS.pack (show err)) status500
 
-throw400 :: MonadError ServantErr m => LBS.ByteString -> m a
-throw400 = throwErr err400
+-- |
+-- Convert an @ApiError@ into a @ServantErr@ and throw
+throwApiError :: MonadError ServantErr m => ApiError -> m a
+throwApiError err
+  | apiErrorStatus err == status400 = throwError (mkErr err400 err)
+  | apiErrorStatus err == status404 = throwError (mkErr err404 err)
+  | otherwise = throwError (mkErr err500 err)
+  where
+    mkErr se ae =
+      se
+      { errBody = encode (Fail ae :: ApiItem ApiError ())
+      }
 
-throw404 :: MonadError ServantErr m => LBS.ByteString -> m a
-throw404 = throwErr err404
-
-throw500 :: MonadError ServantErr m => LBS.ByteString -> m a
-throw500 = throwErr err500
-
-throwErr :: MonadError ServantErr m => ServantErr -> LBS.ByteString -> m a
-throwErr err msg =
-  throwError
-    err
-    { errBody = encode (Fail $ ApiError msg :: ApiItem ApiError ())
-    }
+-- TODO rename
+chain :: Monad m => (Record -> m ApiResult) -> ApiResult -> m ApiResult
+chain = apiItem (return . Fail)

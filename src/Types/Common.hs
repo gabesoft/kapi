@@ -11,8 +11,8 @@ import Data.Aeson as AESON
 import Data.AesonBson (aesonify, bsonify)
 import Data.Bifunctor
 import Data.Bson as BSON
-import qualified Data.ByteString.Lazy.Char8 as LBS
 import qualified Data.ByteString.Char8 as BS
+import qualified Data.ByteString.Lazy.Char8 as LBS
 import Data.Function ((&))
 import Data.List (find)
 import qualified Data.Map.Strict as Map
@@ -23,6 +23,7 @@ import qualified Data.Text as T
 import Data.Time (getCurrentTime)
 import Database.MongoDB (Database)
 import GHC.Generics
+import Network.HTTP.Types.Status
 import Network.Socket (HostName, PortNumber)
 
 -- |
@@ -100,15 +101,11 @@ recFields (Record xs) = xs
 -- Representation for an API error
 data ApiError = ApiError
   { apiErrorMessage :: LBS.ByteString
+  , apiErrorStatus :: Status
   } deriving (Eq, Show, Generic)
 
 instance ToJSON ApiError where
   toJSON err = object [ "message" .= LBS.unpack (apiErrorMessage err)]
-
--- |
--- Convert an error into an @ApiError@
-toApiError :: Show a => a -> ApiError
-toApiError = ApiError . LBS.pack . show
 
 -- |
 -- The result of a record validation
@@ -127,9 +124,16 @@ instance Monoid ValidationResult where
 
 -- |
 -- Convert the result of a validation to an @Either@ value
+-- TODO remove
 vResultToEither :: (a, ValidationResult) -> Either ApiError a
 vResultToEither (a, ValidationErrors []) = Right a
-vResultToEither (_, err) = Left (ApiError $ encode err)
+vResultToEither (_, err) = Left (ApiError (encode err) status400)
+
+-- |
+-- Convert the result of a validation to an @Either@ value
+vResultToApiItem :: (a, ValidationResult) -> ApiItem ApiError a
+vResultToApiItem (a, ValidationErrors []) = Succ a
+vResultToApiItem (_, err) = Fail (ApiError (encode err) status400)
 
 -- |
 -- Representation for an API item result
@@ -137,13 +141,26 @@ vResultToEither (_, err) = Left (ApiError $ encode err)
 data ApiItem e a
   = Fail e
   | Succ a
-  deriving (Eq, Show)
+  deriving (Eq, Show, Ord)
+
+type ApiResult = ApiItem ApiError Record
 
 instance Bifunctor ApiItem where
-  first f (Fail e) = Fail (f e)
-  first _ (Succ a) = Succ a
-  second _ (Fail e) = Fail e
-  second f (Succ a) = Succ (f a)
+  bimap f _ (Fail e) = Fail (f e)
+  bimap _ g (Succ a) = Succ (g a)
+
+instance Functor (ApiItem e) where
+  fmap _ (Fail e) = Fail e
+  fmap f (Succ a) = Succ (f a)
+
+instance Applicative (ApiItem e) where
+  pure = Succ
+  Fail e <*> _ = Fail e
+  Succ f <*> a = fmap f a
+
+instance Monad (ApiItem e) where
+  Fail e >>= _ = Fail e
+  Succ a >>= k = k a
 
 instance (ToJSON a) =>
          ToJSON (ApiItem ApiError a) where
@@ -151,16 +168,10 @@ instance (ToJSON a) =>
   toJSON (Succ a) = toJSON a
 
 -- |
--- Convert an @ApiItem@ to an @Either@
-apiItemToEither :: ApiItem e a -> Either e a
-apiItemToEither (Fail e) = Left e
-apiItemToEither (Succ a) = Right a
-
--- |
--- Convert an @Either@ to an @ApiItem@
-eitherToApiItem :: Either e a -> ApiItem e a
-eitherToApiItem (Left e) = Fail e
-eitherToApiItem (Right a) = Succ a
+-- Case analysis for the @ApiItem@ type
+apiItem :: (e -> c) -> (a -> c) -> ApiItem e a -> c
+apiItem f _ (Fail e) = f e
+apiItem _ g (Succ a) = g a
 
 -- |
 -- Application name
@@ -196,13 +207,17 @@ validateField ignoreId def r name
   | isRequired && notFound && noDefault = Just (mkField name "Field is required")
   | otherwise = Nothing
   where
+    doc (Record d) = d
     fieldDef = fromJust $ Map.lookup name def
     maybeField = getField r name
     isRequired = fieldRequired fieldDef
-    notFound = isNothing maybeField
+    notFound = isNothing maybeField || not (hasValue $ look name (doc r))
     noDefault = isNothing (fieldDefault fieldDef)
     mkField :: Label -> String -> Field
     mkField name msg = name =: msg
+    hasValue Nothing = False
+    hasValue (Just BSON.Null) = False
+    hasValue _ = True
 
 -- |
 -- Populate defaults for all missing fields that have a default value
@@ -304,7 +319,7 @@ setIdValue = setValue "_id"
 
  -- |
  -- Get the value of the id field
-getIdValue :: Val a => Record -> Maybe a
+getIdValue :: Record -> Maybe RecordId
 getIdValue = getValue "_id"
 
 -- |

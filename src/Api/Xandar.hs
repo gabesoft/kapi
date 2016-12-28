@@ -68,4 +68,5 @@ apiProxy = Proxy :: Proxy XandarApi
 
 apiProxyGetSingle = Proxy :: Proxy (XandarApiPre :> UserApiPre :> GetSingle)
 
+mkGetSingleLink :: Text -> String
 mkGetSingleLink = ("/" ++) . show . safeLink apiProxy apiProxyGetSingle

@@ -57,18 +57,20 @@ dbInsert dbName collName doc pipe =
      maybe (error "Unexpected missing document") (return . Right) maybeId
 
 -- |
--- Save an existing record or insert a new record into the database
+-- Save an existing record into the database
+-- The input record is assumed to have the id field populated
 dbUpdate'
   :: MonadIO m
-  => Database -> Collection -> Record -> Pipe -> m ()
+  => Database -> Collection -> Record -> Pipe -> m RecordId
 dbUpdate' dbName collName doc =
-  dbAccess dbName $ save collName (recFields $ mapIdToObjId doc)
+  fmap (const $ fromJust (getIdValue doc)) <$>
+  dbAccess dbName (save collName (recFields $ mapIdToObjId doc))
 
 -- |
 -- Save an existing record or insert a new record into the database
 dbUpdate
   :: (MonadIO m, MonadBaseControl IO m)
-  => Database -> Collection -> Record -> Pipe -> m (Either Failure ())
+  => Database -> Collection -> Record -> Pipe -> m (Either Failure RecordId)
 dbUpdate dbName collName doc pipe =
   dbAction $ Right <$> dbUpdate' dbName collName doc pipe
 
