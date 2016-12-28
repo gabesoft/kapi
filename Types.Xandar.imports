@@ -1,7 +1,0 @@
-import Data.Aeson ( ToJSON, defaultOptions )
-import Data.Aeson.TH
-    ( Options(omitNothingFields fieldLabelModifier), deriveJSON )
-import Data.Char ( toLower )
-import Data.Text ( Text )
-import Data.Time ( UTCTime )
-import GHC.Generics ( Generic )
