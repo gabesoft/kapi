@@ -6,6 +6,7 @@
 -- | Common types
 module Types.Common where
 
+import Control.Monad (join)
 import Control.Lens (view, over)
 import Data.Aeson as AESON
 import Data.AesonBson (aesonify, bsonify)
@@ -14,7 +15,7 @@ import Data.Bson as BSON
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import Data.Function ((&))
-import Data.List (find)
+import Data.List (find, findIndex, foldl)
 import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.Monoid
@@ -59,11 +60,13 @@ data ApiData a
   | Multiple [a]
   deriving (Eq, Show)
 
-instance ToJSON a => ToJSON (ApiData a) where
+instance ToJSON a =>
+         ToJSON (ApiData a) where
   toJSON (Single x) = toJSON x
   toJSON (Multiple xs) = toJSON xs
 
-instance FromJSON a => FromJSON (ApiData a) where
+instance FromJSON a =>
+         FromJSON (ApiData a) where
   parseJSON o@(AESON.Object obj) = Single <$> parseJSON o
   parseJSON a@(AESON.Array _) = Multiple <$> parseJSON a
   parseJSON _ = fail "Could not parse ApiData"
@@ -105,7 +108,7 @@ data ApiError = ApiError
   } deriving (Eq, Show, Generic)
 
 instance ToJSON ApiError where
-  toJSON err = object [ "message" .= LBS.unpack (apiErrorMessage err)]
+  toJSON err = object ["message" .= LBS.unpack (apiErrorMessage err)]
 
 -- |
 -- The result of a record validation
@@ -204,7 +207,8 @@ validateField :: Bool -> RecordDefinition -> Record -> Label -> Maybe Field
 validateField ignoreId def r name
   | ignoreId && name == "_id" = Nothing
   | not (Map.member name def) = Just (mkField name "Field is not allowed")
-  | isRequired && notFound && noDefault = Just (mkField name "Field is required")
+  | isRequired && notFound && noDefault =
+    Just (mkField name "Field is required")
   | otherwise = Nothing
   where
     doc (Record d) = d
@@ -218,6 +222,16 @@ validateField ignoreId def r name
     hasValue Nothing = False
     hasValue (Just BSON.Null) = False
     hasValue _ = True
+
+hasValue :: Label -> Record -> Bool
+hasValue name r@(Record d) = hasField name r && has (look name d)
+  where
+    has Nothing = False
+    has (Just BSON.Null) = False
+    has _ = True
+
+hasField :: Label -> Record -> Bool
+hasField name r = isJust $ getField r name
 
 -- |
 -- Populate defaults for all missing fields that have a default value
@@ -312,13 +326,15 @@ setValue
   => Text -> a -> Record -> Record
 setValue name value record = record & name .=~ value
 
- -- |
- -- Set the value of the id field
-setIdValue :: Val a => a -> Record -> Record
+-- |
+-- Set the value of the id field
+setIdValue
+  :: Val a
+  => a -> Record -> Record
 setIdValue = setValue "_id"
 
- -- |
- -- Get the value of the id field
+-- |
+-- Get the value of the id field
 getIdValue :: Record -> Maybe RecordId
 getIdValue = getValue "_id"
 
@@ -347,3 +363,160 @@ mapField l f r =
   case f (getValue l r) of
     Nothing -> delField r l
     Just v -> setValue l v r
+
+-- field operations implementation
+-- |
+-- Get a field by name. Nested fields are supported.
+--
+-- >>> getField "inner.email" (Record [ inner : [ email : "bson@email.com" ]])
+-- Just ("email" : "bson@email.com")
+--
+-- >>> getField "_id" (Record [_id : "123"])
+-- Just (_id : "123")
+--
+-- >>> getField "email" (Record [_id : "123"])
+-- Nothing
+--
+getField' :: Label -> Record -> Maybe Field
+getField' name (Record d) = findField d (splitAtDot name)
+  where findField doc (name:[]) = find ((name ==) . label) doc
+        findField doc (name:ns) =
+          case findIndex ((name ==) . label) doc of
+            Nothing -> Nothing
+            Just i ->
+              let (_, f:_) = splitAt i doc
+              in findNested f (head ns)
+        findNested f@(k := v) name
+          | valIsDoc v = getField' name (docToRec k f)
+          | otherwise = Nothing
+
+-- |
+-- Get the value of a field by name. Nested fields are supported.
+--
+-- >>> getValue "inner.email" (Record [ inner : [ email : "bson@email.com" ]])
+-- Just "bson@email.com"
+--
+-- >>> getValue "_id" (Record [_id : "123"])
+-- Just "123"
+--
+-- >>> getValue "email" (Record [_id : "123"])
+-- Nothing
+--
+-- >>> getValue "email" (Record [email : Null])
+-- Nothing
+--
+getValue'
+  :: Val a
+  => Label -> Record -> Maybe a
+getValue' name r = join $ get <$> getField' name r
+  where
+    get
+      :: Val a
+      => Field -> Maybe a
+    get (k := v) = cast v
+
+-- |
+-- Set a field in a record. Overwrite the existing value if any.
+setField' :: Field -> Record -> Record
+setField' field = flip mergeRecords (Record [field])
+
+-- |
+-- Set the value of a field in a record. Create the field if necessary.
+setValue'
+  :: Val a
+  => Label -> a -> Record -> Record
+setValue' name value = setField' (mkField $ T.split (== '.') name)
+  where mkField (name:[]) = name =: value
+        mkField (name:ns) = name =: mkField ns
+
+-- |
+-- Delete a field by name
+delField' :: Label -> Record -> Record
+delField' = excludeFields . (:[])
+
+-- |
+-- Set the value of a field to @Null@.
+-- If the field does not exist it will be created.
+delValue' :: Label -> Record -> Record
+delValue' = flip setValue' BSON.Null
+
+-- |
+-- Determine whether a field exists within a record
+hasField' :: Label -> Record -> Bool
+hasField' name = isJust . getField' name
+
+-- |
+-- Determine whether a field exists within a record
+-- and it has a non-null value
+hasValue' :: Label -> Record -> Bool
+hasValue' name r = hasField' name r && has (getValue' name r)
+  where
+    has Nothing = False
+    has (Just BSON.Null) = False
+    has _ = True
+
+-- |
+-- Merge two records with the record on the right overwriting any
+-- existing fields in the left record. Nested records are supported.
+mergeRecords :: Record -> Record -> Record
+mergeRecords (Record r1) (Record r2) = Record $ foldl add r1 r2
+  where
+    add doc field@(k := v) =
+      case findIndex ((k ==) . label) doc of
+        Nothing -> doc ++ [field]
+        Just i ->
+          let (x, _:y) = splitAt i doc
+          in x ++ [new (doc !! i) field] ++ y
+    new lf@(lk := lv) rf@(rk := rv)
+      | valIsDoc lv && valIsDoc rv =
+        rk := recToDoc (mergeRecords (docToRec lk lf) (docToRec rk rf))
+      | otherwise = rk := rv
+
+-- |
+-- Exclude all specified labels from a record
+excludeFields :: [Label] -> Record -> Record
+excludeFields labels (Record d) = Record $ foldl remove d (splitAtDot <$> labels)
+  where
+    remove doc (name:[]) = filter (\(k := _) -> k /= name) doc
+    remove doc (name:ns) =
+      case findIndex ((name ==) . label) doc of
+        Nothing -> doc
+        Just i ->
+          let (x, y:ys) = splitAt i doc
+          in x ++ [removeNested y ns] ++ ys
+    removeNested f@(k := v) names
+      | valIsDoc v = k := recToDoc (excludeFields names (docToRec k f))
+      | otherwise = k := v
+
+-- |
+-- Split a nested label at the first dot
+--
+-- >>> splitAtDot "a.b.c"
+-- ["a", "b.c"]
+--
+-- >>> splitAtDot "a"
+-- ["a"]
+--
+splitAtDot :: Text -> [Text]
+splitAtDot name =
+  case T.findIndex ('.' ==) name of
+    Nothing -> [name]
+    Just i ->
+      let (x, y) = T.splitAt i name
+      in [x, T.tail y]
+
+-- |
+-- Determine whether a bson value is of type @Document@
+valIsDoc :: BSON.Value -> Bool
+valIsDoc (Doc _) = True
+valIsDoc _ = False
+
+-- |
+-- Convert a record to a document value
+recToDoc :: Record -> BSON.Value
+recToDoc (Record doc) = Doc doc
+
+-- |
+-- Extract the document from a field value and convert it to a record
+docToRec :: Label -> Field -> Record
+docToRec name field = Record (at name [field])
