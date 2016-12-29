@@ -68,28 +68,28 @@ verifyExclude :: Record -> Record -> [Label] -> Expectation
 verifyExclude r exp labels = excludeFields labels r `shouldBe` exp
 
 verifyGetField :: Record -> Label -> Maybe Field -> Expectation
-verifyGetField r name exp = getField' name r `shouldBe` exp
+verifyGetField r name exp = getField name r `shouldBe` exp
 
 verifyGetValue :: Val a => Record -> Label -> Maybe a -> Expectation
-verifyGetValue r name exp = getValue' name r `shouldBe` exp
+verifyGetValue r name exp = getValue name r `shouldBe` exp
 
 verifySetField :: Record -> Field -> Record -> Expectation
-verifySetField r field exp = setField' field r `shouldBe` exp
+verifySetField r field exp = setField field r `shouldBe` exp
 
 verifySetValue :: Val a => Record -> Label -> a -> Record -> Expectation
-verifySetValue r name value exp = setValue' name value r `shouldBe` exp
+verifySetValue r name value exp = setValue name value r `shouldBe` exp
 
 verifyDelField :: Record -> Label -> Record -> Expectation
-verifyDelField r name exp = delField' name r `shouldBe` exp
+verifyDelField r name exp = delField name r `shouldBe` exp
 
 verifyDelValue :: Record -> Label -> Record -> Expectation
-verifyDelValue r name exp = delValue' name r `shouldBe` exp
+verifyDelValue r name exp = delValue name r `shouldBe` exp
 
 verifyHasField :: Record -> Label -> Bool -> Expectation
-verifyHasField r name exp = hasField' name r `shouldBe` exp
+verifyHasField r name exp = hasField name r `shouldBe` exp
 
 verifyHasValue :: Record -> Label -> Bool -> Expectation
-verifyHasValue r name exp = hasValue' name r `shouldBe` exp
+verifyHasValue r name exp = hasValue name r `shouldBe` exp
 
 mkField :: Label -> String -> Field
 mkField name val = name =: val

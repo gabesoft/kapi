@@ -129,12 +129,12 @@ objIdToRecId _ = Nothing
 -- |
 -- Convert the id within a record to a @RecordId@
 mapIdToRecId :: Record -> Record
-mapIdToRecId = mapField "_id" (>>= objIdToRecId)
+mapIdToRecId = modField "_id" (>>= objIdToRecId)
 
 -- |
 -- Convert the id within a record to an @ObjectId@
 mapIdToObjId :: Record -> Record
-mapIdToObjId = mapField "_id" (>>= recIdToObjId)
+mapIdToObjId = modField "_id" (>>= recIdToObjId)
 
 -- |
 -- Validate that a record has a valid id field

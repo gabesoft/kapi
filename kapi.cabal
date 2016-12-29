@@ -29,7 +29,6 @@ library
                      , bytestring >= 0.10
                      , containers >= 0.5
                      , http-types >= 0.9
-                     , lens >= 4.15
                      , lifted-base >= 0.2
                      , monad-control >= 1.0
                      , mongoDB >= 2.1

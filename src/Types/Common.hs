@@ -7,7 +7,6 @@
 module Types.Common where
 
 import Control.Monad (join)
-import Control.Lens (view, over)
 import Data.Aeson as AESON
 import Data.AesonBson (aesonify, bsonify)
 import Data.Bifunctor
@@ -127,13 +126,6 @@ instance Monoid ValidationResult where
 
 -- |
 -- Convert the result of a validation to an @Either@ value
--- TODO remove
-vResultToEither :: (a, ValidationResult) -> Either ApiError a
-vResultToEither (a, ValidationErrors []) = Right a
-vResultToEither (_, err) = Left (ApiError (encode err) status400)
-
--- |
--- Convert the result of a validation to an @Either@ value
 vResultToApiItem :: (a, ValidationResult) -> ApiItem ApiError a
 vResultToApiItem (a, ValidationErrors []) = Succ a
 vResultToApiItem (_, err) = Fail (ApiError (encode err) status400)
@@ -196,7 +188,7 @@ confGetDb :: AppName -> ApiConfig -> Database
 confGetDb name = fromJust . Map.lookup name . mongoDbs
 
 -- |
--- Validate a data item against it's definition
+-- Validate a record against it's definition
 validate :: RecordDefinition -> Record -> (Record, ValidationResult)
 validate def r = (r, ValidationErrors $ catMaybes results)
   where
@@ -206,125 +198,30 @@ validate def r = (r, ValidationErrors $ catMaybes results)
 validateField :: Bool -> RecordDefinition -> Record -> Label -> Maybe Field
 validateField ignoreId def r name
   | ignoreId && name == "_id" = Nothing
-  | not (Map.member name def) = Just (mkField name "Field is not allowed")
-  | isRequired && notFound && noDefault =
-    Just (mkField name "Field is required")
+  | not (Map.member name def) = Just (mkField "Field is not allowed")
+  | isRequired && hasValue name r && noDefault =
+    Just (mkField "Field is required")
   | otherwise = Nothing
   where
-    doc (Record d) = d
     fieldDef = fromJust $ Map.lookup name def
-    maybeField = getField r name
     isRequired = fieldRequired fieldDef
-    notFound = isNothing maybeField || not (hasValue $ look name (doc r))
     noDefault = isNothing (fieldDefault fieldDef)
-    mkField :: Label -> String -> Field
-    mkField name msg = name =: msg
-    hasValue Nothing = False
-    hasValue (Just BSON.Null) = False
-    hasValue _ = True
-
-hasValue :: Label -> Record -> Bool
-hasValue name r@(Record d) = hasField name r && has (look name d)
-  where
-    has Nothing = False
-    has (Just BSON.Null) = False
-    has _ = True
-
-hasField :: Label -> Record -> Bool
-hasField name r = isJust $ getField r name
+    mkField :: String -> Field
+    mkField msg = name =: msg
 
 -- |
 -- Populate defaults for all missing fields that have a default value
 populateDefaults :: RecordDefinition -> Record -> Record
-populateDefaults def r = Map.foldl populateDef r defaults
+populateDefaults def r = Map.foldl populate r defaults
   where
     defaults = Map.filter (isJust . fieldDefault) def
-    populateDef acc field =
-      case getField acc (fieldLabel field) of
-        Nothing -> setField acc (fromJust $ fieldDefault field)
-        _ -> acc
+    populate acc field = modField (fieldLabel field) (set field) acc
+    set field = fromMaybe (fieldDefault field)
 
 -- |
 -- Get the names of all fields in a record
 recordLabels :: Record -> [Label]
 recordLabels (Record xs) = label <$> xs
-
--- |
--- Lens for record objects
--- Non-existent fields will yield @Null@ on @view@ and will
--- cause a field to be added on @over@
-recLens
-  :: Functor f
-  => Label -> (Field -> f Field) -> Record -> f Record
-recLens l f r =
-  (\nf -> setField r <$> nf) (f $ fromMaybe (l =: BSON.Null) (getField r l))
-
--- |
--- Lens used for deleting fields from a record
-delLens
-  :: Functor f
-  => Label -> (Field -> f Field) -> Record -> f Record
-delLens l f r = (\nf -> const (delField r l) <$> nf) (f (l =: BSON.Null))
-
--- |
--- Get the value of a field in a record
--- For non-existent fields a value of @Null@ will be returned
-(^=.)
-  :: Val a
-  => Record -> Label -> Maybe a
-(^=.) r l = BSON.cast (value $ view (recLens l) r)
-
--- |
--- Set the value of a field in a record
--- Existing fields are overwritten and non-existent ones are added
-(.=~)
-  :: Val v
-  => Label -> v -> Record -> Record
-(.=~) l v = over (recLens l) (const (l =: v))
-
--- |
--- Delete the value of a field in a record
-(./~) :: Record -> Label -> Record
-(./~) r l = over (delLens l) (const (l =: BSON.Null)) r
-
--- |
--- Set a record field
-setField :: Record -> Field -> Record
-setField r x = modField (label x) r (const $ Just x) (Just x)
-
--- |
--- Delete a record field
-delField :: Record -> Label -> Record
-delField r l = modField l r (const Nothing) Nothing
-
--- |
--- Modify a record field
-modField :: Label -> Record -> (Field -> Maybe Field) -> Maybe Field -> Record
-modField l (Record xs) f empty = Record (modify xs)
-  where
-    modify [] = maybeToList empty
-    modify (a:as)
-      | label a == l = maybeToList (f a) ++ as
-      | otherwise = a : modify as
-
--- |
--- Get a record field
-getField :: Record -> Label -> Maybe Field
-getField (Record xs) l = find ((== l) . label) xs
-
--- |
--- Get the value of a record field
-getValue
-  :: Val a
-  => Text -> Record -> Maybe a
-getValue name r = r ^=. name
-
--- |
--- Set the @value@ of the @record@ field with @name@
-setValue
-  :: Val a
-  => Text -> a -> Record -> Record
-setValue name value record = record & name .=~ value
 
 -- |
 -- Set the value of the id field
@@ -348,23 +245,22 @@ setUpdatedAt r = do
 -- |
 -- Set the value of the createdAt field
 setCreatedAt :: Record -> IO Record
-setCreatedAt r@(Record doc) = do
+setCreatedAt r = do
   currentTime <- getCurrentTime
-  let oid = doc !? "_id" :: Maybe ObjectId
+  let oid = getValue "_id" r :: Maybe ObjectId
   let time = maybe currentTime timestamp oid
   return (setValue "createdAt" time r)
 
 -- |
 -- Modify the value of a field or remove it
-mapField
+modField
   :: (Val a, Val b)
   => Label -> (Maybe a -> Maybe b) -> Record -> Record
-mapField l f r =
-  case f (getValue l r) of
-    Nothing -> delField r l
-    Just v -> setValue l v r
+modField name mod r =
+  case mod (getValue name r) of
+    Nothing -> delField name r
+    Just val -> setValue name val r
 
--- field operations implementation
 -- |
 -- Get a field by name. Nested fields are supported.
 --
@@ -377,8 +273,8 @@ mapField l f r =
 -- >>> getField "email" (Record [_id : "123"])
 -- Nothing
 --
-getField' :: Label -> Record -> Maybe Field
-getField' name (Record d) = findField d (splitAtDot name)
+getField :: Label -> Record -> Maybe Field
+getField name (Record d) = findField d (splitAtDot name)
   where findField doc (name:[]) = find ((name ==) . label) doc
         findField doc (name:ns) =
           case findIndex ((name ==) . label) doc of
@@ -387,7 +283,7 @@ getField' name (Record d) = findField d (splitAtDot name)
               let (_, f:_) = splitAt i doc
               in findNested f (head ns)
         findNested f@(k := v) name
-          | valIsDoc v = getField' name (docToRec k f)
+          | valIsDoc v = getField name (docToRec k f)
           | otherwise = Nothing
 
 -- |
@@ -405,10 +301,10 @@ getField' name (Record d) = findField d (splitAtDot name)
 -- >>> getValue "email" (Record [email : Null])
 -- Nothing
 --
-getValue'
+getValue
   :: Val a
   => Label -> Record -> Maybe a
-getValue' name r = join $ get <$> getField' name r
+getValue name r = join $ get <$> getField name r
   where
     get
       :: Val a
@@ -417,39 +313,39 @@ getValue' name r = join $ get <$> getField' name r
 
 -- |
 -- Set a field in a record. Overwrite the existing value if any.
-setField' :: Field -> Record -> Record
-setField' field = flip mergeRecords (Record [field])
+setField :: Field -> Record -> Record
+setField field = flip mergeRecords (Record [field])
 
 -- |
 -- Set the value of a field in a record. Create the field if necessary.
-setValue'
+setValue
   :: Val a
   => Label -> a -> Record -> Record
-setValue' name value = setField' (mkField $ T.split (== '.') name)
+setValue name value = setField (mkField $ T.split (== '.') name)
   where mkField (name:[]) = name =: value
         mkField (name:ns) = name =: mkField ns
 
 -- |
 -- Delete a field by name
-delField' :: Label -> Record -> Record
-delField' = excludeFields . (:[])
+delField :: Label -> Record -> Record
+delField = excludeFields . (:[])
 
 -- |
 -- Set the value of a field to @Null@.
 -- If the field does not exist it will be created.
-delValue' :: Label -> Record -> Record
-delValue' = flip setValue' BSON.Null
+delValue :: Label -> Record -> Record
+delValue = flip setValue BSON.Null
 
 -- |
 -- Determine whether a field exists within a record
-hasField' :: Label -> Record -> Bool
-hasField' name = isJust . getField' name
+hasField :: Label -> Record -> Bool
+hasField name = isJust . getField name
 
 -- |
 -- Determine whether a field exists within a record
 -- and it has a non-null value
-hasValue' :: Label -> Record -> Bool
-hasValue' name r = hasField' name r && has (getValue' name r)
+hasValue :: Label -> Record -> Bool
+hasValue name r = hasField name r && has (getValue name r)
   where
     has Nothing = False
     has (Just BSON.Null) = False
