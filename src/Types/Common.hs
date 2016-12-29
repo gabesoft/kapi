@@ -199,7 +199,7 @@ validateField :: Bool -> RecordDefinition -> Record -> Label -> Maybe Field
 validateField ignoreId def r name
   | ignoreId && name == "_id" = Nothing
   | not (Map.member name def) = Just (mkField "Field is not allowed")
-  | isRequired && hasValue name r && noDefault =
+  | isRequired && not (hasValue name r) && noDefault =
     Just (mkField "Field is required")
   | otherwise = Nothing
   where
@@ -275,16 +275,13 @@ modField name mod r =
 --
 getField :: Label -> Record -> Maybe Field
 getField name (Record d) = findField d (splitAtDot name)
-  where findField doc (name:[]) = find ((name ==) . label) doc
-        findField doc (name:ns) =
-          case findIndex ((name ==) . label) doc of
-            Nothing -> Nothing
-            Just i ->
-              let (_, f:_) = splitAt i doc
-              in findNested f (head ns)
-        findNested f@(k := v) name
-          | valIsDoc v = getField name (docToRec k f)
-          | otherwise = Nothing
+  where
+    findField doc (name:[]) = find ((name ==) . label) doc
+    findField doc (name:ns) = withField name doc (const Nothing) (process ns)
+    process ns (_, y, _) _ = findNested y (head ns)
+    findNested f@(k := v) name
+      | valIsDoc v = getField name (docToRec k f)
+      | otherwise = Nothing
 
 -- |
 -- Get the value of a field by name. Nested fields are supported.
@@ -357,12 +354,8 @@ hasValue name r = hasField name r && has (getValue name r)
 mergeRecords :: Record -> Record -> Record
 mergeRecords (Record r1) (Record r2) = Record $ foldl add r1 r2
   where
-    add doc field@(k := v) =
-      case findIndex ((k ==) . label) doc of
-        Nothing -> doc ++ [field]
-        Just i ->
-          let (x, _:y) = splitAt i doc
-          in x ++ [new (doc !! i) field] ++ y
+    add doc field@(k := v) = withField k doc (++ [field]) (process field)
+    process field (xs, _, ys) (i,d) = xs ++ [new (d !! i) field] ++ ys
     new lf@(lk := lv) rf@(rk := rv)
       | valIsDoc lv && valIsDoc rv =
         rk := recToDoc (mergeRecords (docToRec lk lf) (docToRec rk rf))
@@ -371,18 +364,30 @@ mergeRecords (Record r1) (Record r2) = Record $ foldl add r1 r2
 -- |
 -- Exclude all specified labels from a record
 excludeFields :: [Label] -> Record -> Record
-excludeFields labels (Record d) = Record $ foldl remove d (splitAtDot <$> labels)
+excludeFields labels (Record d) =
+  Record $ foldl remove d (splitAtDot <$> labels)
   where
     remove doc (name:[]) = filter (\(k := _) -> k /= name) doc
-    remove doc (name:ns) =
-      case findIndex ((name ==) . label) doc of
-        Nothing -> doc
-        Just i ->
-          let (x, y:ys) = splitAt i doc
-          in x ++ [removeNested y ns] ++ ys
+    remove doc (name:ns) = withField name doc id (process ns)
+    process ns (xs, y, ys) _ = xs ++ [removeNested y ns] ++ ys
     removeNested f@(k := v) names
       | valIsDoc v = k := recToDoc (excludeFields names (docToRec k f))
       | otherwise = k := v
+
+-- |
+-- Find the field with @name@ in @doc@ and do a case analysis
+-- based on whether the field is found or not
+withField
+  :: Text -> Document
+  -> (Document -> a)
+  -> (([Field], Field, [Field]) -> (Int, Document) -> a)
+  -> a
+withField name doc f g =
+  case findIndex ((name ==) . label) doc of
+    Nothing -> f doc
+    Just i ->
+      let (xs, y:ys) = splitAt i doc
+      in g (xs, y, ys) (i,doc)
 
 -- |
 -- Split a nested label at the first dot
