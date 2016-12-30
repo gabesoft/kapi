@@ -31,28 +31,38 @@ import Network.Socket (HostName, PortNumber)
 data FieldDefinition = FieldDefinition
   { fieldLabel :: Label
   , fieldRequired :: Bool
-  , fieldDefault :: Maybe Field
+  , fieldDefault :: Maybe BSON.Value
   } deriving (Eq, Show)
 
 type RecordDefinition = Map.Map Label FieldDefinition
 
 -- |
--- Create a @RecordDefinition@
-mkDef
+-- Create a field definition
+mkFieldDef
   :: Val a
   => Label -> Bool -> Maybe a -> (Label, FieldDefinition)
-mkDef name required def =
-  (name, FieldDefinition name required ((name :=) . val <$> def))
+mkFieldDef name required def =
+  (name, FieldDefinition name required (val <$> def))
 
 -- |
--- Create a @RecordDefinition@ for a required field
-mkReqDef :: Label -> (Label, FieldDefinition)
-mkReqDef name = mkDef name True (Nothing :: Maybe String)
+-- Create a definition for a required field without a default value
+mkReqDef' :: Label -> (Label, FieldDefinition)
+mkReqDef' name = mkReqDef name (Nothing :: Maybe String)
 
 -- |
--- Create a @RecordDefinition@ for an optional field
-mkOptDef :: Label -> (Label, FieldDefinition)
-mkOptDef name = mkDef name False (Nothing :: Maybe String)
+-- Create a definition for a required field
+mkReqDef :: Val a => Label -> Maybe a -> (Label, FieldDefinition)
+mkReqDef name = mkFieldDef name True
+
+-- |
+-- Create a definition for an optional field without a default value
+mkOptDef' :: Label -> (Label, FieldDefinition)
+mkOptDef' name = mkOptDef name (Nothing :: Maybe String)
+
+-- |
+-- Create a definition for an optional field
+mkOptDef :: Val a => Label -> Maybe a -> (Label, FieldDefinition)
+mkOptDef name = mkFieldDef name False
 
 data ApiData a
   = Single a
@@ -362,7 +372,7 @@ mergeRecords (Record r1) (Record r2) = Record $ foldl add r1 r2
       | otherwise = rk := rv
 
 -- |
--- Exclude all specified labels from a record
+-- Exclude all specified fields from a record
 excludeFields :: [Label] -> Record -> Record
 excludeFields labels (Record d) =
   Record $ foldl remove d (splitAtDot <$> labels)

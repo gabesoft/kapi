@@ -30,12 +30,12 @@ userIndices =
 userDefinition :: RecordDefinition
 userDefinition =
   Map.fromList
-    [ mkReqDef "email"
-    , mkDef "admin" False (Just False)
-    , mkDef "disabled" True (Just False)
-    , mkOptDef "githubAvatar"
-    , mkOptDef "githubUrl"
-    , mkOptDef "githubLogin"
+    [ mkReqDef' "email"
+    , mkReqDef "disabled" (Just False)
+    , mkReqDef "admin" (Just False)
+    , mkOptDef' "githubAvatar"
+    , mkOptDef' "githubUrl"
+    , mkOptDef' "githubLogin"
     ]
 
 -- |

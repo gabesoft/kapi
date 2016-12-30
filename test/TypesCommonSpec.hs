@@ -7,6 +7,7 @@ module Main
   ) where
 
 import Data.Bson
+import qualified Data.Map.Strict as Map
 import Test.Hspec
 import Types.Common
 
@@ -60,6 +61,7 @@ main = hspec $ describe "Types.Common" $ do
   it "can determine if a nested value exists - 1" $ verifyHasValue rec6 "d.f.g" True
   it "can determine if a nested value exists - 0" $ verifyHasValue rec6 "d.f.x" False
   it "can determine if a nested value exists - 0" $ verifyHasValue rec6 "d.f.h" False
+  it "can populate defaults" $ verifyPopulateDefaults def1 rec7 defRes1
 
 verifyMerge :: Record -> Record -> Record -> Expectation
 verifyMerge r1 r2 exp = mergeRecords r1 r2 `shouldBe` exp
@@ -91,13 +93,36 @@ verifyHasField r name exp = hasField name r `shouldBe` exp
 verifyHasValue :: Record -> Label -> Bool -> Expectation
 verifyHasValue r name exp = hasValue name r `shouldBe` exp
 
+verifyPopulateDefaults :: RecordDefinition -> Record -> Record -> Expectation
+verifyPopulateDefaults def r exp = populateDefaults def r `shouldBe` exp
+
 mkStrField :: Label -> String -> Field
 mkStrField name val = name =: val
 
 mkIntField :: Label -> Int -> Field
 mkIntField name val = name =: val
 
+mkBoolField :: Label -> Bool -> Field
+mkBoolField name val = name =: val
+
 -- TODO move mock data to another file
+
+def1 =
+  Map.fromList
+    [ mkOptDef "admin" (Just False)
+    , mkReqDef "disabled" (Just False)
+    , mkReqDef "count" (Just 1 :: Maybe Int)
+    ]
+
+rec7 = Record [mkStrField "_id" "31889d94-dada-481d-a7d8-0b5e48ee54f3"]
+
+defRes1 =
+  Record
+    [ mkStrField "_id" "31889d94-dada-481d-a7d8-0b5e48ee54f3"
+    , mkBoolField "admin" False
+    , mkIntField "count" 1
+    , mkBoolField "disabled" False
+    ]
 
 rec6 :: Record
 rec6 =

@@ -142,4 +142,4 @@ validateHasId :: Record -> (Record, ValidationResult)
 validateHasId r = (r, ValidationErrors $ catMaybes [val])
   where
     val = validateField False def (mapIdToObjId r) "_id"
-    def = Map.fromList [mkReqDef "_id"]
+    def = Map.fromList [mkReqDef' "_id"]
