@@ -12,6 +12,7 @@ import Data.Maybe
 import Data.Text (unpack, pack)
 import Database.MongoDB
 import Network.Socket (HostName, PortNumber)
+import Persistence.Common
 import Text.Read (readMaybe)
 import Types.Common
 
@@ -87,6 +88,9 @@ failureHandler _ = Nothing
 
 -- |
 -- Select multiple records
+dbFind
+  :: (MonadBaseControl IO f, MonadIO f)
+  => Database -> Collection -> Pipe -> f [Record]
 dbFind dbName collName pipe =
   fmap (mapIdToRecId . Record) <$>
   dbAccess dbName (find (select [] collName) >>= rest) pipe
@@ -139,7 +143,7 @@ mapIdToObjId = modField "_id" (>>= recIdToObjId)
 -- |
 -- Validate that a record has a valid id field
 validateHasId :: Record -> (Record, ValidationResult)
-validateHasId r = (r, ValidationErrors $ catMaybes [val])
+validateHasId r = (r, ValidationErrors $ catMaybes [valField])
   where
-    val = validateField False def (mapIdToObjId r) "_id"
+    valField = validateField False def (mapIdToObjId r) "_id"
     def = Map.fromList [mkReqDef' "_id"]

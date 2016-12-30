@@ -3,10 +3,11 @@
 -- | Persistence layer for users
 module Persistence.Users.Xandar where
 
-import Data.Text (Text)
 import Data.Bson
 import qualified Data.Map.Strict as Map
+import Data.Text (Text)
 import Database.MongoDB
+import Persistence.Common
 import Types.Common
 
 dbName :: Database

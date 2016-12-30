@@ -5,6 +5,7 @@ module Mocks.Common where
 
 import Data.Bson
 import qualified Data.Map.Strict as Map
+import Persistence.Common
 import Types.Common
 
 mkStrField :: Label -> String -> Field

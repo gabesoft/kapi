@@ -7,22 +7,22 @@
 -- | Handlers for Xandar endpoints
 module Handlers.Users.Xandar where
 
-import Network.HTTP.Types.Status
 import Api.Xandar
 import Control.Monad.Except
 import Control.Monad.Reader
 import Data.Aeson (encode)
 import Data.Bifunctor
 import qualified Data.ByteString.Lazy.Char8 as LBS
-import Data.Function ((&))
 import Data.List (intercalate)
 import Data.Maybe
 import Data.Monoid
 import Data.Text (Text)
 import Database.MongoDB (Pipe, Collection, Database)
 import Database.MongoDB.Query (Failure(..))
+import Network.HTTP.Types.Status
+import Persistence.Common
 import Persistence.MongoDB
-import Persistence.Users.Xandar (userDefinition, u1, u2)
+import Persistence.Users.Xandar (userDefinition)
 import Servant
 import Types.Common
 
@@ -230,8 +230,8 @@ validateUser = vResultToApiItem . validateUser'
 -- |
 -- Validate a user record and ensure that it contains a valid id
 validateUserWithId :: Record -> ApiResult
-validateUserWithId u = vResultToApiItem $ validate u
-  where validate u = second (mappend . snd $ validateHasId u) (validateUser' u)
+validateUserWithId user = vResultToApiItem $ valUser user
+  where valUser u = second (mappend . snd $ validateHasId u) (validateUser' u)
 
 -- |
 -- Populate all missing fields of a user record with default values

@@ -18,10 +18,10 @@ library
                      , Data.AesonBson
                      , Data.AesonBson.Instances
                      , Handlers.Users.Xandar
-                     , Persistence.Users.Xandar
+                     , Persistence.Common
                      , Persistence.MongoDB
+                     , Persistence.Users.Xandar
                      , Types.Common
-                     , Types.Xandar
   build-depends:       base >= 4.7 && < 5
                      , aeson >= 1.0.2
                      , attoparsec >= 0.13
@@ -57,10 +57,10 @@ executable kapi-exe
                      , warp >= 3.2
   default-language:    Haskell2010
 
-test-suite types-common-test
+test-suite persistence-common-test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
-  main-is:             TypesCommonSpec.hs
+  main-is:             PersistenceCommonSpec.hs
   other-modules:       Mocks.Common
   build-depends:       base
                      , bson

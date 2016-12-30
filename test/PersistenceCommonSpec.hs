@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 -- |
--- Tests for Types.Common
+-- Tests for Persistence.Common
 module Main
   ( main
   ) where
@@ -9,6 +9,7 @@ module Main
 import Data.Bson
 import qualified Data.Map.Strict as Map
 import Mocks.Common
+import Persistence.Common
 import Test.Hspec
 import Types.Common
 
