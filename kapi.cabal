@@ -61,6 +61,7 @@ test-suite types-common-test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
   main-is:             TypesCommonSpec.hs
+  other-modules:       Mocks.Common
   build-depends:       base
                      , bson
                      , containers >= 0.5

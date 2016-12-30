@@ -14,7 +14,7 @@ import Data.Bson as BSON
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import Data.Function ((&))
-import Data.List (find, findIndex, foldl)
+import Data.List (find, findIndex, foldl, nub)
 import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.Monoid
@@ -202,7 +202,7 @@ confGetDb name = fromJust . Map.lookup name . mongoDbs
 validate :: RecordDefinition -> Record -> (Record, ValidationResult)
 validate def r = (r, ValidationErrors $ catMaybes results)
   where
-    names = Map.keys def ++ recordLabels r
+    names = nub $ Map.keys def ++ recordLabels r
     results = validateField True def r <$> names
 
 validateField :: Bool -> RecordDefinition -> Record -> Label -> Maybe Field
