@@ -6,33 +6,92 @@ module Main
   ( main
   ) where
 
+import Control.Monad.IO.Class
 import Data.Bson
 import qualified Data.Map.Strict as Map
+import Data.Text (Text)
+import Data.Time
 import Persistence.Common
 import Persistence.MongoDB
 import Test.Hspec
+import TestHelper
 import Types.Common
 
-main =
+main :: IO ()
+main = do
+  spec1 <- verifyMkInDocument rec4 res2
+  spec2 <- verifyMkInDocument rec6 res2
+  spec3 <- verifyMkInDocument rec7 res4
+  spec4 <- verifyMkOutDocument rec5 res3
   hspec $
-  describe "Persistence.MongoDB" $
-  do it "validates that a record has a valid id - missing" $
-       verifyValidateId rec1 res1
-     it "validates that a record has a valid id - invalid" $
-       verifyValidateId rec1 res1
-     it "validates that a record has a valid id - valid" $
-       verifyValidateId rec3 (ValidationErrors [])
+    describe "Persistence.MongoDB" $
+    do it "validates that a record has a valid id - missing" $
+         verifyValidateId rec1 res1
+       it "validates that a record has a valid id - invalid" $
+         verifyValidateId rec1 res1
+       it "validates that a record has a valid id - valid" $
+         verifyValidateId rec3 (ValidationErrors [])
+       it "creates a document ready to be saved - missing id" spec1
+       it "creates a document ready to be saved - invalid id" spec2
+       it "creates a document ready to be saved - valid id" spec3
+       it "creates a record ready to be returned" spec4
 
 verifyValidateId r exp = snd (validateHasId r) `shouldBe` exp
 
+verifyMkInDocument
+  :: MonadIO m
+  => Record -> Record -> m Expectation
+verifyMkInDocument r exp = do
+  doc <- mkInDocument r
+  return $ modDate "_updatedAt" (Record doc) `shouldBe` exp
+
+verifyMkOutDocument
+  :: MonadIO m
+  => Document -> Record -> m Expectation
+verifyMkOutDocument doc exp = do
+  r <- mkOutRecord doc
+  return $ modDate "_createdAt" r `shouldBe` exp
+
 rec1 :: Record
-rec1 = Record ["email" =: ("a@email.com" :: String)]
+rec1 = Record [mkStrField "email" "a@email.com"]
 
 rec2 :: Record
-rec2 = Record ["_id" =: ("123" :: String)]
+rec2 = Record [mkRecId "123"]
 
 rec3 :: Record
-rec3 = Record ["_id" =: ("586763745984183aef000002" :: String)]
+rec3 = Record [mkRecId "586763745984183aef000002"]
+
+rec4 :: Record
+rec4 = Record [mkStrField "email" "a@e.com", mkStrField "_createdAt" "1234"]
+
+rec5 :: Document
+rec5 = [mkObjId "586763745984183aef000002"]
+
+rec6 :: Record
+rec6 = Record [mkStrField "email" "a@e.com", mkRecId "1234"]
+
+rec7 :: Record
+rec7 =
+  Record
+    [mkStrField "email" "a@e.com", mkRecId "586763745984183aef000002"]
 
 res1 :: ValidationResult
-res1 = ValidationErrors ["_id" =: ("Field is required" :: String)]
+res1 = ValidationErrors [mkRecId "Field is required"]
+
+res2 :: RecordData Field
+res2 = Record [mkStrField "email" "a@e.com", mkStrField "_updatedAt" "12345"]
+
+res3 :: RecordData Field
+res3 =
+  Record
+    [ mkRecId "586763745984183aef000002"
+    , mkStrField "_createdAt" "12345"
+    ]
+
+res4 :: RecordData Field
+res4 =
+  Record
+    [ mkStrField "email" "a@e.com"
+    , mkObjId "586763745984183aef000002"
+    , mkStrField "_updatedAt" "12345"
+    ]

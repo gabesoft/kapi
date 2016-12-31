@@ -6,16 +6,8 @@ module Mocks.Common where
 import Data.Bson
 import qualified Data.Map.Strict as Map
 import Persistence.Common
+import TestHelper
 import Types.Common
-
-mkStrField :: Label -> String -> Field
-mkStrField name val = name =: val
-
-mkIntField :: Label -> Int -> Field
-mkIntField name val = name =: val
-
-mkBoolField :: Label -> Bool -> Field
-mkBoolField name val = name =: val
 
 -- | definitions
 def1 :: RecordDefinition

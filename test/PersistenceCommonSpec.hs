@@ -11,6 +11,7 @@ import qualified Data.Map.Strict as Map
 import Mocks.Common
 import Persistence.Common
 import Test.Hspec
+import TestHelper
 import Types.Common
 
 main :: IO ()
