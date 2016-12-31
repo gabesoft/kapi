@@ -6,6 +6,7 @@
 -- | Common types
 module Types.Common where
 
+import Control.Monad.Reader
 import Data.Aeson as AESON
 import Data.AesonBson (aesonify, bsonify)
 import Data.Bifunctor
@@ -18,6 +19,10 @@ import Database.MongoDB (Database)
 import GHC.Generics
 import Network.HTTP.Types.Status
 import Network.Socket (HostName, PortNumber)
+import Servant
+
+-- | Api type
+type Api = ReaderT ApiConfig Handler
 
 -- |
 -- Representation of a record schema

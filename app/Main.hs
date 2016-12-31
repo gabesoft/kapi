@@ -28,6 +28,7 @@ main = do
        then "development mode"
        else "production mode"
   putStrLn ("Server started on port " ++ show port ++ " in " ++ env)
+  XU.appInit conf
   if dev
     then run (fromIntegral port) $ logStdoutDev (XU.app conf)
     else run (fromIntegral port) (XU.app conf)

@@ -22,11 +22,9 @@ import Database.MongoDB.Query (Failure(..))
 import Network.HTTP.Types.Status
 import Persistence.Common
 import Persistence.MongoDB
-import Persistence.Users.Xandar (userDefinition)
+import Persistence.Users.Xandar (userDefinition, userIndices)
 import Servant
 import Types.Common
-
-type Api = ReaderT ApiConfig Handler
 
 handlers :: ServerT XandarApi Api
 handlers
@@ -53,7 +51,7 @@ dbName = confGetDb appName
 userColl :: Collection
 userColl = "users"
 
-dbPipe :: ApiConfig -> Api Pipe
+dbPipe :: MonadIO m => ApiConfig -> m Pipe
 dbPipe cfg = liftIO $ mkPipe (mongoHost cfg) (mongoPort cfg)
 
 -- |
@@ -66,13 +64,18 @@ app config = serve apiProxy (server config)
     toHandler :: ApiConfig -> Api :~> Handler
     toHandler cfg = Nat (`runReaderT` cfg)
 
+appInit :: ApiConfig -> IO ()
+appInit conf = do
+  pipe <- dbPipe conf
+  mapM_ (flip (dbAddIndex $ dbName conf) pipe) userIndices
+
 -- |
 -- Get multiple users
 getMultiple :: ServerT GetMultiple Api
 getMultiple fields query sort start limit = do
   -- TODO add sorting, pagination, etc
-  cfg <- ask
-  users <- dbPipe cfg >>= dbFind (dbName cfg) userColl
+  conf <- ask
+  users <- dbPipe conf >>= dbFind (dbName conf) userColl
   return $ addHeader "pagination links" (addHeader (show $ length users) users)
 
 -- |
