@@ -85,6 +85,7 @@ test-suite persistence-mongodb-test
                      , bson
                      , containers >= 0.5
                      , hspec
+                     , hspec-core >= 2.3
                      , kapi
                      , QuickCheck >= 2.8
                      , quickcheck-text >= 0.1

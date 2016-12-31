@@ -14,27 +14,28 @@ import Data.Time
 import Persistence.Common
 import Persistence.MongoDB
 import Test.Hspec
+import Test.Hspec.Core.Spec
 import TestHelper
 import Types.Common
 
 main :: IO ()
-main = do
-  spec1 <- verifyMkInDocument rec4 res2
-  spec2 <- verifyMkInDocument rec6 res2
-  spec3 <- verifyMkInDocument rec7 res4
-  spec4 <- verifyMkOutDocument rec5 res3
+main =
   hspec $
-    describe "Persistence.MongoDB" $
-    do it "validates that a record has a valid id - missing" $
-         verifyValidateId rec1 res1
-       it "validates that a record has a valid id - invalid" $
-         verifyValidateId rec1 res1
-       it "validates that a record has a valid id - valid" $
-         verifyValidateId rec3 (ValidationErrors [])
-       it "creates a document ready to be saved - missing id" spec1
-       it "creates a document ready to be saved - invalid id" spec2
-       it "creates a document ready to be saved - valid id" spec3
-       it "creates a record ready to be returned" spec4
+  describe "Persistence.MongoDB" $
+  do it "validates that a record has a valid id - missing" $
+       verifyValidateId rec1 res1
+     it "validates that a record has a valid id - invalid" $
+       verifyValidateId rec1 res1
+     it "validates that a record has a valid id - valid" $
+       verifyValidateId rec3 (ValidationErrors [])
+     it "creates a document ready to be saved - missing id" =<<
+       runIO (verifyMkInDocument rec4 res2)
+     it "creates a document ready to be saved - invalid id" =<<
+       runIO (verifyMkInDocument rec6 res2)
+     it "creates a document ready to be saved - valid id" =<<
+       runIO (verifyMkInDocument rec7 res4)
+     it "creates a record ready to be returned" =<<
+       runIO (verifyMkOutDocument rec5 res3)
 
 verifyValidateId r exp = snd (validateHasId r) `shouldBe` exp
 
@@ -71,9 +72,7 @@ rec6 :: Record
 rec6 = Record [mkStrField "email" "a@e.com", mkRecId "1234"]
 
 rec7 :: Record
-rec7 =
-  Record
-    [mkStrField "email" "a@e.com", mkRecId "586763745984183aef000002"]
+rec7 = Record [mkStrField "email" "a@e.com", mkRecId "586763745984183aef000002"]
 
 res1 :: ValidationResult
 res1 = ValidationErrors [mkRecId "Field is required"]
@@ -83,10 +82,7 @@ res2 = Record [mkStrField "email" "a@e.com", mkStrField "_updatedAt" "12345"]
 
 res3 :: RecordData Field
 res3 =
-  Record
-    [ mkRecId "586763745984183aef000002"
-    , mkStrField "_createdAt" "12345"
-    ]
+  Record [mkRecId "586763745984183aef000002", mkStrField "_createdAt" "12345"]
 
 res4 :: RecordData Field
 res4 =
