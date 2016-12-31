@@ -122,7 +122,7 @@ mkOutRecord = setCreatedAt . mapIdToRecId . Record
 -- |
 -- Create a document ready to be saved or updated
 mkInDocument :: MonadIO m => Record -> m Document
-mkInDocument = fmap getDocument . setUpdatedAt . mapIdToObjId
+mkInDocument = fmap getDocument . setUpdatedAt . delField "_createdAt" . mapIdToObjId
 
 -- |
 -- Get an selection for querying one record by id

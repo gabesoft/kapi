@@ -65,6 +65,7 @@ main = hspec $ describe "Types.Common" $ do
   it "can determine if a nested value exists - 0" $ verifyHasValue rec6 "d.f.h" False
   it "can populate defaults" $ verifyPopulateDefaults def1 rec7 popRes1
   it "validates a record against a definition" $ verifyValidate def2 rec8 valRes1
+  it "validation ignores timestamp fields" $ verifyValidate def2 rec9 valSuccess
 
 verifyMerge :: Record -> Record -> Record -> Expectation
 verifyMerge r1 r2 exp = mergeRecords r1 r2 `shouldBe` exp

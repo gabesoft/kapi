@@ -104,6 +104,16 @@ rec8 =
     , mkStrField "x" "1"
     ]
 
+rec9 :: Record
+rec9 =
+  Record
+    [ mkStrField "_id" "31889d94-dada-481d-a7d8-0b5e48ee54f3"
+    , mkStrField "name" "bob"
+    , mkStrField "_updatedAt" "123"
+    , mkIntField "count" 1
+    , "_createdAt" =: Null
+    ]
+
 -- | Delete field resultst
 
 delRes1 :: Record
@@ -279,3 +289,6 @@ valRes1 =
     , mkStrField "name" "Field is required"
     , mkStrField "x" "Field is not allowed"
     ]
+
+valSuccess :: ValidationResult
+valSuccess = ValidationErrors []

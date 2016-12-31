@@ -37,8 +37,6 @@ userDefinition =
     , mkOptDef' "githubAvatar"
     , mkOptDef' "githubUrl"
     , mkOptDef' "githubLogin"
-    , mkOptDef' "_createdAt"
-    , mkOptDef' "_updatedAt"
     ]
 
 -- |

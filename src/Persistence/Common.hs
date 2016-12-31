@@ -83,11 +83,13 @@ validate def r = (r, ValidationErrors $ catMaybes results)
 validateField :: Bool -> RecordDefinition -> Record -> Label -> Maybe Field
 validateField ignoreId def r name
   | ignoreId && name == "_id" = Nothing
+  | name `elem` ignore = Nothing
   | not (Map.member name def) = Just (mkField "Field is not allowed")
   | isRequired && not (hasValue name r) && noDefault =
     Just (mkField "Field is required")
   | otherwise = Nothing
   where
+    ignore = ["_updatedAt", "_createdAt"]
     fieldDef = fromJust $ Map.lookup name def
     isRequired = fieldRequired fieldDef
     noDefault = isNothing (fieldDefault fieldDef)
