@@ -43,9 +43,10 @@ dbAddIndex dbName idx = dbAccess dbName (createIndex idx)
 dbInsert'
   :: MonadIO m
   => Database -> Collection -> Record -> Pipe -> m (Maybe RecordId)
-dbInsert' dbName collName doc =
-  fmap objIdToRecId <$>
-  dbAccess dbName (insert collName $ recFields (mapIdToObjId doc))
+dbInsert' dbName collName input pipe = do
+  doc <- mkInDocument input
+  objId <- dbAccess dbName (insert collName doc) pipe
+  return (objIdToRecId objId)
 
 -- |
 -- Insert a record into a collection and return the _id value or a @Failure@
@@ -63,9 +64,10 @@ dbInsert dbName collName doc pipe =
 dbUpdate'
   :: MonadIO m
   => Database -> Collection -> Record -> Pipe -> m RecordId
-dbUpdate' dbName collName doc =
-  fmap (const $ fromJust (getIdValue doc)) <$>
-  dbAccess dbName (save collName (recFields $ mapIdToObjId doc))
+dbUpdate' dbName collName input pipe = do
+  doc <- mkInDocument input
+  dbAccess dbName (save collName doc) pipe
+  return (fromJust $ getIdValue input)
 
 -- |
 -- Save an existing record or insert a new record into the database
@@ -74,6 +76,32 @@ dbUpdate
   => Database -> Collection -> Record -> Pipe -> m (Either Failure RecordId)
 dbUpdate dbName collName doc pipe =
   dbAction $ Right <$> dbUpdate' dbName collName doc pipe
+
+-- |
+-- Select multiple records
+dbFind
+  :: (MonadBaseControl IO f, MonadIO f)
+  => Database -> Collection -> Pipe -> f [Record]
+dbFind dbName collName pipe = do
+  docs <- dbAccess dbName (find (select [] collName) >>= rest) pipe
+  mapM mkOutRecord docs
+
+-- |
+-- Get a record by id
+dbGetById
+  :: MonadIO m
+  => Database -> Collection -> RecordId -> Pipe -> m (Maybe Record)
+dbGetById dbName collName recId pipe = do
+  doc <- dbAccess dbName (findOne $ idQuery collName recId) pipe
+  maybe (return Nothing) (fmap Just . mkOutRecord) doc
+
+-- |
+-- Delete a record by id
+dbDeleteById
+  :: MonadIO m
+  => Database -> Collection -> RecordId -> Pipe -> m ()
+dbDeleteById dbName collName recId =
+  dbAccess dbName (delete $ idQuery collName recId)
 
 -- |
 -- Perform a database action that could result in a @Failure@
@@ -87,30 +115,14 @@ failureHandler err@WriteFailure {} = Just err
 failureHandler _ = Nothing
 
 -- |
--- Select multiple records
-dbFind
-  :: (MonadBaseControl IO f, MonadIO f)
-  => Database -> Collection -> Pipe -> f [Record]
-dbFind dbName collName pipe =
-  fmap (mapIdToRecId . Record) <$>
-  dbAccess dbName (find (select [] collName) >>= rest) pipe
+-- Create a record ready to be returned from a query action
+mkOutRecord :: MonadIO m => Document -> m Record
+mkOutRecord = setCreatedAt . mapIdToRecId . Record
 
 -- |
--- Get a record by id
-dbGetById
-  :: MonadIO m
-  => Database -> Collection -> RecordId -> Pipe -> m (Maybe Record)
-dbGetById dbName collName recId pipe =
-  fmap (mapIdToRecId . Record) <$>
-  dbAccess dbName (findOne $ idQuery collName recId) pipe
-
--- |
--- Delete a record by id
-dbDeleteById
-  :: MonadIO m
-  => Database -> Collection -> RecordId -> Pipe -> m ()
-dbDeleteById dbName collName recId =
-  dbAccess dbName (delete $ idQuery collName recId)
+-- Create a document ready to be saved or updated
+mkInDocument :: MonadIO m => Record -> m Document
+mkInDocument = fmap getDocument . setUpdatedAt . mapIdToObjId
 
 -- |
 -- Get an selection for querying one record by id

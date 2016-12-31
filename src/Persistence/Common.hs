@@ -4,6 +4,7 @@
 module Persistence.Common where
 
 import Control.Monad (join)
+import Control.Monad.IO.Class
 import Data.Aeson as AESON
 import Data.Bson as BSON
 import Data.List (find, findIndex, foldl, nub)
@@ -18,8 +19,8 @@ import Types.Common
 
 -- |
 -- Extract the record fields
-recFields :: RecordData a -> [a]
-recFields (Record xs) = xs
+getDocument :: Record -> Document
+getDocument (Record xs) = xs
 
 -- |
 -- Case analysis for the @ApiItem@ type
@@ -121,19 +122,19 @@ getIdValue = getValue "_id"
 
 -- |
 -- Set the value of the updatedAt field
-setUpdatedAt :: Record -> IO Record
+setUpdatedAt :: MonadIO m => Record -> m Record
 setUpdatedAt r = do
-  time <- getCurrentTime
-  return (setValue "updatedAt" time r)
+  time <- liftIO getCurrentTime
+  return (setValue "_updatedAt" time r)
 
 -- |
 -- Set the value of the createdAt field
-setCreatedAt :: Record -> IO Record
+setCreatedAt :: MonadIO m => Record -> m Record
 setCreatedAt r = do
-  currentTime <- getCurrentTime
+  currentTime <- liftIO getCurrentTime
   let oid = getValue "_id" r :: Maybe ObjectId
   let time = maybe currentTime timestamp oid
-  return (setValue "createdAt" time r)
+  return (setValue "_createdAt" time r)
 
 -- |
 -- Modify the value of a field or remove it
@@ -304,7 +305,7 @@ valIsDoc _ = False
 -- |
 -- Convert a record to a document value
 recToDoc :: Record -> BSON.Value
-recToDoc = Doc . recFields
+recToDoc = Doc . getDocument
 
 -- |
 -- Extract the document from a field value and convert it to a record
