@@ -82,10 +82,10 @@ dbUpdate dbName collName doc pipe =
 -- Select multiple records
 dbFind
   :: (MonadBaseControl IO f, MonadIO f)
-  => Database -> Collection -> [Field] -> Pipe -> f [Record]
-dbFind dbName collName sort pipe = do
-  docs <- dbAccess dbName (find (select [] collName) {sort = sort} >>= rest) pipe
-  mapM mkOutRecord docs
+  => Database -> Collection -> [Field] -> [Field] -> Pipe -> f [Record]
+dbFind dbName collName sort fields pipe = do
+  docs <- dbAccess dbName (find (select [] collName) {sort = sort} {project = fields} >>= rest) pipe
+  mapM (mkOutRecord fields) docs
 
 -- |
 -- Count the number of records in a collection
@@ -99,7 +99,7 @@ dbGetById
   => Database -> Collection -> RecordId -> Pipe -> m (Maybe Record)
 dbGetById dbName collName recId pipe = do
   doc <- dbAccess dbName (findOne $ idQuery collName recId) pipe
-  maybe (return Nothing) (fmap Just . mkOutRecord) doc
+  maybe (return Nothing) (fmap Just . mkOutRecord []) doc
 
 -- |
 -- Delete a record by id
@@ -122,8 +122,18 @@ failureHandler _ = Nothing
 
 -- |
 -- Create a record ready to be returned from a query action
-mkOutRecord :: MonadIO m => Document -> m Record
-mkOutRecord = fmap mapIdToRecId . setCreatedAt . Record
+mkOutRecord :: MonadIO m => [Field] -> Document -> m Record
+mkOutRecord [] = mkOutRecord' True
+mkOutRecord fields = withField "_createdAt" fields out outTimestamp
+  where
+    out _ = mkOutRecord' False
+    outTimestamp (_, f@(k := _), _) _ = mkOutRecord' $ at k [f] == (1 :: Int)
+
+mkOutRecord' :: MonadIO f => Bool -> Document -> f Record
+mkOutRecord' addTimestamp =
+  if addTimestamp
+    then fmap mapIdToRecId . setCreatedAt . Record
+    else return . mapIdToRecId . Record
 
 -- |
 -- Create a document ready to be saved or updated
@@ -178,8 +188,15 @@ validateHasId r = (r, ValidationErrors $ catMaybes [valField])
 mkSortField :: Text -> Maybe Field
 mkSortField name
   | T.null name = Nothing
-  | T.head name == '-' = Just (mkField name (negate 1))
-  | otherwise = Just (mkField name 1)
-  where
-    mkField :: Text -> Int -> Field
-    mkField = (=:)
+  | T.head name == '-' = Just (mkIntField name (negate 1))
+  | otherwise = Just (mkIntField name 1)
+
+-- |
+-- Make a field that will be used for projection during a partial response
+mkIncludeField :: Text -> Maybe Field
+mkIncludeField name
+  | T.null name = Nothing
+  | otherwise = Just (mkIntField name 1)
+
+mkIntField :: Text -> Int -> Field
+mkIntField = (=:)
