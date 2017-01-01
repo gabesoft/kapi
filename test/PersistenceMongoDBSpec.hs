@@ -37,6 +37,7 @@ main =
      it "creates a record ready to be returned" =<<
        runIO (verifyMkOutDocument rec5 res3)
 
+verifyValidateId :: Record -> ValidationResult -> Expectation
 verifyValidateId r exp = snd (validateHasId r) `shouldBe` exp
 
 verifyMkInDocument

@@ -7,6 +7,7 @@ import Control.Monad (join)
 import Control.Monad.IO.Class
 import Data.Aeson as AESON
 import Data.Bson as BSON
+import Data.Digest.Pure.SHA
 import Data.List (find, findIndex, foldl, nub)
 import qualified Data.Map.Strict as Map
 import Data.Maybe
@@ -122,12 +123,15 @@ setIdValue = setValue "_id"
 getIdValue :: Record -> Maybe RecordId
 getIdValue = getValue "_id"
 
+setTimestamp :: MonadIO m => Text -> Record -> m Record
+setTimestamp name r = do
+  time <- liftIO getCurrentTime
+  return (setValue name time r)
+
 -- |
 -- Set the value of the updatedAt field
 setUpdatedAt :: MonadIO m => Record -> m Record
-setUpdatedAt r = do
-  time <- liftIO getCurrentTime
-  return (setValue "_updatedAt" time r)
+setUpdatedAt = setTimestamp "_updatedAt"
 
 -- |
 -- Set the value of the createdAt field
@@ -135,7 +139,7 @@ setCreatedAt :: MonadIO m => Record -> m Record
 setCreatedAt r = do
   currentTime <- liftIO getCurrentTime
   let oid = getValue "_id" r :: Maybe ObjectId
-  let time = maybe currentTime timestamp oid
+  let time = timestamp (fromJust oid)
   return (setValue "_createdAt" time r)
 
 -- |
@@ -313,3 +317,8 @@ recToDoc = Doc . getDocument
 -- Extract the document from a field value and convert it to a record
 docToRec :: Label -> Field -> Record
 docToRec name field = Record (at name [field])
+
+-- |
+-- Compute the sha-1 hash of a record
+recToSha :: Record -> Digest SHA1State
+recToSha = sha1 . encode

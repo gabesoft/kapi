@@ -36,7 +36,7 @@ type GetMultiple = QueryParams "include" String
                 :> QueryParam "limit" Int
                 :> Get '[JSON] (Headers '[Header "Link" String, Header "X-Total-Count" String] [Record])
 
-type GetSingle = Capture "id" Text :> Get '[JSON] Record
+type GetSingle = Capture "id" Text :> Get '[JSON] (Headers '[Header "ETag" String] Record)
 
 type HeadNoContent = Verb 'HEAD 204
 type OptionsNoContent = Verb 'OPTIONS 204
@@ -46,7 +46,7 @@ type OptionsNoContent = Verb 'OPTIONS 204
 type UserApi =
   -- get
        GetMultiple
-  :<|> GetSingle
+  :<|> Header "If-None-Match" Text :> GetSingle
   -- delete
   :<|> Capture "id" Text :> DeleteNoContent '[JSON] NoContent
   -- create
@@ -58,7 +58,7 @@ type UserApi =
   :<|> Capture "id" Text :> ReqBody '[JSON] Record :> Patch '[JSON] Record
   :<|> ReqBody '[JSON] [Record] :> Patch '[JSON] [ApiItem ApiError Record]
   -- head
-  :<|> Capture "id" Text :>  HeadNoContent '[JSON] (Headers '[Header "ETag" String, Header "Last-Modified" String] NoContent)
+  :<|> Capture "id" Text :>  HeadNoContent '[JSON] (Headers '[Header "ETag" String] NoContent)
   :<|> HeadNoContent '[JSON] (Headers '[Header "ETag" String] NoContent)
   -- options
   :<|> Capture "id" Text :> OptionsNoContent '[JSON] (Headers '[Header "Allow" String] NoContent)

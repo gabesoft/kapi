@@ -34,6 +34,7 @@ library
                      , mongoDB >= 2.1
                      , mtl >= 2.2
                      , network >= 2.6
+                     , SHA
                      , scientific >= 0.3
                      , servant >= 0.9
                      , servant-server

@@ -117,7 +117,7 @@ failureHandler _ = Nothing
 -- |
 -- Create a record ready to be returned from a query action
 mkOutRecord :: MonadIO m => Document -> m Record
-mkOutRecord = setCreatedAt . mapIdToRecId . Record
+mkOutRecord = fmap mapIdToRecId . setCreatedAt . Record
 
 -- |
 -- Create a document ready to be saved or updated

@@ -13,10 +13,12 @@ import Control.Monad.Reader
 import Data.Aeson (encode)
 import Data.Bifunctor
 import qualified Data.ByteString.Lazy.Char8 as LBS
+import Data.Digest.Pure.SHA
 import Data.List (intercalate)
 import Data.Maybe
 import Data.Monoid
 import Data.Text (Text)
+import qualified Data.Text as T
 import Database.MongoDB (Pipe, Collection, Database)
 import Database.MongoDB.Query (Failure(..))
 import Network.HTTP.Types.Status
@@ -27,8 +29,7 @@ import Servant
 import Types.Common
 
 handlers :: ServerT XandarApi Api
-handlers
- =
+handlers =
   getMultiple :<|>
   getSingle :<|>
   deleteSingle :<|>
@@ -51,7 +52,9 @@ dbName = confGetDb appName
 userColl :: Collection
 userColl = "users"
 
-dbPipe :: MonadIO m => ApiConfig -> m Pipe
+dbPipe
+  :: MonadIO m
+  => ApiConfig -> m Pipe
 dbPipe cfg = liftIO $ mkPipe (mongoHost cfg) (mongoPort cfg)
 
 -- |
@@ -72,26 +75,29 @@ appInit conf = do
 -- |
 -- Get multiple users
 getMultiple :: ServerT GetMultiple Api
-getMultiple fields query sort start limit = do
-  -- TODO add sorting, pagination, etc
+getMultiple fields query sort start limit
+                                    -- TODO add sorting, pagination, etc
+ = do
   conf <- ask
   users <- dbPipe conf >>= dbFind (dbName conf) userColl
   return $ addHeader "pagination links" (addHeader (show $ length users) users)
 
 -- |
 -- Get a single user by id
-getSingle :: Text -> Api Record
-getSingle uid = do
-  conf <- ask
-  pipe <- dbPipe conf
-  user <- dbGetById (dbName conf) userColl uid pipe
-  maybe (throwError err404) return user
+getSingle :: Maybe Text -> Text -> Api (Headers '[Header "ETag" String] Record)
+getSingle etag uid = do
+  user <- getSingle' uid
+  let sha = showDigest (recToSha user)
+  let res = addHeader (showDigest $ recToSha user) user
+  case etag of
+    Nothing -> return res
+    Just tag -> if tag == T.pack sha then throwError err304 else return res
 
 -- |
 -- Delete a single user
 deleteSingle :: Text -> Api NoContent
 deleteSingle uid = do
-  _ <- getSingle uid
+  _ <- getSingle' uid
   conf <- ask
   pipe <- dbPipe conf
   dbDeleteById (dbName conf) userColl uid pipe >> return NoContent
@@ -117,22 +123,22 @@ createSingle input = validateAndRun input (insertSingle >=> mkResult)
 
 -- |
 -- Create multiple users
-createMultiple :: [Record]
-               -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData ApiResult))
+createMultiple
+  :: [Record]
+  -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData ApiResult))
 createMultiple inputs = do
   users <- mapM insert (validateUser <$> inputs)
   let links = apiItem mempty (mkLink . getUserLink) <$> users
-  return . noHeader $
-    addHeader (intercalate ", " links) (Multiple users)
+  return . noHeader $ addHeader (intercalate ", " links) (Multiple users)
   where
     mkLink path = "<" ++ path ++ ">"
-    insert = chain insertSingle
+    insert = chainResult insertSingle
 
 -- |
 -- Update (replace) a single user
 replaceSingle :: Text -> Record -> Api Record
 replaceSingle uid input =
-  getSingle uid >> validateAndRun user (updateSingle >=> mkResult)
+  getSingle' uid >> validateAndRun user (updateSingle >=> mkResult)
   where
     user = setIdValue uid input
     mkResult (Fail e) = throwApiError e
@@ -142,25 +148,46 @@ replaceSingle uid input =
 -- Update (replace) multiple users
 replaceMultiple :: [Record] -> Api [ApiResult]
 replaceMultiple input =
-  mapM (chain updateSingle) (validateUserWithId <$> input)
+  mapM (chainResult updateSingle) (validateUserWithId <$> input)
 
 -- |
 -- Update (modify) a single user
 modifySingle :: Text -> Record -> Api Record
 modifySingle uid user = do
-  existing <- getSingle uid
-  validateAndRun (existing <> user) (updateSingle >=> apiItem throwApiError return)
+  existing <- getSingle' uid
+  validateAndRun
+    (existing <> user)
+    (updateSingle >=> apiItem throwApiError return)
 
 -- |
 -- Update (modify) multiple users
 modifyMultiple :: [Record] -> Api [ApiResult]
 modifyMultiple input =
-  mapM (chain modify) (vResultToApiItem . validateHasId <$> input)
+  mapM (chainResult modify) (vResultToApiItem . validateHasId <$> input)
   where
     modify :: Record -> Api ApiResult
     modify u = do
-      current <- getSingle (fromJust $ getIdValue u)
-      chain updateSingle (validateUser $ current <> u)
+      current <- getSingle' (fromJust $ getIdValue u)
+      chainResult updateSingle (validateUser $ current <> u)
+
+-- |
+-- Handle a head request for a single user endpoint
+headSingle
+  :: Text
+  -> Api (Headers '[Header "ETag" String] NoContent)
+headSingle uid = do
+  user <- getSingle' uid
+  return $ addHeader (showDigest $ recToSha user) NoContent
+
+-- |
+-- Handle a head request for a multiple users endpoint
+headMultiple :: Api (Headers '[Header "ETag" String] NoContent)
+headMultiple = undefined
+
+-- |
+-- Handle an options request for a single user endpoint
+optionsSingle :: Text -> Api (Headers '[Header "Allow" String] NoContent)
+optionsSingle = undefined
 
 -- |
 -- Insert a single valid user
@@ -189,26 +216,18 @@ insertOrUpdateSingle action user = do
     Right uid -> Succ . fromJust <$> dbGetById (dbName conf) userColl uid pipe
 
 -- |
--- Handle a head request for a single user endpoint
-headSingle
-  :: Text
-  -> Api (Headers '[Header "ETag" String, Header "Last-Modified" String] NoContent)
-headSingle = undefined
-
--- |
--- Handle a head request for a multiple users endpoint
-headMultiple :: Api (Headers '[Header "ETag" String] NoContent)
-headMultiple = undefined
-
--- |
--- Handle an options request for a single user endpoint
-optionsSingle :: Text -> Api (Headers '[Header "Allow" String] NoContent)
-optionsSingle = undefined
-
--- |
 -- Handle an options request for a multiple user endpoint
 optionsMultiple :: Api (Headers '[Header "Allow" String] NoContent)
 optionsMultiple = undefined
+
+-- |
+-- Get a user by id
+getSingle' :: Text -> Api Record
+getSingle' uid = do
+  conf <- ask
+  pipe <- dbPipe conf
+  user <- dbGetById (dbName conf) userColl uid pipe
+  maybe (throwError err404) return user
 
 -- |
 -- Create a link for a user resource
@@ -217,7 +236,9 @@ getUserLink = mkGetSingleLink . fromJust . getIdValue
 
 -- |
 -- Validate a record and run an action if valid or throw an error
-validateAndRun :: MonadError ServantErr m => Record -> (Record -> m a) -> m a
+validateAndRun
+  :: MonadError ServantErr m
+  => Record -> (Record -> m a) -> m a
 validateAndRun record act = apiItem throwApiError act (validateUser record)
 
 -- |
@@ -234,7 +255,8 @@ validateUser = vResultToApiItem . validateUser'
 -- Validate a user record and ensure that it contains a valid id
 validateUserWithId :: Record -> ApiResult
 validateUserWithId user = vResultToApiItem $ valUser user
-  where valUser u = second (mappend . snd $ validateHasId u) (validateUser' u)
+  where
+    valUser u = second (mappend . snd $ validateHasId u) (validateUser' u)
 
 -- |
 -- Populate all missing fields of a user record with default values
@@ -251,7 +273,9 @@ failedToApiError err = ApiError (LBS.pack (show err)) status500
 
 -- |
 -- Convert an @ApiError@ into a @ServantErr@ and throw
-throwApiError :: MonadError ServantErr m => ApiError -> m a
+throwApiError
+  :: MonadError ServantErr m
+  => ApiError -> m a
 throwApiError err
   | apiErrorStatus err == status400 = throwError (mkErr err400 err)
   | apiErrorStatus err == status404 = throwError (mkErr err404 err)
@@ -262,6 +286,7 @@ throwApiError err
       { errBody = encode (Fail ae :: ApiItem ApiError ())
       }
 
--- TODO rename
-chain :: Monad m => (Record -> m ApiResult) -> ApiResult -> m ApiResult
-chain = apiItem (return . Fail)
+chainResult
+  :: Monad m
+  => (Record -> m ApiResult) -> ApiResult -> m ApiResult
+chainResult = apiItem (return . Fail)
