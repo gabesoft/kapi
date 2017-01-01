@@ -87,6 +87,11 @@ dbFind dbName collName pipe = do
   mapM mkOutRecord docs
 
 -- |
+-- Count the number of records in a collection
+dbCount :: MonadIO m => Database -> Collection -> Pipe -> m Int
+dbCount dbName collName = dbAccess dbName (count (select [] collName))
+
+-- |
 -- Get a record by id
 dbGetById
   :: MonadIO m

@@ -181,8 +181,12 @@ headSingle uid = do
 
 -- |
 -- Handle a head request for a multiple users endpoint
-headMultiple :: Api (Headers '[Header "ETag" String] NoContent)
-headMultiple = undefined
+headMultiple :: Api (Headers '[Header "X-Total-Count" String] NoContent)
+headMultiple = do
+  conf <- ask
+  pipe <- dbPipe conf
+  count <- dbCount (dbName conf) userColl pipe
+  return $ addHeader (show count) NoContent
 
 -- |
 -- Handle an options request for a single user endpoint
