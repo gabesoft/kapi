@@ -67,6 +67,8 @@ app config = serve apiProxy (server config)
     toHandler :: ApiConfig -> Api :~> Handler
     toHandler cfg = Nat (`runReaderT` cfg)
 
+-- |
+-- Perform any initialization to be done on server start
 appInit :: ApiConfig -> IO ()
 appInit conf = do
   pipe <- dbPipe conf
@@ -78,10 +80,12 @@ getMultiple :: ServerT GetMultiple Api
 getMultiple include query sort start limit = do
   conf <- ask
   pipe <- dbPipe conf
-  let sortFields = catMaybes $ mkSortField <$> concat (T.splitOn "," <$> sort)
-  let includeFields = catMaybes $ mkIncludeField <$> concat (T.splitOn "," <$> include)
-  users <- dbFind (dbName conf) userColl sortFields includeFields pipe
+  let sort' = mkFields mkSortField sort
+  let include' = mkFields mkIncludeField include
+  users <- dbFind (dbName conf) userColl sort' include' pipe
   return $ addHeader "pagination links" (addHeader (show $ length users) users)
+  where
+    mkFields f input = catMaybes $ f <$> concat (T.splitOn "," <$> input)
 
 -- |
 -- Get a single user by id
