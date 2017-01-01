@@ -61,8 +61,8 @@ type UserApi =
   :<|> Capture "id" Text :>  HeadNoContent '[JSON] (Headers '[Header "ETag" String] NoContent)
   :<|> HeadNoContent '[JSON] (Headers '[Header "X-Total-Count" String] NoContent)
   -- options
-  :<|> Capture "id" Text :> OptionsNoContent '[JSON] (Headers '[Header "Allow" String] NoContent)
-  :<|> OptionsNoContent '[JSON] (Headers '[Header "Allow" String] NoContent)
+  :<|> Capture "id" Text :> OptionsNoContent '[JSON] (Headers '[Header "Access-Control-Allow-Methods" String] NoContent)
+  :<|> OptionsNoContent '[JSON] (Headers '[Header "Access-Control-Allow-Methods" String] NoContent)
 
 apiProxy = Proxy :: Proxy XandarApi
 

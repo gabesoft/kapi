@@ -190,8 +190,14 @@ headMultiple = do
 
 -- |
 -- Handle an options request for a single user endpoint
-optionsSingle :: Text -> Api (Headers '[Header "Allow" String] NoContent)
-optionsSingle = undefined
+optionsSingle :: Text
+              -> Api (Headers '[Header "Access-Control-Allow-Methods" String] NoContent)
+optionsSingle _ = return $ addHeader "GET, PATCH, PUT, DELETE" NoContent
+
+-- |
+-- Handle an options request for a multiple user endpoint
+optionsMultiple :: Api (Headers '[Header "Access-Control-Allow-Methods" String] NoContent)
+optionsMultiple = return $ addHeader "GET, POST, PATCH, PUT" NoContent
 
 -- |
 -- Insert a single valid user
@@ -218,11 +224,6 @@ insertOrUpdateSingle action user = do
   case result of
     Left err -> return $ Fail (failedToApiError err)
     Right uid -> Succ . fromJust <$> dbGetById (dbName conf) userColl uid pipe
-
--- |
--- Handle an options request for a multiple user endpoint
-optionsMultiple :: Api (Headers '[Header "Allow" String] NoContent)
-optionsMultiple = undefined
 
 -- |
 -- Get a user by id
