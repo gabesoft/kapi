@@ -9,7 +9,8 @@ import Control.Monad.IO.Class
 import Control.Monad.Trans.Control
 import qualified Data.Map.Strict as Map
 import Data.Maybe
-import Data.Text (unpack, pack)
+import Data.Text (Text)
+import qualified Data.Text as T
 import Database.MongoDB
 import Network.Socket (HostName, PortNumber)
 import Persistence.Common
@@ -81,9 +82,9 @@ dbUpdate dbName collName doc pipe =
 -- Select multiple records
 dbFind
   :: (MonadBaseControl IO f, MonadIO f)
-  => Database -> Collection -> Pipe -> f [Record]
-dbFind dbName collName pipe = do
-  docs <- dbAccess dbName (find (select [] collName) >>= rest) pipe
+  => Database -> Collection -> [Field] -> Pipe -> f [Record]
+dbFind dbName collName sort pipe = do
+  docs <- dbAccess dbName (find (select [] collName) {sort = sort} >>= rest) pipe
   mapM mkOutRecord docs
 
 -- |
@@ -139,12 +140,12 @@ idQuery collName recId = select ["_id" =: recIdToObjId recId] collName
 -- |
 -- Convert a record id to an object id value
 recIdToObjId :: RecordId -> Maybe Value
-recIdToObjId rid = ObjId <$> readMaybe (unpack rid)
+recIdToObjId rid = ObjId <$> readMaybe (T.unpack rid)
 
 -- |
 -- Convert an object id value to a record id
 objIdToRecId :: Value -> Maybe RecordId
-objIdToRecId (ObjId v) = Just $ pack (show v)
+objIdToRecId (ObjId v) = Just $ T.pack (show v)
 objIdToRecId _ = Nothing
 
 -- |
@@ -164,3 +165,21 @@ validateHasId r = (r, ValidationErrors $ catMaybes [valField])
   where
     valField = validateField False def (mapIdToObjId r) "_id"
     def = Map.fromList [mkReqDef' "_id"]
+
+-- |
+-- Make a field that will be used for sorting
+--
+-- >>> mkSortField "+name"
+-- [name := 1]
+--
+-- >>> mkSortField "-name"
+-- [name := -1]
+--
+mkSortField :: Text -> Maybe Field
+mkSortField name
+  | T.null name = Nothing
+  | T.head name == '-' = Just (mkField name (negate 1))
+  | otherwise = Just (mkField name 1)
+  where
+    mkField :: Text -> Int -> Field
+    mkField = (=:)

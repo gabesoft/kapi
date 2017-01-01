@@ -75,11 +75,11 @@ appInit conf = do
 -- |
 -- Get multiple users
 getMultiple :: ServerT GetMultiple Api
-getMultiple fields query sort start limit
-                                    -- TODO add sorting, pagination, etc
- = do
+getMultiple fields query sort start limit = do
   conf <- ask
-  users <- dbPipe conf >>= dbFind (dbName conf) userColl
+  pipe <- dbPipe conf
+  let sortFields = catMaybes $ mkSortField <$> concat (T.splitOn "," <$> sort)
+  users <- dbFind (dbName conf) userColl sortFields pipe
   return $ addHeader "pagination links" (addHeader (show $ length users) users)
 
 -- |

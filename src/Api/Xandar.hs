@@ -29,9 +29,9 @@ type XandarApiPre = "xandar"
 
 type XandarApi = XandarApiPre :> UserApiPre :> UserApi
 
-type GetMultiple = QueryParams "include" String
-                :> QueryParam "where" String
-                :> QueryParams "sort" String
+type GetMultiple = QueryParams "include" Text
+                :> QueryParam "where" Text
+                :> QueryParams "sort" Text
                 :> QueryParam "start" Int
                 :> QueryParam "limit" Int
                 :> Get '[JSON] (Headers '[Header "Link" String, Header "X-Total-Count" String] [Record])
