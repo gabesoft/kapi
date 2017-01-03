@@ -153,6 +153,14 @@ modField name f r =
     Just v -> setValue name v r
 
 -- |
+-- Change the name of a field if it exists
+renameField :: Label -> Label -> Record -> Record
+renameField old new (Record doc) = withField old doc Record rename
+  where
+    rename :: ([Field], Field, [Field]) -> (Int, Document) -> Record
+    rename (xs, _ := v, ys) _ = Record $ xs ++ [new := v] ++ ys
+
+-- |
 -- Get a field by name. Nested fields are supported.
 --
 -- >>> getField "inner.email" (Record [ inner : [ email : "bson@email.com" ]])
@@ -322,3 +330,30 @@ docToRec name field = Record (at name [field])
 -- Compute the sha-1 hash of a record
 recToSha :: Record -> Digest SHA1State
 recToSha = sha1 . encode
+
+-- |
+-- Compute the pagination data given a current page,
+-- the page size, and the total number of records
+paginate :: Int -> Int -> Int -> Pagination
+paginate page' size' total' =
+  Pagination
+  { paginationTotal = total
+  , paginationPage = page
+  , paginationSize = size
+  , paginationNext = next
+  , paginationPrev = prev
+  , paginationFirst = first
+  , paginationLast = last
+  , paginationStart = start
+  , paginationLimit = limit
+  }
+  where
+    total = max total' 0
+    size = max size' 1
+    first = 1
+    last = max 1 (div total size + min 1 (mod total size))
+    page = min (max page' first) last
+    next = min (page + 1) last
+    prev = max first (page - 1)
+    start = max 0 ((page - 1) * size)
+    limit = size

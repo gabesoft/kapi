@@ -77,13 +77,22 @@ appInit conf = do
 -- |
 -- Get multiple users
 getMultiple :: ServerT GetMultiple Api
-getMultiple include query sort start limit = do
+getMultiple include query sort page perPage = do
   conf <- ask
   pipe <- dbPipe conf
   let sort' = mkFields mkSortField sort
   let include' = mkFields mkIncludeField include
-  users <- dbFind (dbName conf) userColl sort' include' pipe
-  return $ addHeader "pagination links" (addHeader (show $ length users) users)
+  count <- dbCount (dbName conf) userColl pipe
+  let pagination = paginate (fromMaybe 1 page) (fromMaybe 50 perPage) count
+  let start = paginationStart pagination
+  let limit = paginationLimit pagination
+  users <- dbFind (dbName conf) userColl sort' include' start limit pipe
+  return $
+    addHeader (show $ paginationPage pagination) $
+    addHeader (show $ paginationTotal pagination) $
+    addHeader (show $ paginationLast pagination) $
+    addHeader (show $ paginationSize pagination) $
+    addHeader "pagination links" users
   where
     mkFields f input = catMaybes $ f <$> concat (T.splitOn "," <$> input)
 

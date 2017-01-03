@@ -201,7 +201,22 @@ mergeRes2 =
       ]
     ]
 
--- Populate defaults results
+-- | Pagination results
+
+pgeRes1 =
+  Pagination
+  { paginationTotal = 15
+  , paginationPage = 4
+  , paginationSize = 3
+  , paginationNext = 5
+  , paginationPrev = 3
+  , paginationFirst = 1
+  , paginationLast = 5
+  , paginationStart = 9
+  , paginationLimit = 3
+  }
+
+-- | Populate defaults results
 
 popRes1 =
   Record
@@ -211,7 +226,7 @@ popRes1 =
     , mkBoolField "disabled" False
     ]
 
--- Set field results
+-- | Set field results
 
 setRes1 :: Record
 setRes1 =
@@ -272,7 +287,7 @@ setRes6 =
       ]
     ]
 
--- Validate results
+-- | Validate results
 
 valRes1 :: ValidationResult
 valRes1 =

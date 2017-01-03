@@ -1,0 +1,77 @@
+# -*- restclient -*-
+#
+# Queries against the /xandar/users endpoints
+#
+
+# variables
+:date := (shell-command-to-string "echo -n (date +%Y-%m-%d-%M-%s)")
+:host = localhost:8001
+:path = xandar/users
+
+#
+# Get all users
+#
+GET http://:host/:path
+
+#
+# Get all users - sort & partial response
+#
+GET http://:host/:path?sort=email&include=email,admin
+
+#
+# Get all users - pagination
+#
+GET http://:host/:path?page=2&per_page=3&sort=_createdAt
+
+#
+# Get a single user
+#
+GET http://:host/:path/5869ec3e59841810dc000009
+
+#
+# Get a single user using ETag
+#
+GET http://:host/:path/5869ec3e59841810dc000009
+If-None-Match: ef19b2e0ce2baa83fa90abfa82a5141d4f18842d
+
+#
+# Delete a non-existent user
+#
+DELETE http://:host/:path/non-existent
+
+#
+# Create a single user
+#
+POST http://:host/:path
+Content-Type: application/json
+{
+  "email": "admin:date@aol.com",
+  "githubUrl" : "https://api.github.com/users/admin",
+  "admin": true
+}
+
+#
+# Create multiple users
+#
+POST http://:host/:path
+Content-Type: application/json
+[
+  {
+    "email": "user1:date@aol.com",
+    "githubUrl": "https://api.github.com/users/user1",
+    "admin": false
+  },
+  {
+    "email": "admin1:date@aol.com",
+    "githubUrl": "https://api.github.com/users/admin1",
+    "admin": true
+  },
+  {
+    "email": "admin2@aol.com",
+    "githubUrl": "https://api.github.com/users/admin2",
+    "admin": true
+  },
+  {
+    "githubUrl": "https://api.github.com/users/other"
+  }
+]

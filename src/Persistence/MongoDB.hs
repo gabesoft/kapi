@@ -82,9 +82,23 @@ dbUpdate dbName collName doc pipe =
 -- Select multiple records
 dbFind
   :: (MonadBaseControl IO f, MonadIO f)
-  => Database -> Collection -> [Field] -> [Field] -> Pipe -> f [Record]
-dbFind dbName collName sort fields pipe = do
-  docs <- dbAccess dbName (find (select [] collName) {sort = sort} {project = fields} >>= rest) pipe
+  => Database -> Collection -> [Field] -> [Field] -> Int -> Int -> Pipe -> f [Record]
+dbFind dbName collName sort fields skip limit pipe = do
+  docs <-
+    dbAccess
+      dbName
+      (find
+         (select [] collName)
+         { sort = getDocument . renameField "_createdAt" "_id" . Record $ sort
+         }
+         { project = fields
+         }
+         { skip = fromIntegral skip
+         }
+         { limit = fromIntegral limit
+         } >>=
+       rest)
+      pipe
   mapM (mkOutRecord fields) docs
 
 -- |

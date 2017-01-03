@@ -7,10 +7,12 @@ module Main
   ) where
 
 import Data.Bson
+import Data.List (all)
 import qualified Data.Map.Strict as Map
 import Mocks.Common
 import Persistence.Common
 import Test.Hspec
+import Test.QuickCheck
 import TestHelper
 import Types.Common
 
@@ -70,6 +72,19 @@ main =
      it "can delete nested values - existing" $
        verifyDelValue rec4 "nested.guid" delRes5
      it "can delete nested values - missing" $ verifyDelValue rec4 "nested.w" delRes6
+     -- rename field
+     it "can rename an existing field" $
+       verifyRenameField
+         "a"
+         "b"
+         (Record [mkStrField "a" "1"])
+         (Record [mkStrField "b" "1"])
+     it "can rename a non existing field" $
+       verifyRenameField
+         "x"
+         "b"
+         (Record [mkStrField "a" "1"])
+         (Record [mkStrField "a" "1"])
      -- has
      it "can determine if a simple field exists - 1 int" $
        verifyHasField rec6 "a" True
@@ -100,6 +115,8 @@ main =
      -- validate
      it "validates a record against a definition" $ verifyValidate def2 rec8 valRes1
      it "validation ignores timestamp fields" $ verifyValidate def2 rec9 valSuccess
+     it "computes pagination - quick-check" $ property prop_pagination
+     it "computes pagination" $ verifyPagination 4 3 15 pgeRes1
 
 verifyMerge :: Record -> Record -> Record -> Expectation
 verifyMerge r1 r2 exp = mergeRecords r1 r2 `shouldBe` exp
@@ -135,8 +152,44 @@ verifyHasField r name exp = hasField name r `shouldBe` exp
 verifyHasValue :: Record -> Label -> Bool -> Expectation
 verifyHasValue r name exp = hasValue name r `shouldBe` exp
 
+verifyRenameField :: Label -> Label -> Record -> Record -> Expectation
+verifyRenameField old new r exp = renameField old new r `shouldBe` exp
+
 verifyPopulateDefaults :: RecordDefinition -> Record -> Record -> Expectation
 verifyPopulateDefaults def r exp = populateDefaults def r `shouldBe` exp
 
 verifyValidate :: RecordDefinition -> Record -> ValidationResult -> Expectation
 verifyValidate def r exp = snd (validate def r) `shouldBe` exp
+
+verifyPagination :: Int -> Int -> Int -> Pagination -> Expectation
+verifyPagination page size total exp = paginate page size total `shouldBe` exp
+
+prop_pagination :: Int -> Int -> Int -> Bool
+prop_pagination page' size' total' =
+  and
+    [ page == min last (max page' first)
+    , total == max total' 0
+    , size == max size' 1
+    , next >= page
+    , next <= last
+    , next - page <= 1
+    , prev <= page
+    , prev >= first
+    , page - prev <= 1
+    , first == 1
+    , last >= 1
+    , last <= div total size + 1
+    , start == (page - 1) * size
+    , limit == size
+    ]
+  where
+    pagination = paginate page' size' total'
+    total = paginationTotal pagination
+    page = paginationPage pagination
+    size = paginationSize pagination
+    next = paginationNext pagination
+    prev = paginationPrev pagination
+    first = paginationFirst pagination
+    last = paginationLast pagination
+    start = paginationStart pagination
+    limit = paginationLimit pagination

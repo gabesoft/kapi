@@ -51,7 +51,7 @@ verifyMkOutDocument
   :: MonadIO m
   => Document -> Record -> m Expectation
 verifyMkOutDocument doc exp = do
-  r <- mkOutRecord doc
+  r <- mkOutRecord [] doc
   return $ modDate "_createdAt" r `shouldBe` exp
 
 rec1 :: Record

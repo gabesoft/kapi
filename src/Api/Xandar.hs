@@ -32,9 +32,14 @@ type XandarApi = XandarApiPre :> UserApiPre :> UserApi
 type GetMultiple = QueryParams "include" Text
                 :> QueryParam "where" Text
                 :> QueryParams "sort" Text
-                :> QueryParam "start" Int
-                :> QueryParam "limit" Int
-                :> Get '[JSON] (Headers '[Header "Link" String, Header "X-Total-Count" String] [Record])
+                :> QueryParam "page" Int
+                :> QueryParam "per_page" Int
+                :> Get '[JSON] (Headers '[ Header "X-Page" String
+                                         , Header "X-Total-Count" String
+                                         , Header "X-Page-Count" String
+                                         , Header "X-Per-Page" String
+                                         , Header "Link" String
+                                         ] [Record])
 
 type GetSingle = Capture "id" Text :> Get '[JSON] (Headers '[Header "ETag" String] Record)
 

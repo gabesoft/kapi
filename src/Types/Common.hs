@@ -143,3 +143,17 @@ data ApiConfig = ApiConfig
   , mongoPort :: PortNumber
   , mongoDbs :: Map.Map AppName Database
   } deriving (Eq, Show)
+
+-- |
+-- Pagination data
+data Pagination = Pagination
+  { paginationTotal :: Int
+  , paginationPage :: Int
+  , paginationSize :: Int
+  , paginationNext :: Int
+  , paginationPrev :: Int
+  , paginationFirst :: Int
+  , paginationLast :: Int
+  , paginationStart :: Int
+  , paginationLimit :: Int
+  } deriving (Eq, Show, Read)
