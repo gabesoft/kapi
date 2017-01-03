@@ -24,6 +24,11 @@ getDocument :: Record -> Document
 getDocument (Record xs) = xs
 
 -- |
+-- Extract the field names from a record
+getLabels :: Record -> [Label]
+getLabels = fmap label . getDocument
+
+-- |
 -- Case analysis for the @ApiItem@ type
 apiItem :: (e -> c) -> (a -> c) -> ApiItem e a -> c
 apiItem f _ (Fail e) = f e
@@ -136,11 +141,7 @@ setUpdatedAt = setTimestamp "_updatedAt"
 -- |
 -- Set the value of the createdAt field
 setCreatedAt :: MonadIO m => Record -> m Record
-setCreatedAt r = do
-  currentTime <- liftIO getCurrentTime
-  let oid = getValue "_id" r :: Maybe ObjectId
-  let time = timestamp (fromJust oid)
-  return (setValue "_createdAt" time r)
+setCreatedAt = setTimestamp "_createdAt"
 
 -- |
 -- Modify the value of a field or remove it

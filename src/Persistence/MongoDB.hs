@@ -4,6 +4,7 @@
 -- | Functionality for interacting with MongoDB
 module Persistence.MongoDB where
 
+import Control.Monad ((>=>))
 import Control.Exception.Lifted (handleJust)
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Control
@@ -45,7 +46,7 @@ dbInsert'
   :: MonadIO m
   => Database -> Collection -> Record -> Pipe -> m (Maybe RecordId)
 dbInsert' dbName collName input pipe = do
-  doc <- mkInDocument input
+  doc <- mkInDocument True input
   objId <- dbAccess dbName (insert collName doc) pipe
   return (objIdToRecId objId)
 
@@ -66,7 +67,7 @@ dbUpdate'
   :: MonadIO m
   => Database -> Collection -> Record -> Pipe -> m RecordId
 dbUpdate' dbName collName input pipe = do
-  doc <- mkInDocument input
+  doc <- mkInDocument False input
   dbAccess dbName (save collName doc) pipe
   return (fromJust $ getIdValue input)
 
@@ -89,7 +90,7 @@ dbFind dbName collName sort fields skip limit pipe = do
       dbName
       (find
          (select [] collName)
-         { sort = getDocument . renameField "_createdAt" "_id" . Record $ sort
+         { sort = sort
          }
          { project = fields
          }
@@ -99,7 +100,7 @@ dbFind dbName collName sort fields skip limit pipe = do
          } >>=
        rest)
       pipe
-  mapM (mkOutRecord fields) docs
+  return $ mkOutRecord <$> docs
 
 -- |
 -- Count the number of records in a collection
@@ -113,7 +114,7 @@ dbGetById
   => Database -> Collection -> RecordId -> Pipe -> m (Maybe Record)
 dbGetById dbName collName recId pipe = do
   doc <- dbAccess dbName (findOne $ idQuery collName recId) pipe
-  maybe (return Nothing) (fmap Just . mkOutRecord []) doc
+  return $ mkOutRecord <$> doc
 
 -- |
 -- Delete a record by id
@@ -136,23 +137,21 @@ failureHandler _ = Nothing
 
 -- |
 -- Create a record ready to be returned from a query action
-mkOutRecord :: MonadIO m => [Field] -> Document -> m Record
-mkOutRecord [] = mkOutRecord' True
-mkOutRecord fields = withField "_createdAt" fields out outTimestamp
-  where
-    out _ = mkOutRecord' False
-    outTimestamp (_, f@(k := _), _) _ = mkOutRecord' $ at k [f] == (1 :: Int)
-
-mkOutRecord' :: MonadIO f => Bool -> Document -> f Record
-mkOutRecord' addTimestamp =
-  if addTimestamp
-    then fmap mapIdToRecId . setCreatedAt . Record
-    else return . mapIdToRecId . Record
+mkOutRecord :: Document -> Record
+mkOutRecord = mapIdToRecId . Record
 
 -- |
 -- Create a document ready to be saved or updated
-mkInDocument :: MonadIO m => Record -> m Document
-mkInDocument = fmap getDocument . setUpdatedAt . delField "_createdAt" . mapIdToObjId
+mkInDocument :: MonadIO m => Bool -> Record -> m Document
+mkInDocument insert = fmap getDocument . setTimestamp' insert . mapIdToObjId
+
+-- |
+-- Set the updatedAt and createdAt fields
+setTimestamp' :: MonadIO m => Bool -> Record -> m Record
+setTimestamp' insert =
+  if insert
+    then setUpdatedAt >=> setCreatedAt
+    else setUpdatedAt
 
 -- |
 -- Get an selection for querying one record by id

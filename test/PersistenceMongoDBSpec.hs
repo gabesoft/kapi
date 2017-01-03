@@ -29,13 +29,12 @@ main =
      it "validates that a record has a valid id - valid" $
        verifyValidateId rec3 (ValidationErrors [])
      it "creates a document ready to be saved - missing id" =<<
-       runIO (verifyMkInDocument rec4 res2)
+       runIO (verifyMkInDocument rec4 res5)
      it "creates a document ready to be saved - invalid id" =<<
        runIO (verifyMkInDocument rec6 res2)
      it "creates a document ready to be saved - valid id" =<<
        runIO (verifyMkInDocument rec7 res4)
-     it "creates a record ready to be returned" =<<
-       runIO (verifyMkOutDocument rec5 res3)
+     it "creates a record ready to be returned" $ verifyMkOutDocument rec5 res3
 
 verifyValidateId :: Record -> ValidationResult -> Expectation
 verifyValidateId r exp = snd (validateHasId r) `shouldBe` exp
@@ -44,15 +43,13 @@ verifyMkInDocument
   :: MonadIO m
   => Record -> Record -> m Expectation
 verifyMkInDocument r exp = do
-  doc <- mkInDocument r
-  return $ modDate "_updatedAt" (Record doc) `shouldBe` exp
+  doc <- mkInDocument (not $ hasField "_id" r) r
+  return $
+    (modDate "_createdAt" . modDate "_updatedAt") (Record doc) `shouldBe` exp
 
-verifyMkOutDocument
-  :: MonadIO m
-  => Document -> Record -> m Expectation
-verifyMkOutDocument doc exp = do
-  r <- mkOutRecord [] doc
-  return $ modDate "_createdAt" r `shouldBe` exp
+verifyMkOutDocument :: Document -> Record -> Expectation
+verifyMkOutDocument doc exp =
+  modDate "_createdAt" (mkOutRecord doc) `shouldBe` exp
 
 rec1 :: Record
 rec1 = Record [mkStrField "email" "a@email.com"]
@@ -82,13 +79,20 @@ res2 :: RecordData Field
 res2 = Record [mkStrField "email" "a@e.com", mkStrField "_updatedAt" "12345"]
 
 res3 :: RecordData Field
-res3 =
-  Record [mkRecId "586763745984183aef000002", mkStrField "_createdAt" "12345"]
+res3 = Record [mkRecId "586763745984183aef000002"]
 
 res4 :: RecordData Field
 res4 =
   Record
     [ mkStrField "email" "a@e.com"
     , mkObjId "586763745984183aef000002"
+    , mkStrField "_updatedAt" "12345"
+    ]
+
+res5 :: RecordData Field
+res5 =
+  Record
+    [ mkStrField "email" "a@e.com"
+    , mkStrField "_createdAt" "12345"
     , mkStrField "_updatedAt" "12345"
     ]

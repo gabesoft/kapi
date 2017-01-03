@@ -7,6 +7,7 @@
 :date := (shell-command-to-string "echo -n (date +%Y-%m-%d-%M-%s)")
 :host = localhost:8001
 :path = xandar/users
+:json = application/json
 
 #
 # Get all users
@@ -21,7 +22,7 @@ GET http://:host/:path?sort=email&include=email,admin
 #
 # Get all users - pagination
 #
-GET http://:host/:path?page=2&per_page=3&sort=_createdAt
+GET http://:host/:path?page=10&per_page=5&sort=_createdAt
 
 #
 # Get a single user
@@ -43,7 +44,7 @@ DELETE http://:host/:path/non-existent
 # Create a single user
 #
 POST http://:host/:path
-Content-Type: application/json
+Content-Type: :json
 {
   "email": "admin:date@aol.com",
   "githubUrl" : "https://api.github.com/users/admin",
@@ -54,7 +55,7 @@ Content-Type: application/json
 # Create multiple users
 #
 POST http://:host/:path
-Content-Type: application/json
+Content-Type: :json
 [
   {
     "email": "user1:date@aol.com",
@@ -75,3 +76,22 @@ Content-Type: application/json
     "githubUrl": "https://api.github.com/users/other"
   }
 ]
+
+#
+# Replace a single user
+#
+PUT http://:host/:path/586b44e859841867f2000001
+Content-Type: :json
+{
+    "email": "replaced3@aol.com",
+    "admin": true
+}
+
+#
+# Modify a single user
+#
+PATCH http://:host/:path/586b44e859841867f2000002
+Content-Type: :json
+{
+    "email": "updated3@aol.com"
+}

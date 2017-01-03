@@ -43,19 +43,27 @@ handlers =
   optionsSingle :<|>
   optionsMultiple
 
+-- |
+-- Application name
 appName :: AppName
 appName = "xandar"
 
-dbName :: ApiConfig -> Database
-dbName = confGetDb appName
-
+-- |
+-- MongoDB collection name
 userColl :: Collection
 userColl = "users"
 
+-- |
+-- Get the configured database name for this app
+dbName :: ApiConfig -> Database
+dbName = confGetDb appName
+
+-- |
+-- Create a MongoDB connection pipe
 dbPipe
   :: MonadIO m
   => ApiConfig -> m Pipe
-dbPipe cfg = liftIO $ mkPipe (mongoHost cfg) (mongoPort cfg)
+dbPipe conf = liftIO $ mkPipe (mongoHost conf) (mongoPort conf)
 
 -- |
 -- Create a application for providing the user functionality
@@ -161,38 +169,22 @@ createMultiple inputs = do
 -- |
 -- Update (replace) a single user
 replaceSingle :: Text -> Record -> Api Record
-replaceSingle uid input =
-  getSingle' uid >> validateAndRun user (updateSingle >=> mkResult)
-  where
-    user = setIdValue uid input
-    mkResult (Fail e) = throwApiError e
-    mkResult (Succ r) = return r
+replaceSingle uid user = updateSingle True uid user >>= apiItem throwApiError return
 
 -- |
 -- Update (replace) multiple users
 replaceMultiple :: [Record] -> Api [ApiResult]
-replaceMultiple input =
-  mapM (chainResult updateSingle) (validateUserWithId <$> input)
+replaceMultiple = updateMultiple True
 
 -- |
 -- Update (modify) a single user
 modifySingle :: Text -> Record -> Api Record
-modifySingle uid user = do
-  existing <- getSingle' uid
-  validateAndRun
-    (existing <> user)
-    (updateSingle >=> apiItem throwApiError return)
+modifySingle uid user = updateSingle False uid user >>= apiItem throwApiError return
 
 -- |
 -- Update (modify) multiple users
 modifyMultiple :: [Record] -> Api [ApiResult]
-modifyMultiple input =
-  mapM (chainResult modify) (vResultToApiItem . validateHasId <$> input)
-  where
-    modify :: Record -> Api ApiResult
-    modify u = do
-      current <- getSingle' (fromJust $ getIdValue u)
-      chainResult updateSingle (validateUser $ current <> u)
+modifyMultiple = updateMultiple False
 
 -- |
 -- Handle a head request for a single user endpoint
@@ -230,10 +222,32 @@ insertSingle :: Record -> Api ApiResult
 insertSingle = insertOrUpdateSingle dbInsert
 
 -- |
--- Update an existing valid user
--- populating any missing fields with default values
-updateSingle :: Record -> Api ApiResult
-updateSingle = insertOrUpdateSingle dbUpdate
+-- Modify or replace multiple users
+updateMultiple :: Bool -> [Record] -> Api [ApiResult]
+updateMultiple replace = mapM modify
+  where
+    modify u =
+      chainResult
+        (updateSingle replace $ fromJust (getIdValue u))
+        (vResultToApiItem $ validateHasId u)
+
+-- |
+-- Modify or replace a single user
+updateSingle :: Bool -> Text -> Record -> Api ApiResult
+updateSingle replace uid updated = do
+  existing <- getSingle' uid
+  chainResult
+    (insertOrUpdateSingle dbUpdate)
+    (validateUser $ merge existing updated)
+  where
+    merge r1 r2 =
+      if replace
+        then exclude (r1 <> r2)
+        else r1 <> r2
+    include = getLabels updated
+    skip = ["_createdAt", "_updatedAt", "_id"]
+    keep name = elem name include || elem name skip
+    exclude r = excludeFields (filter (not . keep) (getLabels r)) r
 
 -- |
 -- Insert or update a valid @user@ record according to @action@
@@ -272,20 +286,8 @@ validateAndRun record act = apiItem throwApiError act (validateUser record)
 
 -- |
 -- Validate a user record
-validateUser' :: Record -> (Record, ValidationResult)
-validateUser' = validate userDefinition
-
--- |
--- Validate a user record
 validateUser :: Record -> ApiResult
-validateUser = vResultToApiItem . validateUser'
-
--- |
--- Validate a user record and ensure that it contains a valid id
-validateUserWithId :: Record -> ApiResult
-validateUserWithId user = vResultToApiItem $ valUser user
-  where
-    valUser u = second (mappend . snd $ validateHasId u) (validateUser' u)
+validateUser = vResultToApiItem . validate userDefinition
 
 -- |
 -- Populate all missing fields of a user record with default values
