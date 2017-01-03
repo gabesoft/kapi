@@ -15,6 +15,7 @@ module Api.Xandar
   , GetSingle
   , apiProxy
   , mkGetSingleLink
+  , mkGetMultipleLink
   ) where
 
 import Data.Text (Text)
@@ -72,6 +73,17 @@ type UserApi =
 apiProxy = Proxy :: Proxy XandarApi
 
 apiProxyGetSingle = Proxy :: Proxy (XandarApiPre :> UserApiPre :> GetSingle)
+apiProxyGetMultiple = Proxy :: Proxy (XandarApiPre :> UserApiPre :> GetMultiple)
 
 mkGetSingleLink :: Text -> String
 mkGetSingleLink = ("/" ++) . show . safeLink apiProxy apiProxyGetSingle
+
+mkGetMultipleLink :: [Text]
+                  -> Maybe Text
+                  -> [Text]
+                  -> Maybe Int
+                  -> Maybe Int
+                  -> String
+mkGetMultipleLink include query sort page perPage =
+  ("/" ++) $
+  show $ safeLink apiProxy apiProxyGetMultiple include query sort page perPage

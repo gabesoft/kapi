@@ -14,7 +14,10 @@
 **** _links : an array of relationship URLs
      - each link is an object containing =rel= and =href= fields
      #+BEGIN_SRC json
-       { "rel": "user", "href": "http://example.com/api/users/a123" }
+     {
+       "rel": "user",
+       "href": "http://example.com/api/users/a123"
+     }
      #+END_SRC
 *** Supported content types
     - Content-Type: application/json; charset=utf-8
@@ -34,7 +37,10 @@
 **** Failure
      - all error codes should be accompanied by an error payload that explains the error
      #+BEGIN_SRC json
-     { "message": "error reason", "documentationUrl": "http://api/documentation" }
+     {
+       "message": "error reason",
+       "documentationUrl": "http://api/documentation"
+     }
      #+END_SRC
 |-------------+------------------------+--------------------------------------------------------------------------------------|
 | Status Code | Status                 | Description                                                                          |

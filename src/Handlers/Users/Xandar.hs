@@ -92,9 +92,19 @@ getMultiple include query sort page perPage = do
     addHeader (show $ paginationTotal pagination) $
     addHeader (show $ paginationLast pagination) $
     addHeader (show $ paginationSize pagination) $
-    addHeader "pagination links" users
+    addHeader (mkPaginationHeader $ mkPaginationLinks pagination) users
   where
     mkFields f input = catMaybes $ f <$> concat (T.splitOn "," <$> input)
+    mkLink rel link = "<" ++ link ++ ">; rel=\"" ++ rel ++ "\""
+    mkSafeLink p = mkGetMultipleLink include query sort p perPage
+    mkPaginationHeader = intercalate ","
+    mkPaginationLinks p =
+      uncurry mkLink . second mkSafeLink <$>
+      [ ("next", Just $ paginationNext p)
+      , ("last", Just $ paginationLast p)
+      , ("first", Just $ paginationFirst p)
+      , ("prev", Just $ paginationPrev p)
+      ]
 
 -- |
 -- Get a single user by id
