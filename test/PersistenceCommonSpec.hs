@@ -19,11 +19,13 @@ import Types.Common
 main :: IO ()
 main =
   hspec $
-  describe "Persistence.Common" $
-  -- merge
-  do it "can merge simple records" $ verifyMerge rec1 rec2 mergeRes1
+  describe "Persistence.Common" $ do
+     -- merge
+     it "can merge simple records" $ verifyMerge rec1 rec2 mergeRes1
      it "can merge nested records 1" $ verifyMerge rec3 rec4 mergeRes2
      it "can merge nested records 2" $ verifyMerge rec4 rec5 rec5
+     -- replace
+     it "can replace simple records" $ verifyReplace ["x","y", "e.r"] rec10 rec11 replaceRes1
      -- exclude
      it "can exclude simple fields" $
        verifyExclude rec1 excludeRes1 ["email", "y"]
@@ -120,6 +122,9 @@ main =
 
 verifyMerge :: Record -> Record -> Record -> Expectation
 verifyMerge r1 r2 exp = mergeRecords r1 r2 `shouldBe` exp
+
+verifyReplace :: [Label] -> Record -> Record -> Record -> Expectation
+verifyReplace labels r1 r2 exp = replaceRecords labels r1 r2 `shouldBe` exp
 
 verifyExclude :: Record -> Record -> [Label] -> Expectation
 verifyExclude r exp labels = excludeFields labels r `shouldBe` exp

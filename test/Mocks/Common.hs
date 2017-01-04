@@ -106,6 +106,47 @@ rec9 =
     , "_createdAt" =: Null
     ]
 
+rec10 :: Record
+rec10 =
+  Record
+    [ f "a" "1"
+    , f "b" "2"
+    , f "c" "3"
+    , f "d" "4"
+    , "e" =: [f "p" "1", f "q" "2", f "r" "3"]
+    , f "x" "5"
+    , f "y" "6"
+    ]
+  where
+    f = mkStrField
+
+rec11 :: Record
+rec11 =
+  Record
+    [ f "a" "1"
+    , f "b" "p"
+    , f "c" "q"
+    , "e" =: [f "p" "x", f "r" "s"]
+    , f "x" "9"
+    , f "w" "10"
+    ]
+  where
+    f = mkStrField
+
+replaceRes1 :: Record
+replaceRes1 =
+  Record
+    [ f "a" "1"
+    , f "b" "p"
+    , f "c" "q"
+    , "e" =: [f "p" "x", f "r" "3"]
+    , f "x" "5"
+    , f "y" "6"
+    , f "w" "10"
+    ]
+  where
+    f = mkStrField
+
 -- | Delete field resultst
 
 delRes1 :: Record

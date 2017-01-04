@@ -28,21 +28,6 @@ import Persistence.Users.Xandar (userDefinition, userIndices)
 import Servant
 import Types.Common
 
-handlers :: ServerT XandarApi Api
-handlers =
-  getMultiple :<|>
-  getSingle :<|>
-  deleteSingle :<|>
-  createSingleOrMultiple :<|>
-  replaceSingle :<|>
-  replaceMultiple :<|>
-  modifySingle :<|>
-  modifyMultiple :<|>
-  headSingle :<|>
-  headMultiple :<|>
-  optionsSingle :<|>
-  optionsMultiple
-
 -- |
 -- Application name
 appName :: AppName
@@ -66,14 +51,28 @@ dbPipe
 dbPipe conf = liftIO $ mkPipe (mongoHost conf) (mongoPort conf)
 
 -- |
--- Create a application for providing the user functionality
+-- Create an application for providing the user functionality
 app :: ApiConfig -> Application
 app config = serve apiProxy (server config)
   where
     server :: ApiConfig -> Server XandarApi
-    server cfg = enter (toHandler cfg) handlers
+    server conf = enter (toHandler conf) handlers
     toHandler :: ApiConfig -> Api :~> Handler
-    toHandler cfg = Nat (`runReaderT` cfg)
+    toHandler conf = Nat (`runReaderT` conf)
+    handlers :: ServerT XandarApi Api
+    handlers =
+      getMultiple :<|>
+      getSingle :<|>
+      deleteSingle :<|>
+      createSingleOrMultiple :<|>
+      replaceSingle :<|>
+      replaceMultiple :<|>
+      modifySingle :<|>
+      modifyMultiple :<|>
+      headSingle :<|>
+      headMultiple :<|>
+      optionsSingle :<|>
+      optionsMultiple
 
 -- |
 -- Perform any initialization to be done on server start
@@ -88,8 +87,6 @@ getMultiple :: ServerT GetMultiple Api
 getMultiple include query sort page perPage = do
   conf <- ask
   pipe <- dbPipe conf
-  let sort' = mkFields mkSortField sort
-  let include' = mkFields mkIncludeField include
   count <- dbCount (dbName conf) userColl pipe
   let pagination = paginate (fromMaybe 1 page) (fromMaybe 50 perPage) count
   let start = paginationStart pagination
@@ -100,18 +97,18 @@ getMultiple include query sort page perPage = do
     addHeader (show $ paginationTotal pagination) $
     addHeader (show $ paginationLast pagination) $
     addHeader (show $ paginationSize pagination) $
-    addHeader (mkPaginationHeader $ mkPaginationLinks pagination) users
+    addHeader (intercalate "," $ mkPaginationLinks pagination) users
   where
     mkFields f input = catMaybes $ f <$> concat (T.splitOn "," <$> input)
-    mkLink rel link = "<" ++ link ++ ">; rel=\"" ++ rel ++ "\""
-    mkSafeLink p = mkGetMultipleLink include query sort p perPage
-    mkPaginationHeader = intercalate ","
-    mkPaginationLinks p =
-      uncurry mkLink . second mkSafeLink <$>
-      [ ("next", Just $ paginationNext p)
-      , ("last", Just $ paginationLast p)
-      , ("first", Just $ paginationFirst p)
-      , ("prev", Just $ paginationPrev p)
+    sort' = mkFields mkSortField sort
+    include' = mkFields mkIncludeField include
+    mkUrl page' = mkGetMultipleLink include query sort (Just page') perPage
+    mkPaginationLinks pagination =
+      uncurry mkRelLink . second mkUrl <$>
+      [ ("next", paginationNext pagination)
+      , ("last", paginationLast pagination)
+      , ("first", paginationFirst pagination)
+      , ("prev", paginationPrev pagination)
       ]
 
 -- |
@@ -119,11 +116,14 @@ getMultiple include query sort page perPage = do
 getSingle :: Maybe Text -> Text -> Api (Headers '[Header "ETag" String] Record)
 getSingle etag uid = do
   user <- getSingle' uid
-  let sha = showDigest (recToSha user)
-  let res = addHeader (showDigest $ recToSha user) user
+  let sha = recToSha user
+  let res = addHeader sha user
   case etag of
     Nothing -> return res
-    Just tag -> if tag == T.pack sha then throwError err304 else return res
+    Just tag ->
+      if tag == T.pack sha
+        then throwError err304
+        else return res
 
 -- |
 -- Delete a single user
@@ -147,11 +147,11 @@ createSingleOrMultiple (Multiple rs) = createMultiple rs
 createSingle
   :: Record
   -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData ApiResult))
-createSingle input = validateAndRun input (insertSingle >=> mkResult)
+createSingle input = do
+  user <- insertSingle input
+  apiItem throwApiError (return . mkResult) user
   where
-    mkResult (Succ r) = return $ addHeader (getUserLink r) $ noHeader (mkData r)
-    mkResult (Fail e) = throwApiError e
-    mkData = Single . Succ
+    mkResult r = addHeader (getUserLink r) $ noHeader (Single $ Succ r)
 
 -- |
 -- Create multiple users
@@ -159,27 +159,24 @@ createMultiple
   :: [Record]
   -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData ApiResult))
 createMultiple inputs = do
-  users <- mapM insert (validateUser <$> inputs)
+  users <- mapM insertSingle inputs
   let links = apiItem mempty (mkLink . getUserLink) <$> users
   return . noHeader $ addHeader (intercalate ", " links) (Multiple users)
-  where
-    mkLink path = "<" ++ path ++ ">"
-    insert = chainResult insertSingle
 
 -- |
 -- Update (replace) a single user
 replaceSingle :: Text -> Record -> Api Record
-replaceSingle uid user = updateSingle True uid user >>= apiItem throwApiError return
+replaceSingle = updateSingle' True
+
+-- |
+-- Update (modify) a single user
+modifySingle :: Text -> Record -> Api Record
+modifySingle = updateSingle' False
 
 -- |
 -- Update (replace) multiple users
 replaceMultiple :: [Record] -> Api [ApiResult]
 replaceMultiple = updateMultiple True
-
--- |
--- Update (modify) a single user
-modifySingle :: Text -> Record -> Api Record
-modifySingle uid user = updateSingle False uid user >>= apiItem throwApiError return
 
 -- |
 -- Update (modify) multiple users
@@ -193,7 +190,7 @@ headSingle
   -> Api (Headers '[Header "ETag" String] NoContent)
 headSingle uid = do
   user <- getSingle' uid
-  return $ addHeader (showDigest $ recToSha user) NoContent
+  return $ addHeader (recToSha user) NoContent
 
 -- |
 -- Handle a head request for a multiple users endpoint
@@ -219,17 +216,13 @@ optionsMultiple = return $ addHeader "GET, POST, PATCH, PUT" NoContent
 -- Insert a single valid user
 -- populating any missing fields with default values
 insertSingle :: Record -> Api ApiResult
-insertSingle = insertOrUpdateSingle dbInsert
+insertSingle = chainResult (insertOrUpdateSingle dbInsert) . validateUser
 
 -- |
--- Modify or replace multiple users
-updateMultiple :: Bool -> [Record] -> Api [ApiResult]
-updateMultiple replace = mapM modify
-  where
-    modify u =
-      chainResult
-        (updateSingle replace $ fromJust (getIdValue u))
-        (vResultToApiItem $ validateHasId u)
+-- Modify or replace a single user
+updateSingle' :: Bool -> Text -> Record -> Api Record
+updateSingle' replace uid user =
+  updateSingle replace uid user >>= apiItem throwApiError return
 
 -- |
 -- Modify or replace a single user
@@ -240,14 +233,22 @@ updateSingle replace uid updated = do
     (insertOrUpdateSingle dbUpdate)
     (validateUser $ merge existing updated)
   where
-    merge r1 r2 =
+    merge =
       if replace
-        then exclude (r1 <> r2)
-        else r1 <> r2
+        then replaceRecords preserve
+        else mergeRecords
     include = getLabels updated
-    skip = ["_createdAt", "_updatedAt", "_id"]
-    keep name = elem name include || elem name skip
-    exclude r = excludeFields (filter (not . keep) (getLabels r)) r
+    preserve = ["_createdAt", "_updatedAt", "_id"]
+
+-- |
+-- Modify or replace multiple users
+updateMultiple :: Bool -> [Record] -> Api [ApiResult]
+updateMultiple replace = mapM modify
+  where
+    modify u =
+      chainResult
+        (updateSingle replace $ fromJust (getIdValue u))
+        (vResultToApiItem $ validateHasId u)
 
 -- |
 -- Insert or update a valid @user@ record according to @action@
@@ -276,13 +277,6 @@ getSingle' uid = do
 -- Create a link for a user resource
 getUserLink :: Record -> String
 getUserLink = mkGetSingleLink . fromJust . getIdValue
-
--- |
--- Validate a record and run an action if valid or throw an error
-validateAndRun
-  :: MonadError ServantErr m
-  => Record -> (Record -> m a) -> m a
-validateAndRun record act = apiItem throwApiError act (validateUser record)
 
 -- |
 -- Validate a user record
@@ -317,7 +311,19 @@ throwApiError err
       { errBody = encode (Fail ae :: ApiItem ApiError ())
       }
 
+-- |
+-- Chain two API results
 chainResult
   :: Monad m
   => (Record -> m ApiResult) -> ApiResult -> m ApiResult
 chainResult = apiItem (return . Fail)
+
+-- |
+-- Create a link element
+mkLink :: String -> String
+mkLink link = "<" ++ link ++ ">"
+
+-- |
+-- Create a relative link element
+mkRelLink :: String -> String -> String
+mkRelLink rel link = mkLink link ++ "; rel=\"" ++ rel ++ "\""

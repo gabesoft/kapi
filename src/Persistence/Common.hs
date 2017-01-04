@@ -24,11 +24,6 @@ getDocument :: Record -> Document
 getDocument (Record xs) = xs
 
 -- |
--- Extract the field names from a record
-getLabels :: Record -> [Label]
-getLabels = fmap label . getDocument
-
--- |
 -- Case analysis for the @ApiItem@ type
 apiItem :: (e -> c) -> (a -> c) -> ApiItem e a -> c
 apiItem f _ (Fail e) = f e
@@ -255,7 +250,7 @@ hasValue name r = hasField name r && has (getValue name r)
 -- Merge two records with the record on the right overwriting any
 -- existing fields in the left record. Nested records are supported.
 mergeRecords :: Record -> Record -> Record
-mergeRecords (Record r1) (Record r2) = Record $ foldl add r1 r2
+mergeRecords (Record d1) (Record d2) = Record $ foldl add d1 d2
   where
     add doc field@(k := _) = withField k doc (++ [field]) (process field)
     process field (xs, _, ys) (i, d) = xs ++ [new (d !! i) field] ++ ys
@@ -263,6 +258,31 @@ mergeRecords (Record r1) (Record r2) = Record $ foldl add r1 r2
       | valIsDoc lv && valIsDoc rv =
         rk := recToDoc (mergeRecords (docToRec lk lf) (docToRec rk rf))
       | otherwise = rk := rv
+
+-- |
+-- Extract the field names from a record
+getLabels :: Record -> [Label]
+getLabels = fmap label . getDocument
+
+-- |
+-- Extract the field names from a record and all of its children
+getLabels' :: Record -> [Label]
+getLabels' (Record d) = foldl add (label <$> d) d
+  where
+    pre k l = T.concat [k, ".", l]
+    add labels f@(k := v)
+      | valIsDoc v =
+        labels ++ (pre k <$> getLabels' (docToRec k f))
+      | otherwise = labels
+
+-- |
+-- Replace one record with another keeping some fields fields unmodified
+replaceRecords :: [Label] -> Record -> Record -> Record
+replaceRecords preserveLabels r1 r2 = exclude (mergeRecords r1 r2')
+  where
+    r2' = excludeFields preserveLabels r2
+    keep name = elem name (getLabels' r2) || elem name preserveLabels
+    exclude r = excludeFields (filter (not . keep) (getLabels' r)) r
 
 -- |
 -- Exclude all specified fields from a record
@@ -329,8 +349,13 @@ docToRec name field = Record (at name [field])
 
 -- |
 -- Compute the sha-1 hash of a record
-recToSha :: Record -> Digest SHA1State
-recToSha = sha1 . encode
+recToSha' :: Record -> Digest SHA1State
+recToSha' = sha1 . encode
+
+-- |
+-- Compute the sha-1 hash of a record as a string
+recToSha :: Record -> String
+recToSha = showDigest . recToSha'
 
 -- |
 -- Compute the pagination data given a current page,

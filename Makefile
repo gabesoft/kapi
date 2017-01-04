@@ -18,7 +18,7 @@ serve: build
 
 serve-watch: export KAPI_ENV=development
 serve-watch:
-	find $(CURDIR)/src $(CURDIR)/app -name "*.hs" | entr -d -r sh -c 'make serve'
+	ag -l -Ghs --ignore test | entr -r sh -c 'make serve'
 
 test:
 	stack build --test
