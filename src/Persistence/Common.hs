@@ -260,29 +260,13 @@ mergeRecords (Record d1) (Record d2) = Record $ foldl add d1 d2
       | otherwise = rk := rv
 
 -- |
--- Extract the field names from a record
-getLabels :: Record -> [Label]
-getLabels = fmap label . getDocument
-
--- |
--- Extract the field names from a record and all of its children
-getLabels' :: Record -> [Label]
-getLabels' (Record d) = foldl add (label <$> d) d
-  where
-    pre k l = T.concat [k, ".", l]
-    add labels f@(k := v)
-      | valIsDoc v =
-        labels ++ (pre k <$> getLabels' (docToRec k f))
-      | otherwise = labels
-
--- |
 -- Replace one record with another keeping some fields fields unmodified
 replaceRecords :: [Label] -> Record -> Record -> Record
-replaceRecords preserveLabels r1 r2 = exclude (mergeRecords r1 r2')
+replaceRecords preserveLabels r1 r2 = exclude' (mergeRecords r1 r2')
   where
     r2' = excludeFields preserveLabels r2
     keep name = elem name (getLabels' r2) || elem name preserveLabels
-    exclude r = excludeFields (filter (not . keep) (getLabels' r)) r
+    exclude' r = excludeFields (filter (not . keep) (getLabels' r)) r
 
 -- |
 -- Exclude all specified fields from a record
@@ -297,6 +281,22 @@ excludeFields labels (Record d) =
     removeNested f@(k := v) names
       | valIsDoc v = k := recToDoc (excludeFields names (docToRec k f))
       | otherwise = k := v
+
+-- |
+-- Extract the field names from a record
+getLabels :: Record -> [Label]
+getLabels = fmap label . getDocument
+
+-- |
+-- Extract the field names from a record and all of its children
+getLabels' :: Record -> [Label]
+getLabels' (Record d) = foldl add (label <$> d) d
+  where
+    pre k l = T.concat [k, ".", l]
+    add labels f@(k := v)
+      | valIsDoc v =
+        labels ++ (pre k <$> getLabels' (docToRec k f))
+      | otherwise = labels
 
 -- |
 -- Find the field with @name@ in @doc@ and do a case analysis
@@ -369,7 +369,7 @@ paginate page' size' total' =
   , paginationNext = next
   , paginationPrev = prev
   , paginationFirst = first
-  , paginationLast = last
+  , paginationLast = last'
   , paginationStart = start
   , paginationLimit = limit
   }
@@ -377,9 +377,9 @@ paginate page' size' total' =
     total = max total' 0
     size = max size' 1
     first = 1
-    last = max 1 (div total size + min 1 (mod total size))
-    page = min (max page' first) last
-    next = min (page + 1) last
+    last' = max 1 (div total size + min 1 (mod total size))
+    page = min (max page' first) last'
+    next = min (page + 1) last'
     prev = max first (page - 1)
     start = max 0 ((page - 1) * size)
     limit = size

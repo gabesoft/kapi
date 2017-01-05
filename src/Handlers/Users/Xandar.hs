@@ -166,12 +166,12 @@ createMultiple inputs = do
 -- |
 -- Update (replace) a single user
 replaceSingle :: Text -> Record -> Api Record
-replaceSingle = updateSingle' True
+replaceSingle = updateSingle True
 
 -- |
 -- Update (modify) a single user
 modifySingle :: Text -> Record -> Api Record
-modifySingle = updateSingle' False
+modifySingle = updateSingle False
 
 -- |
 -- Update (replace) multiple users
@@ -220,25 +220,9 @@ insertSingle = chainResult (insertOrUpdateSingle dbInsert) . validateUser
 
 -- |
 -- Modify or replace a single user
-updateSingle' :: Bool -> Text -> Record -> Api Record
-updateSingle' replace uid user =
-  updateSingle replace uid user >>= apiItem throwApiError return
-
--- |
--- Modify or replace a single user
-updateSingle :: Bool -> Text -> Record -> Api ApiResult
-updateSingle replace uid updated = do
-  existing <- getSingle' uid
-  chainResult
-    (insertOrUpdateSingle dbUpdate)
-    (validateUser $ merge existing updated)
-  where
-    merge =
-      if replace
-        then replaceRecords preserve
-        else mergeRecords
-    include = getLabels updated
-    preserve = ["_createdAt", "_updatedAt", "_id"]
+updateSingle :: Bool -> Text -> Record -> Api Record
+updateSingle replace uid user =
+  updateSingle' replace uid user >>= apiItem throwApiError return
 
 -- |
 -- Modify or replace multiple users
@@ -247,8 +231,22 @@ updateMultiple replace = mapM modify
   where
     modify u =
       chainResult
-        (updateSingle replace $ fromJust (getIdValue u))
+        (updateSingle' replace $ fromJust (getIdValue u))
         (vResultToApiItem $ validateHasId u)
+
+-- |
+-- Modify or replace a single user
+updateSingle' :: Bool -> Text -> Record -> Api ApiResult
+updateSingle' replace uid updated = do
+  existing <- getSingle' uid
+  chainResult
+    (insertOrUpdateSingle dbUpdate)
+    (validateUser $ merge existing updated)
+  where
+    merge =
+      if replace
+        then replaceRecords ["_createdAt", "_updatedAt", "_id"]
+        else mergeRecords
 
 -- |
 -- Insert or update a valid @user@ record according to @action@
@@ -306,9 +304,9 @@ throwApiError err
   | apiErrorStatus err == status404 = throwError (mkErr err404 err)
   | otherwise = throwError (mkErr err500 err)
   where
-    mkErr se ae =
-      se
-      { errBody = encode (Fail ae :: ApiItem ApiError ())
+    mkErr sErr aErr =
+      sErr
+      { errBody = encode (Fail aErr :: ApiItem ApiError ())
       }
 
 -- |

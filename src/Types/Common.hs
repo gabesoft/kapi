@@ -6,6 +6,7 @@
 -- | Common types
 module Types.Common where
 
+import Data.Time (UTCTime(..))
 import Control.Monad.Reader
 import Data.Aeson as AESON
 import Data.AesonBson (aesonify, bsonify)
@@ -157,3 +158,52 @@ data Pagination = Pagination
   , paginationStart :: Int
   , paginationLimit :: Int
   } deriving (Eq, Show, Read)
+
+-- |
+-- Filter expressions
+data FilterExpr
+  = FilterBoolOp FilterBooleanOperator
+                 FilterExpr
+                 FilterExpr
+  | FilterRelOp FilterRelationalOperator
+                ColumnName
+                FilterTerm
+  deriving (Eq, Read, Show)
+
+-- |
+-- Relational operators
+data FilterRelationalOperator
+  = EQ -- equal
+  | NQ -- not equal
+  | GT -- greater than
+  | GE -- greater than or equal
+  | LT -- less than
+  | LE -- less than or equal
+  | IN -- in
+  | NN -- not in
+  | CONTAINS
+  deriving (Eq, Read, Show)
+
+-- |
+-- Boolean operators
+data FilterBooleanOperator
+  = AND
+  | OR
+  deriving (Eq, Read, Show)
+
+-- |
+-- Field or column name
+type ColumnName = Text
+
+-- |
+-- Filter term
+data FilterTerm
+  = TermInt Int
+  | TermIntList [Int]
+  | TermBool Bool
+  | TermStr String
+  | TermStrList [String]
+  | TermDate UTCTime
+  | TermDateList [UTCTime]
+  | TermNull
+  deriving (Eq, Read, Show)

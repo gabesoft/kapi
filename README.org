@@ -86,22 +86,33 @@
      - GET /users?where=(name eq 'joe') and (createdAt lt '123')
      - GET /users?where=profile.phone eq '112-332-4423'
 ***** Filtering operators
-|-------------+--------------------------------+-------------------------------------------|
-| Operator    | Description                    | Example                                   |
-|-------------+--------------------------------+-------------------------------------------|
-| eq          | equal                          | name eq 'Tom'                             |
-| ne          | not equal                      | name ne 'Tom'                             |
-| gt          | greater than                   |                                           |
-| ge          | greater than or equal          | version ge '1.0'                          |
-| lt          | less than                      |                                           |
-| le          | less than or equal             |                                           |
-| in          | in list                        | id in (1,2,3)                             |
-| contains    | contains                       | name contains 'the'                       |
-| is null     | is null                        | version is null                           |
-| is not null | is not null                    | description is not null                   |
-| and         | combine two conditions via AND | (active eq 'true') and (version ge '1.1') |
-| or          | combine two conditions via OR  | (active eq 'false') or (version ge '1.1') |
-|-------------+--------------------------------+-------------------------------------------|
+|-------------+--------------------------------+-----------------------------------------|
+| Operator    | Description                    | Example                                 |
+|-------------+--------------------------------+-----------------------------------------|
+| eq          | equal                          | name eq 'Tom'                           |
+| ne          | not equal                      | name ne 'Tom'                           |
+| gt          | greater than                   | height gt 6                             |
+| ge          | greater than or equal          | version ge '1.0'                        |
+| lt          | less than                      |                                         |
+| le          | less than or equal             |                                         |
+| in          | in list                        | id in [1,2,3]                           |
+| not in      | not in list                    | id not in [1,2,3]                    |
+| contains    | contains                       | name contains 'the'                     |
+| is null     | is null                        | version is null                         |
+| is not null | is not null                    | description is not null                 |
+| and         | combine two conditions via AND | (active eq true) and (version ge '1.1') |
+| or          | combine two conditions via OR  | (active eq false) or (version ge '1.1') |
+|-------------+--------------------------------+-----------------------------------------|
+***** Supported types
+|------------+---------------------------------------+---------------------------------------|
+| Type       | Sample Query                          |                                       |
+|------------+---------------------------------------+---------------------------------------|
+| Integer    | price gt 123                          |                                       |
+| Float      | price lt 2.5                          |                                       |
+| String     | name eq 'Tom'                         | surrounded by single or double quotes |
+| Date (UTC) | startDate gt 2017-01-05T05:27:03.213Z | ISO 8601                              |
+| Boolean    | admin eq true                         |                                       |
+|------------+---------------------------------------+---------------------------------------|
 **** Via query object for custom queries
      - objects that support queries should be query-able via a query id like so ~?q=<query-id>~
 *** Fields

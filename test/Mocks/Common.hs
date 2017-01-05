@@ -133,21 +133,7 @@ rec11 =
   where
     f = mkStrField
 
-replaceRes1 :: Record
-replaceRes1 =
-  Record
-    [ f "a" "1"
-    , f "b" "p"
-    , f "c" "q"
-    , "e" =: [f "p" "x", f "r" "3"]
-    , f "x" "5"
-    , f "y" "6"
-    , f "w" "10"
-    ]
-  where
-    f = mkStrField
-
--- | Delete field resultst
+-- | Delete field results
 
 delRes1 :: Record
 delRes1 =
@@ -266,6 +252,22 @@ popRes1 =
     , mkIntField "count" 1
     , mkBoolField "disabled" False
     ]
+
+-- | Replace results
+
+replaceRes1 :: Record
+replaceRes1 =
+  Record
+    [ f "a" "1"
+    , f "b" "p"
+    , f "c" "q"
+    , "e" =: [f "p" "x", f "r" "3"]
+    , f "x" "5"
+    , f "y" "6"
+    , f "w" "10"
+    ]
+  where
+    f = mkStrField
 
 -- | Set field results
 

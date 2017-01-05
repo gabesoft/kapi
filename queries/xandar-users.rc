@@ -22,7 +22,7 @@ GET http://:host/:path?sort=email&include=email,admin
 #
 # Get all users - pagination
 #
-GET http://:host/:path?page=10&per_page=5
+GET http://:host/:path?page=4&per_page=5
 
 #
 # Get a single user

@@ -18,6 +18,7 @@ library
                      , Data.AesonBson
                      , Data.AesonBson.Instances
                      , Handlers.Users.Xandar
+                     , Parsers.Filter
                      , Persistence.Common
                      , Persistence.MongoDB
                      , Persistence.Users.Xandar
@@ -29,11 +30,13 @@ library
                      , bytestring >= 0.10
                      , containers >= 0.5
                      , http-types >= 0.9
+                     , iso8601-time
                      , lifted-base >= 0.2
                      , monad-control >= 1.0
                      , mongoDB >= 2.1
                      , mtl >= 2.2
                      , network >= 2.6
+                     , parsec >= 3.1
                      , SHA
                      , scientific >= 0.3
                      , servant >= 0.9
