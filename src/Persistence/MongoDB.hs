@@ -4,16 +4,18 @@
 -- | Functionality for interacting with MongoDB
 module Persistence.MongoDB where
 
-import Control.Monad ((>=>))
 import Control.Exception.Lifted (handleJust)
+import Control.Monad ((>=>))
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Control
+import Data.Bifunctor
 import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as T
 import Database.MongoDB
 import Network.Socket (HostName, PortNumber)
+import Parsers.Filter (parse)
 import Persistence.Common
 import Text.Read (readMaybe)
 import Types.Common
@@ -213,6 +215,13 @@ mkIncludeField name
 
 mkIntField :: Text -> Int -> Field
 mkIntField = (=:)
+
+-- |
+-- Convert a filter query to a @Document@
+queryToDoc :: Text -> Either String Document
+queryToDoc xs
+  | T.null xs = Right []
+  | otherwise = first ("Invalid query: " ++) $ parse xs >>= filterToDoc
 
 -- |
 -- Convert a @FilterExpr@ into a @Document@ that can be used to filter

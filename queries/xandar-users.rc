@@ -27,7 +27,7 @@ GET http://:host/:path?where=(admin eq true)
 #
 # Get users filtered by email
 #
-GET http://:host/:path?where=(email contains "aol")
+GET http://:host/:path?where=(email contains "updated")
 
 #
 # Get users created afte a date

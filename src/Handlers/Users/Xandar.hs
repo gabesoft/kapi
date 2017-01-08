@@ -22,7 +22,6 @@ import qualified Data.Text as T
 import Database.MongoDB (Pipe, Collection, Database)
 import Database.MongoDB.Query (Failure(..))
 import Network.HTTP.Types.Status
-import Parsers.Filter (parse)
 import Persistence.Common
 import Persistence.MongoDB
 import Persistence.Users.Xandar (userDefinition, userIndices)
@@ -92,7 +91,7 @@ getMultiple include query sort page perPage = do
   let pagination = paginate (fromMaybe 1 page) (fromMaybe 50 perPage) count
   let start = paginationStart pagination
   let limit = paginationLimit pagination
-  case parse (fromMaybe "" query) >>= filterToDoc of
+  case queryToDoc (fromMaybe "" query) of
     Right filter -> do
       users <- dbFind (dbName conf) userColl filter sort' include' start limit pipe
       return $
