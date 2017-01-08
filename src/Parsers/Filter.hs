@@ -8,7 +8,7 @@ import Control.Applicative ((<|>))
 import Control.Monad (void, when)
 import Data.Attoparsec.Text
        (Parser, choice, skipWhile, char, asciiCI, many', many1,
-        scientific, scan, anyChar, takeWhile, takeWhile1, inClass)
+        scientific, scan, anyChar, takeWhile, takeWhile1, inClass, option)
 import qualified Data.Attoparsec.Text as A
 import Data.Char (isSpace)
 import Data.Functor.Identity
@@ -62,9 +62,16 @@ termList = TermList <$> braces (sepByComma item)
     item = skipSpace *> termSingle <* skipSpace
 
 col :: Parser ColumnName
-col = takeWhile1 (not . inClass excluded)
+col = do
+  name <- takeWhile1 (not . inClass excluded)
+  b <- boost
+  return $ ColumnName name b
   where
     excluded = "():{}[] \t\r\n"
+    boost = option 1 $ char ':' *> value
+    value = do
+      x <- scientific
+      either (fail "expected a natural number") return $ floatingOrInteger x
 
 num :: Parser FilterTerm
 num = do

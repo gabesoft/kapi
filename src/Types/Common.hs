@@ -6,7 +6,6 @@
 -- | Common types
 module Types.Common where
 
-import Data.Time (UTCTime(..))
 import Control.Monad.Reader
 import Data.Aeson as AESON
 import Data.AesonBson (aesonify, bsonify)
@@ -15,7 +14,10 @@ import Data.Bson as BSON
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import qualified Data.Map.Strict as Map
 import Data.Monoid
+import Data.String
 import Data.Text (Text)
+import qualified Data.Text as T
+import Data.Time (UTCTime(..))
 import Database.MongoDB (Database)
 import GHC.Generics
 import Network.HTTP.Types.Status
@@ -194,7 +196,13 @@ data FilterBooleanOperator
 
 -- |
 -- Field or column name
-type ColumnName = Text
+data ColumnName =
+  ColumnName Text
+             Int
+  deriving (Eq, Read, Show)
+
+instance IsString ColumnName where
+  fromString name = ColumnName (T.pack name) 1
 
 -- |
 -- Filter term

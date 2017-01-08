@@ -48,6 +48,12 @@ validCases =
         "colBoolList"
         (TermList
            [TermBool True, TermInt 123, TermFloat 99.33, TermNull, TermStr "x"]))
+  , ( "title:1 eq \"hoop\" and (desc:2 ~in [\"hoola\",\"boop\"])"
+    , FilterBoolOp
+        And
+        (FilterRelOp Equal "title" $ TermStr "hoop")
+        (FilterRelOp NotIn (ColumnName "desc" 2) $
+         TermList [TermStr "hoola", TermStr "boop"]))
   , mkAnd (expr 1) (expr 2)
   , mkAnd (expr 1) (parens $ mkOr (expr 2) (expr 3))
   , mkAnd (expr 1) (parens $ mkOr (expr 2) (parens $ mkAnd (expr 4) (expr 5)))
