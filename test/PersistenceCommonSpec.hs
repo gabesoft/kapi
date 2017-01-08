@@ -2,9 +2,7 @@
 
 -- |
 -- Tests for Persistence.Common
-module Main
-  ( main
-  ) where
+module Main (main) where
 
 import Data.Bson
 import Data.List (all)

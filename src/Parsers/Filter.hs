@@ -6,10 +6,10 @@ module Parsers.Filter where
 
 import Control.Applicative ((<|>))
 import Control.Monad (void, when)
-import qualified Data.Attoparsec as A
 import Data.Attoparsec.Text
        (Parser, choice, skipWhile, char, asciiCI, many', many1,
         scientific, scan, anyChar, takeWhile, takeWhile1, inClass)
+import qualified Data.Attoparsec.Text as A
 import Data.Char (isSpace)
 import Data.Functor.Identity
 import Data.Scientific (floatingOrInteger)
@@ -21,6 +21,9 @@ import Parsers.Unescape
 import Prelude ()
 import Prelude.Compat
 import Types.Common
+
+parse :: Text -> Either String FilterExpr
+parse = A.parseOnly expr
 
 expr :: Parser FilterExpr
 expr = foldl mkExprParser simpleExpr [("and", And), ("or", Or)]
@@ -50,7 +53,7 @@ term :: Parser FilterTerm
 term = termSingle <|> termList
 
 termSingle :: Parser FilterTerm
-termSingle = str <|> bool <|> nil <|> jsDate <|> num
+termSingle = jsDate <|> bool <|> nil <|> str <|> num
 
 termList :: Parser FilterTerm
 termList = TermList <$> braces (sepByComma item)
@@ -103,7 +106,7 @@ nil = asciiCI "null" >> return TermNull
 jsDate :: Parser FilterTerm
 jsDate = TermDate <$> (takeWhile1 (inClass included) >>= getDate)
   where
-    included = "0123456789:.+-TZD"
+    included = "0-9:.TZD+-"
     getDate s =
       case parseISO8601 (T.unpack s) of
         Just d -> return d
