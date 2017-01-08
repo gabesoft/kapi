@@ -1,9 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 -- | Tests for Parsers.Filter
-module Main
-  ( main
-  ) where
+module Main (main) where
 
 import Data.Maybe
 import Data.Text (Text, unpack, pack)

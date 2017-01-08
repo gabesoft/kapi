@@ -20,6 +20,21 @@ GET http://:host/:path
 GET http://:host/:path?sort=email&include=email,admin
 
 #
+# Get all admin users
+#
+GET http://:host/:path?where=(admin eq true)
+
+#
+# Get users filtered by email
+#
+GET http://:host/:path?where=(email contains "aol")
+
+#
+# Get users created afte a date
+#
+GET http://:host/:path?where=(_createdAt ge 2017-01-08T07:47:45.928Z)
+
+#
 # Get all users - pagination
 #
 GET http://:host/:path?page=4&per_page=5

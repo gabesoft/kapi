@@ -215,3 +215,20 @@ data FilterTerm
   | TermNull
   | TermList [FilterTerm]
   deriving (Eq, Read, Show)
+
+instance Val FilterTerm where
+  val (TermInt x) = val x
+  val (TermFloat x) = val x
+  val (TermBool x) = val x
+  val (TermStr x) = val x
+  val (TermDate x) = val x
+  val TermNull = BSON.Null
+  val (TermList xs) = valList xs
+  cast' x@(Int32 _) = TermInt <$> cast' x
+  cast' x@(Int64 _) = TermInt <$> cast' x
+  cast' x@(Float _) = TermFloat <$> cast' x
+  cast' x@(BSON.Bool _) = TermBool <$> cast' x
+  cast' x@(BSON.String _) = TermStr <$> cast' x
+  cast' x@(BSON.UTC _) = TermDate <$> cast' x
+  cast' BSON.Null = Just TermNull
+  cast' xs = TermList <$> cast' xs

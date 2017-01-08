@@ -22,6 +22,7 @@ import qualified Data.Text as T
 import Database.MongoDB (Pipe, Collection, Database)
 import Database.MongoDB.Query (Failure(..))
 import Network.HTTP.Types.Status
+import Parsers.Filter (parse)
 import Persistence.Common
 import Persistence.MongoDB
 import Persistence.Users.Xandar (userDefinition, userIndices)
@@ -91,13 +92,16 @@ getMultiple include query sort page perPage = do
   let pagination = paginate (fromMaybe 1 page) (fromMaybe 50 perPage) count
   let start = paginationStart pagination
   let limit = paginationLimit pagination
-  users <- dbFind (dbName conf) userColl sort' include' start limit pipe
-  return $
-    addHeader (show $ paginationPage pagination) $
-    addHeader (show $ paginationTotal pagination) $
-    addHeader (show $ paginationLast pagination) $
-    addHeader (show $ paginationSize pagination) $
-    addHeader (intercalate "," $ mkPaginationLinks pagination) users
+  case parse (fromMaybe "" query) >>= filterToDoc of
+    Right filter -> do
+      users <- dbFind (dbName conf) userColl filter sort' include' start limit pipe
+      return $
+        addHeader (show $ paginationPage pagination) $
+        addHeader (show $ paginationTotal pagination) $
+        addHeader (show $ paginationLast pagination) $
+        addHeader (show $ paginationSize pagination) $
+        addHeader (intercalate "," $ mkPaginationLinks pagination) users
+    Left err -> throwError (err400 { errBody = LBS.pack err })
   where
     mkFields f input = catMaybes $ f <$> concat (T.splitOn "," <$> input)
     sort' = mkFields mkSortField sort

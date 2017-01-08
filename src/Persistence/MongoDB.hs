@@ -83,13 +83,13 @@ dbUpdate dbName collName doc pipe =
 -- Select multiple records
 dbFind
   :: (MonadBaseControl IO f, MonadIO f)
-  => Database -> Collection -> [Field] -> [Field] -> Int -> Int -> Pipe -> f [Record]
-dbFind dbName collName sort fields skip limit pipe = do
+  => Database -> Collection -> [Field] -> [Field] -> [Field] -> Int -> Int -> Pipe -> f [Record]
+dbFind dbName collName filter sort fields skip limit pipe = do
   docs <-
     dbAccess
       dbName
       (find
-         (select [] collName)
+         (select filter collName)
          { sort = sort
          }
          { project = fields
@@ -213,3 +213,34 @@ mkIncludeField name
 
 mkIntField :: Text -> Int -> Field
 mkIntField = (=:)
+
+-- |
+-- Convert a @FilterExpr@ into a @Document@ that can be used to filter
+-- records during a query
+filterToDoc :: FilterExpr -> Either String Document
+filterToDoc (FilterRelOp op col term) = (:[]) <$> termToField op col term
+filterToDoc (FilterBoolOp op e1 e2) = do
+  f1 <- filterToDoc e1
+  f2 <- filterToDoc e2
+  return [opName op =: [f1, f2]]
+  where
+    opName And = "$and"
+    opName Or = "$or"
+
+-- |
+-- Convert a filter term to a field
+termToField :: FilterRelationalOperator -> ColumnName -> FilterTerm -> Either String Field
+termToField Equal (ColumnName col _) term = Right (col =: term)
+termToField NotEqual (ColumnName col _) term = Right (col =: ("$ne" =: term))
+termToField In (ColumnName col _) term@(TermList _) = Right (col =: ("$in" =: term))
+termToField In (ColumnName col _) term = Right (col =: ("$in" =: TermList [term]))
+termToField NotIn (ColumnName col _) term@(TermList _) = Right (col =: ("$nin" =: term))
+termToField NotIn (ColumnName col _) term = Right (col =: ("$nin" =: TermList [term]))
+termToField GreaterThan (ColumnName col _) term = Right (col =: ("$gt" =: term))
+termToField GreaterThanOrEqual (ColumnName col _) term = Right (col =: ("$gte" =: term))
+termToField LessThan (ColumnName col _) term = Right (col =: ("$lt" =: term))
+termToField LessThanOrEqual (ColumnName col _) term = Right (col =: ("$lte" =: term))
+termToField Contains (ColumnName col _) (TermStr s) = Right (col =: Regex s "i")
+termToField Contains (ColumnName col _) _ = Left "contains: expected a string term"
+termToField NotContains (ColumnName col _) (TermStr s) = Right (col =: ("$not" =: Regex s "i"))
+termToField NotContains (ColumnName col _) _ = Left "~contains: expected a string term"
