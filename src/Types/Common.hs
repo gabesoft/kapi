@@ -173,22 +173,23 @@ data FilterExpr
 -- |
 -- Relational operators
 data FilterRelationalOperator
-  = EQ -- equal
-  | NQ -- not equal
-  | GT -- greater than
-  | GE -- greater than or equal
-  | LT -- less than
-  | LE -- less than or equal
-  | IN -- in
-  | NN -- not in
-  | CONTAINS
+  = Equal
+  | NotEqual
+  | GreaterThan
+  | GreaterThanOrEqual
+  | LessThan
+  | LessThanOrEqual
+  | In
+  | NotIn
+  | Contains
+  | NotContains
   deriving (Eq, Read, Show)
 
 -- |
 -- Boolean operators
 data FilterBooleanOperator
-  = AND
-  | OR
+  = And
+  | Or
   deriving (Eq, Read, Show)
 
 -- |
@@ -199,11 +200,10 @@ type ColumnName = Text
 -- Filter term
 data FilterTerm
   = TermInt Int
-  | TermIntList [Int]
+  | TermFloat Double
   | TermBool Bool
-  | TermStr String
-  | TermStrList [String]
+  | TermStr Text
   | TermDate UTCTime
-  | TermDateList [UTCTime]
   | TermNull
+  | TermList [FilterTerm]
   deriving (Eq, Read, Show)

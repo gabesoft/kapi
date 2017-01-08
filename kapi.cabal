@@ -19,11 +19,13 @@ library
                      , Data.AesonBson.Instances
                      , Handlers.Users.Xandar
                      , Parsers.Filter
+                     , Parsers.Unescape
                      , Persistence.Common
                      , Persistence.MongoDB
                      , Persistence.Users.Xandar
                      , Types.Common
   build-depends:       base >= 4.7 && < 5
+                     , base-compat >= 0.9
                      , aeson >= 1.0.2
                      , attoparsec >= 0.13
                      , bson
@@ -36,7 +38,6 @@ library
                      , mongoDB >= 2.1
                      , mtl >= 2.2
                      , network >= 2.6
-                     , parsec >= 3.1
                      , SHA
                      , scientific >= 0.3
                      , servant >= 0.9
