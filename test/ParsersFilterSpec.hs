@@ -18,9 +18,9 @@ runCase ctor (input, exp) = it (unpack input) $ parse input `shouldBe` ctor exp
 
 validCases :: [(Text, FilterExpr)]
 validCases =
-  [ ("(colStr eq \"June\")", FilterRelOp Equal "colStr" (TermStr "June"))
-  , ( "(col1 ~eq \"Blue and CO.\")"
-    , FilterRelOp NotEqual "col1" (TermStr "Blue and CO."))
+  [ ("(colStr2 eq \"June\")", FilterRelOp Equal "colStr2" (TermStr "June"))
+  , ("(colStr2 eq \"The \\\"great\\\" June\")", FilterRelOp Equal "colStr2" (TermStr "The \"great\" June"))
+  , ( "(col1 ~eq \"Blue and CO.\")" , FilterRelOp NotEqual "col1" (TermStr "Blue and CO."))
   , ("colInt lt 123", FilterRelOp LessThan "colInt" (TermInt 123))
   , ("colFloat lt 123.93", FilterRelOp LessThan "colFloat" (TermFloat 123.93))
   , ("colBool eq true", FilterRelOp Equal "colBool" (TermBool True))

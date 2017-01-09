@@ -29,5 +29,8 @@ mkStrField name val = name =: val
 mkIntField :: Label -> Int -> Field
 mkIntField name val = name =: val
 
+mkFloatField :: Label -> Double -> Field
+mkFloatField name val = name =: val
+
 mkBoolField :: Label -> Bool -> Field
 mkBoolField name val = name =: val

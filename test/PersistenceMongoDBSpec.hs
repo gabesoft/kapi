@@ -35,6 +35,12 @@ main =
      it "creates a document ready to be saved - valid id" =<<
        runIO (verifyMkInDocument rec7 res4)
      it "creates a record ready to be returned" $ verifyMkOutDocument rec5 res3
+     it "can make a sort field for ascending sort" $
+       verifyMkSortField "email" (mkIntField "email" 1)
+     it "can make a sort field for descending sort" $
+       verifyMkSortField "-email" (mkIntField "email" (negate 1))
+     it "converts a query to a document" $
+       verifyQueryToDoc "(a eq \"b\") and (b gt 1) or (c:2 lt 2.4)" res6
 
 verifyValidateId :: Record -> ValidationResult -> Expectation
 verifyValidateId r exp = snd (validateHasId r) `shouldBe` exp
@@ -50,6 +56,12 @@ verifyMkInDocument r exp = do
 verifyMkOutDocument :: Document -> Record -> Expectation
 verifyMkOutDocument doc exp =
   modDate "_createdAt" (mkOutRecord doc) `shouldBe` exp
+
+verifyMkSortField :: Text -> Field -> Expectation
+verifyMkSortField name exp = mkSortField name `shouldBe` (Just exp)
+
+verifyQueryToDoc :: Text -> Document -> Expectation
+verifyQueryToDoc query exp = queryToDoc query `shouldBe` (Right exp)
 
 rec1 :: Record
 rec1 = Record [mkStrField "email" "a@email.com"]
@@ -96,3 +108,11 @@ res5 =
     , mkStrField "_createdAt" "12345"
     , mkStrField "_updatedAt" "12345"
     ]
+
+res6 :: Document
+res6 =
+  [ "$or" =:
+    [ ["$and" =: [[mkStrField "a" "b"], ["b" =: [mkIntField "$gt" 1]]]]
+    , ["c" =: [mkFloatField "$lt" 2.4]]
+    ]
+  ]

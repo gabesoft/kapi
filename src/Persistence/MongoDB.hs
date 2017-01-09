@@ -2,7 +2,23 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 -- | Functionality for interacting with MongoDB
-module Persistence.MongoDB where
+module Persistence.MongoDB
+  ( mkPipe
+  , dbAccess
+  , dbAddIndex
+  , dbCount
+  , dbDeleteById
+  , dbFind
+  , dbGetById
+  , dbInsert
+  , dbUpdate
+  , mkSortField
+  , mkIncludeField
+  , queryToDoc
+  , validateHasId
+  , mkOutRecord
+  , mkInDocument
+  ) where
 
 import Control.Exception.Lifted (handleJust)
 import Control.Monad ((>=>))
@@ -203,8 +219,13 @@ validateHasId r = (r, ValidationErrors $ catMaybes [valField])
 mkSortField :: Text -> Maybe Field
 mkSortField name
   | T.null name = Nothing
-  | T.head name == '-' = Just (mkIntField name (negate 1))
-  | otherwise = Just (mkIntField name 1)
+  | T.head name == '-' = Just $ mkField (negate 1)
+  | otherwise = Just $ mkField 1
+  where
+    mkField = mkIntField (getName name)
+    getName xs
+      | T.head xs == '+' || T.head xs == '-' = T.tail xs
+      | otherwise = xs
 
 -- |
 -- Make a field that will be used for projection during a partial response

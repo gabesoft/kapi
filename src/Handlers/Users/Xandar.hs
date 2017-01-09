@@ -92,6 +92,7 @@ getMultiple include query sort page perPage = do
   let start = paginationStart pagination
   let limit = paginationLimit pagination
   case queryToDoc (fromMaybe "" query) of
+    Left err -> throwApiError $ ApiError (LBS.pack err) status400
     Right filter -> do
       users <- dbFind (dbName conf) userColl filter sort' include' start limit pipe
       return $
@@ -100,7 +101,6 @@ getMultiple include query sort page perPage = do
         addHeader (show $ paginationLast pagination) $
         addHeader (show $ paginationSize pagination) $
         addHeader (intercalate "," $ mkPaginationLinks pagination) users
-    Left err -> throwError (err400 { errBody = LBS.pack err })
   where
     mkFields f input = catMaybes $ f <$> concat (T.splitOn "," <$> input)
     sort' = mkFields mkSortField sort
