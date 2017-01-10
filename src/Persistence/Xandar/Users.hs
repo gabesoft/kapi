@@ -1,7 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
--- | Persistence layer for users
-module Persistence.Users.Xandar where
+-- |
+-- User model schema and indices
+module Persistence.Xandar.Users where
 
 import Data.Bson
 import qualified Data.Map.Strict as Map
@@ -9,9 +10,6 @@ import Data.Text (Text)
 import Database.MongoDB
 import Persistence.Common
 import Types.Common
-
-dbName :: Database
-dbName = "kapi-xandar"
 
 userColl :: Collection
 userColl = "users"
@@ -37,23 +35,4 @@ userDefinition =
     , mkOptDef' "githubAvatar"
     , mkOptDef' "githubUrl"
     , mkOptDef' "githubLogin"
-    ]
-
--- |
--- Sample records. TO BE REMOVED.
--- "_id" =: (read "584e58195984185eb8000005" :: ObjectId)
-u1 :: Record
-u1 =
-  Record
-    [ "_id" =: ("584e58195984185eb8000005" :: String)
-    , "email" =: ("blue@leaf.com" :: String)
-    , "githubUrl" =: ("https://github.com/api/users/mrblue" :: String)
-    ]
-
-u2 :: Record
-u2 =
-  Record
-    [ "_id" =: ("584e58195984185eb8000006" :: String)
-    , "email" =: ("green@leaf.com" :: String)
-    , "githubUrl" =: ("https://github.com/api/users/mrgreen" :: String)
     ]

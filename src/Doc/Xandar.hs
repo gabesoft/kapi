@@ -70,4 +70,4 @@ instance ToSample Record where
   toSamples _ = singleSample (Record [])
 
 markdownDoc :: String
-markdownDoc = markdown $ docs (Proxy :: Proxy XandarApi)
+markdownDoc = markdown $ docs (Proxy :: Proxy XandarUserApi)

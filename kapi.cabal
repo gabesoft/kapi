@@ -14,15 +14,16 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     Api.Xandar
+  exposed-modules:     Api.Common
+                     , Api.Xandar
                      , Data.AesonBson
                      , Data.AesonBson.Instances
-                     , Handlers.Users.Xandar
+                     , Handlers.Xandar.Users
                      , Parsers.Filter
                      , Parsers.Unescape
                      , Persistence.Common
                      , Persistence.MongoDB
-                     , Persistence.Users.Xandar
+                     , Persistence.Xandar.Users
                      , Types.Common
   build-depends:       base >= 4.7 && < 5
                      , base-compat >= 0.9

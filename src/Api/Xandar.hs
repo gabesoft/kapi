@@ -8,82 +8,72 @@
 -- |
 -- Declaration for all endpoints used by the Xandar app
 module Api.Xandar
-  ( XandarApi
-  , XandarApiPre
-  , UserApiPre
+  ( XandarUserApi
+  , XandarApiPath
+  , UserApiPath
   , GetMultiple
   , GetSingle
-  , apiProxy
-  , mkGetSingleLink
-  , mkGetMultipleLink
+  , appName
+  , apiUserProxy
+  , apiFeedProxy
+  , mkUserGetSingleLink
+  , mkUserGetMultipleLink
   ) where
 
+import Api.Common
 import Data.Text (Text)
 import Servant
 import Servant.API
 import Servant.Utils.Links
 import Types.Common
 
-type UserApiPre = "users"
+appName :: AppName
+appName = "xandar"
 
-type XandarApiPre = "xandar"
+type XandarApiPath = "xandar"
 
-type XandarApi = XandarApiPre :> UserApiPre :> UserApi
+type UserApiPath = "users"
 
-type GetMultiple = QueryParams "include" Text
-                :> QueryParam "where" Text
-                :> QueryParams "sort" Text
-                :> QueryParam "page" Int
-                :> QueryParam "per_page" Int
-                :> Get '[JSON] (Headers '[ Header "X-Page" String
-                                         , Header "X-Total-Count" String
-                                         , Header "X-Page-Count" String
-                                         , Header "X-Per-Page" String
-                                         , Header "Link" String
-                                         ] [Record])
+type FeedApiPath = "feeds"
 
-type GetSingle = Capture "id" Text :> Get '[JSON] (Headers '[Header "ETag" String] Record)
+type XandarUserApi = XandarApiPath :> UserApiPath :> GenericApi
 
-type HeadNoContent = Verb 'HEAD 204
-type OptionsNoContent = Verb 'OPTIONS 204
+type XandarFeedApi = XandarApiPath :> FeedApiPath :> GenericApi
 
--- |
--- User api description
-type UserApi =
-  -- get
-       GetMultiple
-  :<|> Header "If-None-Match" Text :> GetSingle
-  -- delete
-  :<|> Capture "id" Text :> DeleteNoContent '[JSON] NoContent
-  -- create
-  :<|> ReqBody '[JSON] (ApiData Record) :> PostCreated '[JSON] (Headers '[Header "Location" String, Header "Link" String] (ApiData (ApiItem ApiError Record)))
-  -- update (replace)
-  :<|> Capture "id" Text :> ReqBody '[JSON] Record :> Put '[JSON] Record
-  :<|> ReqBody '[JSON] [Record] :> Put '[JSON] [ApiItem ApiError Record]
-  -- update (modify)
-  :<|> Capture "id" Text :> ReqBody '[JSON] Record :> Patch '[JSON] Record
-  :<|> ReqBody '[JSON] [Record] :> Patch '[JSON] [ApiItem ApiError Record]
-  -- head
-  :<|> Capture "id" Text :>  HeadNoContent '[JSON] (Headers '[Header "ETag" String] NoContent)
-  :<|> HeadNoContent '[JSON] (Headers '[Header "X-Total-Count" String] NoContent)
-  -- options
-  :<|> Capture "id" Text :> OptionsNoContent '[JSON] (Headers '[Header "Access-Control-Allow-Methods" String] NoContent)
-  :<|> OptionsNoContent '[JSON] (Headers '[Header "Access-Control-Allow-Methods" String] NoContent)
+apiUserProxy = Proxy :: Proxy XandarUserApi
 
-apiProxy = Proxy :: Proxy XandarApi
+apiFeedProxy = Proxy :: Proxy XandarFeedApi
 
-apiProxyGetSingle = Proxy :: Proxy (XandarApiPre :> UserApiPre :> GetSingle)
-apiProxyGetMultiple = Proxy :: Proxy (XandarApiPre :> UserApiPre :> GetMultiple)
+apiUserProxyGetSingle =
+  Proxy :: Proxy (XandarApiPath :> UserApiPath :> GetSingle)
 
-mkGetSingleLink :: Text -> String
-mkGetSingleLink = ("/" ++) . show . safeLink apiProxy apiProxyGetSingle
+apiFeedProxyGetSingle =
+  Proxy :: Proxy (XandarApiPath :> FeedApiPath :> GetSingle)
 
-mkGetMultipleLink :: [Text]
-                  -> Maybe Text
-                  -> [Text]
-                  -> Maybe Int
-                  -> Maybe Int
-                  -> String
-mkGetMultipleLink include query sort page perPage =
-  ("/" ++) $
-  show $ safeLink apiProxy apiProxyGetMultiple include query sort page perPage
+apiUserProxyGetMultiple =
+  Proxy :: Proxy (XandarApiPath :> UserApiPath :> GetMultiple)
+
+apiFeedProxyGetMultiple =
+  Proxy :: Proxy (XandarApiPath :> FeedApiPath :> GetMultiple)
+
+mkUserGetSingleLink :: Text -> String
+mkUserGetSingleLink = mkLink1 apiUserProxy apiUserProxyGetSingle
+
+mkFeedGetSingleLink :: Text -> String
+mkFeedGetSingleLink = mkLink1 apiFeedProxy apiFeedProxyGetSingle
+
+mkUserGetMultipleLink :: [Text]
+                      -> Maybe Text
+                      -> [Text]
+                      -> Maybe Int
+                      -> Maybe Int
+                      -> String
+mkUserGetMultipleLink = mkLink5 apiUserProxy apiUserProxyGetMultiple
+
+mkFeedGetMultipleLink :: [Text]
+                      -> Maybe Text
+                      -> [Text]
+                      -> Maybe Int
+                      -> Maybe Int
+                      -> String
+mkFeedGetMultipleLink = mkLink5 apiFeedProxy apiFeedProxyGetMultiple

@@ -5,7 +5,7 @@
 {-# LANGUAGE TypeOperators #-}
 
 -- | Handlers for Xandar endpoints
-module Handlers.Users.Xandar where
+module Handlers.Xandar.Users where
 
 import Api.Xandar
 import Control.Monad.Except
@@ -24,19 +24,9 @@ import Database.MongoDB.Query (Failure(..))
 import Network.HTTP.Types.Status
 import Persistence.Common
 import Persistence.MongoDB
-import Persistence.Users.Xandar (userDefinition, userIndices)
+import Persistence.Xandar.Users (userDefinition, userIndices, userColl)
 import Servant
 import Types.Common
-
--- |
--- Application name
-appName :: AppName
-appName = "xandar"
-
--- |
--- MongoDB collection name
-userColl :: Collection
-userColl = "users"
 
 -- |
 -- Get the configured database name for this app
@@ -53,13 +43,13 @@ dbPipe conf = liftIO $ mkPipe (mongoHost conf) (mongoPort conf)
 -- |
 -- Create an application for providing the user functionality
 app :: ApiConfig -> Application
-app config = serve apiProxy (server config)
+app config = serve apiUserProxy (server config)
   where
-    server :: ApiConfig -> Server XandarApi
+    server :: ApiConfig -> Server XandarUserApi
     server conf = enter (toHandler conf) handlers
     toHandler :: ApiConfig -> Api :~> Handler
     toHandler conf = Nat (`runReaderT` conf)
-    handlers :: ServerT XandarApi Api
+    handlers :: ServerT XandarUserApi Api
     handlers =
       getMultiple :<|>
       getSingle :<|>
@@ -93,8 +83,9 @@ getMultiple include query sort page perPage = do
   let limit = paginationLimit pagination
   case queryToDoc (fromMaybe "" query) of
     Left err -> throwApiError $ ApiError (LBS.pack err) status400
-    Right filter -> do
-      users <- dbFind (dbName conf) userColl filter sort' include' start limit pipe
+    Right filter' -> do
+      users <-
+        dbFind (dbName conf) userColl filter' sort' include' start limit pipe
       return $
         addHeader (show $ paginationPage pagination) $
         addHeader (show $ paginationTotal pagination) $
@@ -105,7 +96,7 @@ getMultiple include query sort page perPage = do
     mkFields f input = catMaybes $ f <$> concat (T.splitOn "," <$> input)
     sort' = mkFields mkSortField sort
     include' = mkFields mkIncludeField include
-    mkUrl page' = mkGetMultipleLink include query sort (Just page') perPage
+    mkUrl page' = mkUserGetMultipleLink include query sort (Just page') perPage
     mkPaginationLinks pagination =
       uncurry mkRelLink . second mkUrl <$>
       [ ("next", paginationNext pagination)
@@ -277,7 +268,7 @@ getSingle' uid = do
 -- |
 -- Create a link for a user resource
 getUserLink :: Record -> String
-getUserLink = mkGetSingleLink . fromJust . getIdValue
+getUserLink = mkUserGetSingleLink . fromJust . getIdValue
 
 -- |
 -- Validate a user record

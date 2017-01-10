@@ -4,7 +4,7 @@ module Main where
 
 import qualified Data.Map.Strict as Map
 import Data.Maybe
-import qualified Handlers.Users.Xandar as XU
+import qualified Handlers.Xandar.Users as XU
 import Network.Wai
 import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.RequestLogger
