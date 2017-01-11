@@ -5,22 +5,38 @@
 module Parsers.Filter where
 
 import Control.Applicative ((<|>))
-import Control.Monad (void, when)
+import Control.Monad (void, when, replicateM)
 import Data.Attoparsec.Text
-       (Parser, choice, skipWhile, char, asciiCI, many', many1,
-        scientific, scan, anyChar, takeWhile, takeWhile1, inClass, option)
+       (Parser, choice, skipWhile, char, asciiCI, many', many1, satisfy,
+        scientific, scan, anyChar, takeWhile, takeWhile1, inClass, option,
+        notInClass)
 import qualified Data.Attoparsec.Text as A
-import Data.Char (isSpace)
+import Data.Char (isSpace, chr, isHexDigit)
 import Data.Functor.Identity
+import Data.List (find, foldr)
+import Data.Maybe
 import Data.Scientific (floatingOrInteger)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time (UTCTime)
 import Data.Time.ISO8601
+import Numeric (readHex)
 import Parsers.Unescape
 import Prelude ()
 import Prelude.Compat
 import Types.Common
+
+data SpecialCharacter
+  = BackSpace
+  | FormFeed
+  | NewLine
+  | CarriageReturn
+  | Tab
+  | VerticalTab
+  | SingleQuote
+  | DoubleQuote
+  | Backslash
+  deriving (Eq, Ord, Show)
 
 parse :: Text -> Either String FilterExpr
 parse = A.parseOnly expr
@@ -53,12 +69,12 @@ term :: Parser FilterTerm
 term = termSingle <|> termList
 
 termSingle :: Parser FilterTerm
-termSingle = jsDate <|> bool <|> nil <|> str <|> num
+termSingle = jsDate <|> bool <|> null' <|> str <|> num
 
 termList :: Parser FilterTerm
 termList = TermList <$> braces (sepByComma item)
   where
-    braces = between (char '[') (char ']')
+    braces = between '[' ']'
     item = skipSpace *> termSingle <* skipSpace
 
 col :: Parser ColumnName
@@ -80,6 +96,76 @@ num = do
   where
     mkTerm = either TermFloat TermInt . floatingOrInteger
 
+mkOp :: (Text, a) -> Parser a
+mkOp (s, v) = asciiCI s >> return v
+
+bool :: Parser FilterTerm
+bool = TermBool <$> (bool' "true" True <|> bool' "false" False)
+  where
+    bool' s v = const v <$> asciiCI s
+
+null' :: Parser FilterTerm
+null' = asciiCI "null" >> return TermNull
+
+jsDate :: Parser FilterTerm
+jsDate = TermDate <$> (takeWhile1 (inClass included) >>= getDate)
+  where
+    included = "0-9:.TZD+-"
+    getDate s =
+      case parseISO8601 (T.unpack s) of
+        Just d -> return d
+        Nothing -> fail "expected an ISO8601 date"
+
+str :: Parser FilterTerm
+str = TermStr <$> (str' '"' <|> str' '\'')
+
+str' :: Char -> Parser Text
+str' delim = between delim delim (T.concat <$> many' strPart)
+  where
+    strPart = escapedHex <|> special <|> unspecial
+    special = char '\\' *> foldr1 (<|>) (specialParser <$> (fst <$> specialChars))
+    unspecial = A.takeWhile1 $ notInClass [delim, '\\']
+    escapedHex = T.singleton <$> (specialParser '\\' *> hexu)
+    specialToText = T.singleton . fromSpecialCharacter . fromJust . toSpecialCharacter
+    specialParser c = specialToText <$> char c
+
+hexu :: Parser Char
+hexu = char 'u' *> hex
+
+hex :: Parser Char
+hex = do
+  cs <- replicateM 4 (satisfy isHexDigit)
+  case readHex cs of
+    ((h,_):_) -> return (chr h)
+    [] -> fail "expected a hex digit"
+
+fromSpecialCharacter :: SpecialCharacter -> Char
+fromSpecialCharacter BackSpace = chr 0x08
+fromSpecialCharacter FormFeed = chr 0x0C
+fromSpecialCharacter NewLine = '\n'
+fromSpecialCharacter CarriageReturn = '\r'
+fromSpecialCharacter Tab = '\t'
+fromSpecialCharacter VerticalTab = '\v'
+fromSpecialCharacter SingleQuote = '\''
+fromSpecialCharacter DoubleQuote = '"'
+fromSpecialCharacter Backslash = '\\'
+
+toSpecialCharacter :: Char -> Maybe SpecialCharacter
+toSpecialCharacter c = snd <$> find ((==) c . fst) specialChars
+
+specialChars :: [(Char, SpecialCharacter)]
+specialChars =
+  [ ('b', BackSpace)
+  , ('f', FormFeed)
+  , ('n', NewLine)
+  , ('r', CarriageReturn)
+  , ('t', Tab)
+  , ('v', VerticalTab)
+  , ('\'', SingleQuote)
+  , ('"', DoubleQuote)
+  , ('\\', Backslash)
+  ]
+
 opr :: Parser FilterRelationalOperator
 opr =
   choice $
@@ -100,49 +186,19 @@ opr =
   , ("~contains", NotContains)
   ]
 
-mkOp (s, v) = asciiCI s >> return v
-
-bool :: Parser FilterTerm
-bool = TermBool <$> (bool' "true" True <|> bool' "false" False)
-  where
-    bool' s v = const v <$> asciiCI s
-
-nil :: Parser FilterTerm
-nil = asciiCI "null" >> return TermNull
-
-jsDate :: Parser FilterTerm
-jsDate = TermDate <$> (takeWhile1 (inClass included) >>= getDate)
-  where
-    included = "0-9:.TZD+-"
-    getDate s =
-      case parseISO8601 (T.unpack s) of
-        Just d -> return d
-        Nothing -> fail "expected an ISO8601 date"
-
-str :: Parser FilterTerm
-str = TermStr <$> (char '"' *> str')
-
-str' :: Parser Text
-str' = do
-  s <- scan startState go <* anyChar
-  case unescapeText s of
-    Right r -> return r
-    Left err -> fail (show err)
-  where
-    startState = False
-    go a c
-      | a = Just False
-      | c == '"' = Nothing
-      | otherwise = Just (c == '\\')
-
 parens :: Parser a -> Parser a
-parens = between (char '(') (char ')')
+parens = between '(' ')'
 
 sepByComma :: Parser a -> Parser [a]
 sepByComma = sepBy (char ',')
 
-between :: Applicative f => f a1 -> f b -> f a -> f a
-between open close p = open *> p <* close
+between :: Char -> Char -> Parser a -> Parser a
+between l r = between' (char l) (char r)
+
+between'
+  :: Applicative f
+  => f a1 -> f b -> f a -> f a
+between' open close p = open *> p <* close
 
 sepBy :: Parser b -> Parser a -> Parser [a]
 sepBy sep p = sepBy1 sep p <|> return []
@@ -157,4 +213,4 @@ skipSpace :: Parser ()
 skipSpace = skipWhile isSpace
 
 skipSpace1 :: Parser ()
-skipSpace1 = const () <$> takeWhile1 isSpace
+skipSpace1 = void $ takeWhile1 isSpace

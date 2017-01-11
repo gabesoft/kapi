@@ -19,7 +19,12 @@ runCase ctor (input, exp) = it (unpack input) $ parse input `shouldBe` ctor exp
 validCases :: [(Text, FilterExpr)]
 validCases =
   [ ("(colStr2 eq \"June\")", FilterRelOp Equal "colStr2" (TermStr "June"))
-  , ("(colStr2 eq \"The \\\"great\\\" June\")", FilterRelOp Equal "colStr2" (TermStr "The \"great\" June"))
+  , ("(colStr2 eq \"The \\\"great\\\" good\")", FilterRelOp Equal "colStr2" (TermStr "The \"great\" good"))
+  , ("(colStr2 eq 'The great good')", FilterRelOp Equal "colStr2" (TermStr "The great good"))
+  , ("(colStr2 eq 'The \"great\" good')", FilterRelOp Equal "colStr2" (TermStr "The \"great\" good"))
+  , ("(colStr2 eq 'The \\'great\\' good')", FilterRelOp Equal "colStr2" (TermStr "The \'great\' good"))
+  , ("(colStr2 eq 'The \\'great\\' good')", FilterRelOp Equal "colStr2" (TermStr "The \'great\' good"))
+  , ("(colStr2 eq \"a \\u00faabc\\\"def\")", FilterRelOp Equal "colStr2" (TermStr "a \250abc\"def"))
   , ( "(col1 ~eq \"Blue and CO.\")" , FilterRelOp NotEqual "col1" (TermStr "Blue and CO."))
   , ("colInt lt 123", FilterRelOp LessThan "colInt" (TermInt 123))
   , ("colFloat lt 123.93", FilterRelOp LessThan "colFloat" (TermFloat 123.93))

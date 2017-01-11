@@ -36,13 +36,19 @@ type UserApiPath = "users"
 
 type FeedApiPath = "feeds"
 
+type PostApiPath = "posts"
+
 type XandarUserApi = XandarApiPath :> UserApiPath :> GenericApi
 
 type XandarFeedApi = XandarApiPath :> FeedApiPath :> GenericApi
 
+type XandarPostApi = XandarApiPath :> PostApiPath :> GenericApi
+
 apiUserProxy = Proxy :: Proxy XandarUserApi
 
 apiFeedProxy = Proxy :: Proxy XandarFeedApi
+
+apiPostProxy = Proxy :: Proxy XandarPostApi
 
 apiUserProxyGetSingle =
   Proxy :: Proxy (XandarApiPath :> UserApiPath :> GetSingle)
@@ -50,17 +56,26 @@ apiUserProxyGetSingle =
 apiFeedProxyGetSingle =
   Proxy :: Proxy (XandarApiPath :> FeedApiPath :> GetSingle)
 
+apiPostProxyGetSingle =
+  Proxy :: Proxy (XandarApiPath :> PostApiPath :> GetSingle)
+
 apiUserProxyGetMultiple =
   Proxy :: Proxy (XandarApiPath :> UserApiPath :> GetMultiple)
 
 apiFeedProxyGetMultiple =
   Proxy :: Proxy (XandarApiPath :> FeedApiPath :> GetMultiple)
 
+apiPostProxyGetMultiple =
+  Proxy :: Proxy (XandarApiPath :> PostApiPath :> GetMultiple)
+
 mkUserGetSingleLink :: Text -> String
 mkUserGetSingleLink = mkLink1 apiUserProxy apiUserProxyGetSingle
 
 mkFeedGetSingleLink :: Text -> String
 mkFeedGetSingleLink = mkLink1 apiFeedProxy apiFeedProxyGetSingle
+
+mkPostGetSingleLink :: Text -> String
+mkPostGetSingleLink = mkLink1 apiPostProxy apiPostProxyGetSingle
 
 mkUserGetMultipleLink :: [Text]
                       -> Maybe Text
@@ -77,3 +92,11 @@ mkFeedGetMultipleLink :: [Text]
                       -> Maybe Int
                       -> String
 mkFeedGetMultipleLink = mkLink5 apiFeedProxy apiFeedProxyGetMultiple
+
+mkPostGetMultipleLink :: [Text]
+                      -> Maybe Text
+                      -> [Text]
+                      -> Maybe Int
+                      -> Maybe Int
+                      -> String
+mkPostGetMultipleLink = mkLink5 apiPostProxy apiPostProxyGetMultiple
