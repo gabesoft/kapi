@@ -9,7 +9,7 @@ import Control.Monad (void, when, replicateM)
 import Data.Attoparsec.Text
        (Parser, choice, skipWhile, char, asciiCI, many', many1, satisfy,
         scientific, scan, anyChar, takeWhile, takeWhile1, inClass, option,
-        notInClass)
+        notInClass, (<?>))
 import qualified Data.Attoparsec.Text as A
 import Data.Char (isSpace, chr, isHexDigit)
 import Data.Functor.Identity
@@ -72,7 +72,7 @@ termSingle :: Parser FilterTerm
 termSingle = jsDate <|> bool <|> null' <|> str <|> num
 
 termList :: Parser FilterTerm
-termList = TermList <$> braces (sepByComma item)
+termList = TermList <$> braces (sepByComma item) <?> "list"
   where
     braces = between '[' ']'
     item = skipSpace *> termSingle <* skipSpace
@@ -100,15 +100,15 @@ mkOp :: (Text, a) -> Parser a
 mkOp (s, v) = asciiCI s >> return v
 
 bool :: Parser FilterTerm
-bool = TermBool <$> (bool' "true" True <|> bool' "false" False)
+bool = TermBool <$> (bool' "true" True <|> bool' "false" False) <?> "bool"
   where
     bool' s v = const v <$> asciiCI s
 
 null' :: Parser FilterTerm
-null' = asciiCI "null" >> return TermNull
+null' = asciiCI "null" >> return TermNull <?> "null"
 
 jsDate :: Parser FilterTerm
-jsDate = TermDate <$> (takeWhile1 (inClass included) >>= getDate)
+jsDate = TermDate <$> (takeWhile1 (inClass included) >>= getDate) <?> "iso8601 date"
   where
     included = "0-9:.TZD+-"
     getDate s =
@@ -117,20 +117,20 @@ jsDate = TermDate <$> (takeWhile1 (inClass included) >>= getDate)
         Nothing -> fail "expected an ISO8601 date"
 
 str :: Parser FilterTerm
-str = TermStr <$> (str' '"' <|> str' '\'')
+str = TermStr <$> (str' '"' <|> str' '\'') <?> "string"
 
 str' :: Char -> Parser Text
 str' delim = between delim delim (T.concat <$> many' strPart)
   where
     strPart = escapedHex <|> special <|> unspecial
-    special = char '\\' *> foldr1 (<|>) (specialParser <$> (fst <$> specialChars))
+    special = char '\\' *> choice (specialParser <$> (fst <$> specialChars))
     unspecial = A.takeWhile1 $ notInClass [delim, '\\']
     escapedHex = T.singleton <$> (specialParser '\\' *> hexu)
     specialToText = T.singleton . fromSpecialCharacter . fromJust . toSpecialCharacter
     specialParser c = specialToText <$> char c
 
 hexu :: Parser Char
-hexu = char 'u' *> hex
+hexu = char 'u' *> hex <?> "hex"
 
 hex :: Parser Char
 hex = do
