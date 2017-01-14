@@ -95,7 +95,7 @@ Content-Type: :json
 #
 # Replace a single user
 #
-PUT http://:host/:path/586b44e859841867f2000001
+PUT http://:host/:path/587a810d598418739b000001
 Content-Type: :json
 {
     "email": "replaced3@aol.com",
@@ -105,7 +105,7 @@ Content-Type: :json
 #
 # Modify a single user
 #
-PATCH http://:host/:path/586b44e859841867f2000002
+PATCH http://:host/:path/587a810d598418739b000001
 Content-Type: :json
 {
     "email": "updated3@aol.com"

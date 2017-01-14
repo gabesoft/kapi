@@ -1,16 +1,11 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE TypeOperators #-}
-
 -- |
 -- Handlers for Xandar endpoints
 module Handlers.Xandar.Users where
 
 import Api.Xandar
 import Handlers.Xandar.Common
-import Persistence.Xandar.Users (userDefinition, userIndices, userColl)
+import Persistence.Xandar.Users
+       (userDefinition, userIndices, userColl)
 import Servant
 import Types.Common
 
@@ -21,9 +16,7 @@ app = app' apiUserProxy handlers
   where
     handlers :: ServerT XandarUserApi Api
     handlers =
-      getMultiple userColl :<|>
-      getSingle userColl :<|>
-      deleteSingle userColl :<|>
+      getMultiple userColl :<|> getSingle userColl :<|> deleteSingle userColl :<|>
       createSingleOrMultiple userDefinition userColl :<|>
       replaceSingle userDefinition userColl :<|>
       replaceMultiple userDefinition userColl :<|>

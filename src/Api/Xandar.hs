@@ -9,6 +9,8 @@
 -- Declaration for all endpoints used by the Xandar app
 module Api.Xandar
   ( XandarUserApi
+  , XandarPostApi
+  , XandarFeedApi
   , XandarApiPath
   , UserApiPath
   , GetMultiple

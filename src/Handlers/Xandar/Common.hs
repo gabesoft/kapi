@@ -130,7 +130,7 @@ createMultiple
   -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData ApiResult))
 createMultiple def coll inputs = do
   users <- mapM (insertSingle def coll) inputs
-  let links = apiItem mempty (mkLink . getUserLink) <$> users
+  let links = apiItem (const "<>") (mkLink . getUserLink) <$> users
   return . noHeader $ addHeader (intercalate ", " links) (Multiple users)
 
 -- |
