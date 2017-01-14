@@ -18,6 +18,7 @@ library
                      , Api.Xandar
                      , Data.AesonBson
                      , Data.AesonBson.Instances
+                     , Handlers.Xandar.Common
                      , Handlers.Xandar.Users
                      , Parsers.Filter
                      , Parsers.Unescape
