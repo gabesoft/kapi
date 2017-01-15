@@ -5,6 +5,7 @@ module Handlers.Xandar.Xandar where
 import Api.Xandar
 import Handlers.Xandar.Common
 import Persistence.Xandar.Feeds (feedDefinition, feedIndices, feedColl)
+import Persistence.Xandar.Posts (postDefinition, postIndices, postColl)
 import Persistence.Xandar.Users (userDefinition, userIndices, userColl)
 import Servant
 import Types.Common
@@ -12,7 +13,7 @@ import Types.Common
 -- |
 -- Create an application for providing the user functionality
 app :: ApiConfig -> Application
-app = app' apiProxy (userHandlers :<|> feedHandlers)
+app = app' apiProxy (userHandlers :<|> feedHandlers :<|> postHandlers)
   where
     userHandlers :: ServerT XandarUserApi Api
     userHandlers =
@@ -42,8 +43,22 @@ app = app' apiProxy (userHandlers :<|> feedHandlers)
       headMultiple feedColl :<|>
       optionsSingle :<|>
       optionsMultiple
+    postHandlers :: ServerT XandarPostApi Api
+    postHandlers =
+      getMultiple mkPostGetMultipleLink postColl :<|>
+      getSingle postColl :<|>
+      deleteSingle postColl :<|>
+      createSingleOrMultiple postDefinition postColl mkPostGetSingleLink :<|>
+      replaceSingle postDefinition postColl :<|>
+      replaceMultiple postDefinition postColl :<|>
+      modifySingle postDefinition postColl :<|>
+      modifyMultiple postDefinition postColl :<|>
+      headSingle postColl :<|>
+      headMultiple postColl :<|>
+      optionsSingle :<|>
+      optionsMultiple
 
 -- |
 -- Perform any initialization to be done on server start
 appInit :: ApiConfig -> IO ()
-appInit = addDbIndices userIndices >> addDbIndices feedIndices
+appInit = addDbIndices userIndices >> addDbIndices feedIndices >> addDbIndices postIndices

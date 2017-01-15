@@ -1,36 +1,36 @@
 # -*- restclient -*-
 #
-# Queries against the /xandar/feeds endpoints
+# Queries against the /xandar/posts endpoints
 #
 
 # variables
 :date := (shell-command-to-string "echo -n (date +%Y-%m-%d-%M-%s)")
 :host = localhost:8001
-:path = xandar/feeds
+:path = xandar/posts
 :json = application/json
 
 #
-# Get all feeds
+# Get all posts
 #
 GET http://:host/:path
 
 #
-# Get all feeds - sort & partial response
+# Get all posts - sort & partial response
 #
 GET http://:host/:path?sort=title&include=title,uri
 
 #
-# Get feeds filtered by status
+# Get posts filtered by status
 #
 GET http://:host/:path?where=(lastReadStatus.readStatus eq "success")&include=title,lastReadStatus,uri
 
 #
-# Get feeds created afte a date
+# Get posts created afte a date
 #
 GET http://:host/:path?where=(_createdAt ge 2017-01-08T07:47:45.928Z)
 
 #
-# Get all feeds - pagination
+# Get all posts - pagination
 #
 GET http://:host/:path?page=4&per_page=5
 
@@ -53,7 +53,7 @@ DELETE http://:host/:path/non-existent
 #
 # Delete an existent feed
 #
-DELETE http://:host/:path/587ad5bd5984186b15000001 
+DELETE http://:host/:path/587ad5bd5984186b15000001
 
 #
 # Create a single feed
@@ -61,37 +61,23 @@ DELETE http://:host/:path/587ad5bd5984186b15000001
 POST http://:host/:path
 Content-Type: :json
 {
-  "author": null,
-  "data": {
-    "etag": "\"6b188e14abb0321740881b7893cbc0ab\"",
-    "last-modified": "Fri, 13 Jan 2017 02:09:05 GMT"
-  },
-  "date": "2017-01-13T02:09:05.000Z",
-  "description": "Personal blog for Christie Koehler. \"It's a poor sort of memory that only works backward.\"",
-  "failedAttempts": 0,
-  "favicon": null,
-  "format": "rss-2.0",
-  "generator": "https://wordpress.org/?v=4.7",
-  "guid": "https://subfictional.com",
+  "author": "Bill Wadman & Jeffery Saddoris",
+  "comments": null,
+  "date": "2016-03-01T18:30:00.000Z",
+  "description": "post content",
+  "feedId": "56d7d88bc788cb1d6eb9199c",
+  "guid": "http://5by5.tv/otp/205",
   "image": {
-    "title": "Subfictional Studios",
-    "url": "https://subfictional.com/files/2016/07/cropped-sf-logo-2016-sf-sq-512px-32x32.jpg"
+    "url": "http://icebox.5by5.tv/images/broadcasts/48/cover.jpg"
   },
-  "language": "en-US",
-  "lastPostDate": "2017-01-13T02:09:05.000Z",
-  "lastReadDate": "2017-01-14T20:01:06.227Z",
-  "lastReadStatus": {
-    "readStatus": "failure",
-    "readStatusError": "StatusCodeException (Status {statusCode = 304, statusMessage = \"Not Modified\"}) [(\"Date\",\"Sat, 14 Jan 2017 20:01:07 GMT\"),(\"Server\",\"Apache/2.4.7 (Ubuntu)\"),(\"ETag\",\"\\\"6b188e14abb0321740881b7893cbc0ab\\\"\"),(\"Expires\",\"Thu, 19 Nov 1981 08:52:00 GMT\"),(\"Cache-Control\",\"no-store, no-cache, must-revalidate, post-check=0, pre-check=0\"),(\"Vary\",\"User-Agent\"),(\"Set-Cookie\",\"PHPSESSID=cfiki8nufmmqr5qb3sifrnhha6; path=/\"),(\"X-Response-Body-Start\",\"\"),(\"X-Request-URL\",\"GET https://subfictional.com:443/feed/\")] (CJ {expose = [Cookie {cookie_name = \"PHPSESSID\", cookie_value = \"cfiki8nufmmqr5qb3sifrnhha6\", cookie_expiry_time = 3016-05-17 00:00:00 UTC, cookie_domain = \"subfictional.com\", cookie_path = \"/\", cookie_creation_time = 2017-01-14 20:01:07.288073354 UTC, cookie_last_access_time = 2017-01-14 20:01:07.288073354 UTC, cookie_persistent = False, cookie_host_only = True, cookie_secure_only = False, cookie_http_only = False}]})"
-  },
-  "link": "https://subfictional.com",
-  "postCount": 17,
-  "title": "Subfictional Studios",
-  "uri": "https://subfictional.com/feed/"
+  "link": "http://5by5.tv/otp/205",
+  "pubdate": "2016-03-01T18:30:00.000Z",
+  "summary": "post summary",
+  "title": "On Taking Pictures 201: No Such Thing as Never or Always"
 }
 
 #
-# Create multiple feeds
+# Create multiple posts
 #
 POST http://:host/:path
 Content-Type: :json

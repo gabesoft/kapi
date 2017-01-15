@@ -54,7 +54,7 @@ type XandarFeedApi = XandarApiPath :> FeedApiPath :> GenericApi
 
 type XandarPostApi = XandarApiPath :> PostApiPath :> GenericApi
 
-type XandarApi = XandarUserApi :<|> XandarFeedApi
+type XandarApi = XandarUserApi :<|> XandarFeedApi :<|> XandarPostApi
 
 type ApiGetMultipleLink = [Text] -> Maybe Text -> [Text] -> Maybe Int -> Maybe Int -> String
 
