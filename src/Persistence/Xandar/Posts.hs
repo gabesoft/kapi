@@ -6,7 +6,6 @@ module Persistence.Xandar.Posts where
 
 import Data.Bson
 import qualified Data.Map.Strict as Map
-import Data.Text (Text)
 import Database.MongoDB
 import Persistence.Common
 import Types.Common

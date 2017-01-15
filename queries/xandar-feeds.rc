@@ -10,53 +10,53 @@
 :json = application/json
 
 #
-# Get all users
+# Get all feeds
 #
 GET http://:host/:path
 
 #
-# Get all users - sort & partial response
+# Get all feeds - sort & partial response
 #
-GET http://:host/:path?sort=email&include=email,admin
+GET http://:host/:path?sort=title&include=title,uri
 
 #
-# Get all admin users
+# Get feeds filtered by status
 #
-GET http://:host/:path?where=(admin eq true)
+GET http://:host/:path?where=(lastReadStatus.readStatus eq "success")&include=title,lastReadStatus,uri
 
 #
-# Get users filtered by email
-#
-GET http://:host/:path?where=(email contains "updated") or (email contains "admin")&include=email&sort=-email
-
-#
-# Get users created afte a date
+# Get feeds created afte a date
 #
 GET http://:host/:path?where=(_createdAt ge 2017-01-08T07:47:45.928Z)
 
 #
-# Get all users - pagination
+# Get all feeds - pagination
 #
 GET http://:host/:path?page=4&per_page=5
 
 #
-# Get a single user
+# Get a single feed
 #
 GET http://:host/:path/5869ec3e59841810dc000009
 
 #
-# Get a single user using ETag
+# Get a single feed using ETag
 #
 GET http://:host/:path/5869ec3e59841810dc000009
 If-None-Match: ef19b2e0ce2baa83fa90abfa82a5141d4f18842d
 
 #
-# Delete a non-existent user
+# Delete a non-existent feed
 #
 DELETE http://:host/:path/non-existent
 
 #
-# Create a single user
+# Delete an existent feed
+#
+DELETE http://:host/:path/587ad5bd5984186b15000001 
+
+#
+# Create a single feed
 #
 POST http://:host/:path
 Content-Type: :json
@@ -73,7 +73,6 @@ Content-Type: :json
   "format": "rss-2.0",
   "generator": "https://wordpress.org/?v=4.7",
   "guid": "https://subfictional.com",
-  "id": "586b4c640fe72b0636fbec3e",
   "image": {
     "title": "Subfictional Studios",
     "url": "https://subfictional.com/files/2016/07/cropped-sf-logo-2016-sf-sq-512px-32x32.jpg"
@@ -92,33 +91,73 @@ Content-Type: :json
 }
 
 #
-# Create multiple users
+# Create multiple feeds
 #
 POST http://:host/:path
 Content-Type: :json
 [
   {
-    "email": "user1:date@aol.com",
-    "githubUrl": "https://api.github.com/users/user1",
-    "admin": false
+    "author": null,
+    "data": {
+      "etag": null,
+      "last-modified": "Mon, 19 Sep 2016 23:30:42 GMT"
+    },
+    "date": "2016-09-19T23:30:42.000Z",
+    "description": "Haskell and assembly tricks",
+    "failedAttempts": 0,
+    "favicon": null,
+    "format": "rss-2.0",
+    "generator": "http://wordpress.com/",
+    "guid": "https://hbtvl.wordpress.com",
+    "image": {
+      "title": "hbtvl",
+      "url": "https://s2.wp.com/i/buttonw-com.png"
+    },
+    "language": "en",
+    "lastPostDate": "2015-12-14T21:17:23.000Z",
+    "lastReadDate": "2017-01-15T01:48:05.200Z",
+    "lastReadStatus": {
+      "readStatus": "success",
+      "readStatusError": null
+    },
+    "link": "https://hbtvl.wordpress.com",
+    "postCount": 6,
+    "title": "hbtvl",
+    "uri": "https://hbtvl.wordpress.com/feed/"
   },
   {
-    "email": "admin1:date@aol.com",
-    "githubUrl": "https://api.github.com/users/admin1",
-    "admin": true
-  },
-  {
-    "email": "admin2@aol.com",
-    "githubUrl": "https://api.github.com/users/admin2",
-    "admin": true
-  },
-  {
-    "githubUrl": "https://api.github.com/users/other"
+    "author": "Dennis Gosnell",
+    "data": {
+      "etag": null,
+      "last-modified": null
+    },
+    "date": "2016-11-09T00:00:00.000Z",
+    "description": null,
+    "failedAttempts": 0,
+    "favicon": null,
+    "format": "atom-1.0",
+    "generator": null,
+    "guid": "https://functor.tokyo/blog",
+    "image": {
+      "title": "",
+      "url": "https://functor.tokyo/static/img/functor.tokyo.logo.png?etag=-HTQgqMp"
+    },
+    "language": null,
+    "lastPostDate": "2016-11-09T00:00:00.000Z",
+    "lastReadDate": "2017-01-15T01:48:05.595Z",
+    "lastReadStatus": {
+      "readStatus": "success",
+      "readStatusError": null
+    },
+    "link": "https://functor.tokyo/blog",
+    "postCount": 16,
+    "title": "functor.tokyo blog feed",
+    "uri": "https://functor.tokyo/blog/feed"
   }
 ]
 
 #
-# Replace a single user
+# Replace a single feed
 #
 PUT http://:host/:path/587a810d598418739b000001
 Content-Type: :json
@@ -128,9 +167,9 @@ Content-Type: :json
 }
 
 #
-# Modify a single user
+# Modify a single feed
 #
-PATCH http://:host/:path/587a810d598418739b000001
+PATCH http://:host/:path/587ad83859841886c7000003
 Content-Type: :json
 {
     "email": "updated3@aol.com"

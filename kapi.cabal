@@ -19,12 +19,14 @@ library
                      , Data.AesonBson
                      , Data.AesonBson.Instances
                      , Handlers.Xandar.Common
-                     , Handlers.Xandar.Users
+                     , Handlers.Xandar.Xandar
                      , Parsers.Filter
                      , Parsers.Unescape
                      , Persistence.Common
                      , Persistence.MongoDB
                      , Persistence.Xandar.Users
+                     , Persistence.Xandar.Feeds
+                     , Persistence.Xandar.Posts
                      , Types.Common
   build-depends:       base >= 4.7 && < 5
                      , base-compat >= 0.9

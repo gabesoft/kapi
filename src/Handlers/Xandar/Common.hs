@@ -28,7 +28,7 @@ import Servant.Utils.Enter (Enter)
 import Types.Common
 
 -- |
--- Create an application for providing the user functionality
+-- Create an application for providing CRUD functionality for a type of record
 -- app
 --   :: (HasServer a '[])
 --   => Proxy a -> (ServerT a Api) -> ApiConfig -> Application
@@ -46,9 +46,9 @@ server' handlers config = enter (toHandler config) handlers
     toHandler conf = Nat (`runReaderT` conf)
 
 -- |
--- Get multiple users
-getMultiple :: Collection -> ServerT GetMultiple Api
-getMultiple coll include query sort page perPage = do
+-- Get multiple records
+getMultiple :: ApiGetMultipleLink -> Collection -> ServerT GetMultiple Api
+getMultiple getLink coll include query sort page perPage = do
   conf <- ask
   pipe <- dbPipe conf
   count <- dbCount (dbName conf) coll pipe
@@ -58,19 +58,19 @@ getMultiple coll include query sort page perPage = do
   case queryToDoc (fromMaybe "" query) of
     Left err -> throwApiError $ ApiError (LBS.pack err) status400
     Right filter' -> do
-      users <-
+      records <-
         dbFind (dbName conf) coll filter' sort' include' start limit pipe
       return $
         addHeader (show $ paginationPage pagination) $
         addHeader (show $ paginationTotal pagination) $
         addHeader (show $ paginationLast pagination) $
         addHeader (show $ paginationSize pagination) $
-        addHeader (intercalate "," $ mkPaginationLinks pagination) users
+        addHeader (intercalate "," $ mkPaginationLinks pagination) records
   where
     mkFields f input = catMaybes $ f <$> concat (T.splitOn "," <$> input)
     sort' = mkFields mkSortField sort
     include' = mkFields mkIncludeField include
-    mkUrl page' = mkUserGetMultipleLink include query sort (Just page') perPage
+    mkUrl page' = getLink include query sort (Just page') perPage
     mkPaginationLinks pagination =
       uncurry mkRelLink . second mkUrl <$>
       [ ("next", paginationNext pagination)
@@ -80,12 +80,12 @@ getMultiple coll include query sort page perPage = do
       ]
 
 -- |
--- Get a single user by id
+-- Get a single record by id
 getSingle :: Collection -> Maybe Text -> Text -> Api (Headers '[Header "ETag" String] Record)
 getSingle coll etag uid = do
-  user <- getSingle' coll uid
-  let sha = recToSha user
-  let res = addHeader sha user
+  record <- getSingle' coll uid
+  let sha = recToSha record
+  let res = addHeader sha record
   case etag of
     Nothing -> return res
     Just tag ->
@@ -105,65 +105,69 @@ deleteSingle coll uid = do
 -- |
 -- Create one or more records
 createSingleOrMultiple
-  :: RecordDefinition -> Collection -> ApiData Record
+  :: RecordDefinition -> Collection -> (Text -> String) -> ApiData Record
   -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData ApiResult))
-createSingleOrMultiple def coll (Single r) = createSingle def coll r
-createSingleOrMultiple def coll (Multiple rs) = createMultiple def coll rs
+createSingleOrMultiple def coll getLink (Single r) = createSingle def coll getLink r
+createSingleOrMultiple def coll getLink (Multiple rs) = createMultiple def coll getLink rs
 
 -- |
 -- Create a single record
 createSingle
   :: RecordDefinition
   -> Collection
+  -> (Text -> String)
   -> Record
   -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData ApiResult))
-createSingle def coll input = do
-  user <- insertSingle def coll input
-  apiItem throwApiError (return . mkResult) user
+createSingle def coll getLink input = do
+  record <- insertSingle def coll input
+  apiItem throwApiError (return . mkResult) record
   where
-    mkResult r = addHeader (getUserLink r) $ noHeader (Single $ Succ r)
+    mkResult r = addHeader (getCreateLink getLink r) $ noHeader (Single $ Succ r)
 
 -- |
--- Create multiple users
+-- Create multiple records
 createMultiple
-  :: RecordDefinition -> Collection -> [Record]
-  -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData ApiResult))
-createMultiple def coll inputs = do
-  users <- mapM (insertSingle def coll) inputs
-  let links = apiItem (const "<>") (mkLink . getUserLink) <$> users
-  return . noHeader $ addHeader (intercalate ", " links) (Multiple users)
+  :: RecordDefinition
+  -> Collection
+  -> (Text -> String)
+  -> [Record]
+  -> Api (Headers '[ Header "Location" String, Header "Link" String] (ApiData ApiResult))
+createMultiple def coll getLink inputs = do
+  records <- mapM (insertSingle def coll) inputs
+  let links = apiItem (const "<>") (mkLink . getCreateLink getLink) <$> records
+  return . noHeader $ addHeader (intercalate ", " links) (Multiple records)
 
 -- |
--- Update (replace) a single user
+-- Update (replace) a single record
 replaceSingle :: RecordDefinition -> Collection -> Text -> Record -> Api Record
 replaceSingle def coll = updateSingle def coll True
 
 -- |
--- Update (modify) a single user
+-- Update (modify) a single record
 modifySingle :: RecordDefinition -> Collection -> Text -> Record -> Api Record
 modifySingle def coll = updateSingle def coll False
 
 -- |
--- Update (replace) multiple users
+-- Update (replace) multiple records
 replaceMultiple :: RecordDefinition -> Collection -> [Record] -> Api [ApiResult]
 replaceMultiple def coll = updateMultiple def coll True
 
 -- |
--- Update (modify) multiple users
+-- Update (modify) multiple records
 modifyMultiple :: RecordDefinition -> Collection -> [Record] -> Api [ApiResult]
 modifyMultiple def coll = updateMultiple def coll False
 
 -- |
--- Handle a head request for a single user endpoint
+-- Handle a head request for a single record endpoint
 headSingle
   :: Collection -> Text
   -> Api (Headers '[Header "ETag" String] NoContent)
 headSingle coll uid = do
-  user <- getSingle' coll uid
-  return $ addHeader (recToSha user) NoContent
+  record <- getSingle' coll uid
+  return $ addHeader (recToSha record) NoContent
 
 -- |
--- Handle a head request for a multiple users endpoint
+-- Handle a head request for a multiple records endpoint
 headMultiple :: Collection -> Api (Headers '[Header "X-Total-Count" String] NoContent)
 headMultiple coll = do
   conf <- ask
@@ -172,31 +176,31 @@ headMultiple coll = do
   return $ addHeader (show count) NoContent
 
 -- |
--- Handle an options request for a single user endpoint
+-- Handle an options request for a single record endpoint
 optionsSingle :: Text
               -> Api (Headers '[Header "Access-Control-Allow-Methods" String] NoContent)
 optionsSingle _ = return $ addHeader "GET, PATCH, PUT, DELETE" NoContent
 
 -- |
--- Handle an options request for a multiple user endpoint
+-- Handle an options request for a multiple record endpoint
 optionsMultiple :: Api (Headers '[Header "Access-Control-Allow-Methods" String] NoContent)
 optionsMultiple = return $ addHeader "GET, POST, PATCH, PUT" NoContent
 
 -- |
--- Insert a single valid user
+-- Insert a single valid record
 -- populating any missing fields with default values
 insertSingle :: RecordDefinition -> Collection -> Record -> Api ApiResult
 insertSingle def coll =
   chainResult (insertOrUpdateSingle def coll dbInsert) . validateRecord def
 
 -- |
--- Modify or replace a single user
+-- Modify or replace a single record
 updateSingle :: RecordDefinition -> Collection -> Bool -> Text -> Record -> Api Record
-updateSingle def coll replace uid user =
-  updateSingle' def coll replace uid user >>= apiItem throwApiError return
+updateSingle def coll replace uid record =
+  updateSingle' def coll replace uid record >>= apiItem throwApiError return
 
 -- |
--- Modify or replace multiple users
+-- Modify or replace multiple records
 updateMultiple :: RecordDefinition -> Collection -> Bool -> [Record] -> Api [ApiResult]
 updateMultiple def coll replace = mapM modify
   where
@@ -206,7 +210,7 @@ updateMultiple def coll replace = mapM modify
         (vResultToApiItem $ validateHasId u)
 
 -- |
--- Modify or replace a single user
+-- Modify or replace a single record
 updateSingle' :: RecordDefinition -> Collection -> Bool -> Text -> Record -> Api ApiResult
 updateSingle' def coll replace uid updated = do
   existing <- getSingle' coll uid
@@ -220,27 +224,27 @@ updateSingle' def coll replace uid updated = do
         else mergeRecords
 
 -- |
--- Insert or update a valid @user@ record according to @action@
+-- Insert or update a valid @record@ record according to @action@
 insertOrUpdateSingle
   :: RecordDefinition -> Collection -> (Database -> Collection -> Record -> Pipe -> Api (Either Failure RecordId))
   -> Record
   -> Api ApiResult
-insertOrUpdateSingle def coll action user = do
+insertOrUpdateSingle def coll action record = do
   conf <- ask
   pipe <- dbPipe conf
-  result <- action (dbName conf) coll (populateDefaults def user) pipe
+  result <- action (dbName conf) coll (populateDefaults def record) pipe
   case result of
     Left err -> return $ Fail (failedToApiError err)
     Right uid -> Succ . fromJust <$> dbGetById (dbName conf) coll uid pipe
 
 -- |
--- Get a user by id
+-- Get a record by id
 getSingle' :: Collection -> Text -> Api Record
 getSingle' coll uid = do
   conf <- ask
   pipe <- dbPipe conf
-  user <- dbGetById (dbName conf) coll uid pipe
-  maybe (throwError err404) return user
+  record <- dbGetById (dbName conf) coll uid pipe
+  maybe (throwError err404) return record
 
 -- |
 -- Get the configured database name for this app
@@ -302,11 +306,11 @@ mkRelLink :: String -> String -> String
 mkRelLink rel link = mkLink link ++ "; rel=\"" ++ rel ++ "\""
 
 -- |
--- Create a link for a user resource
-getUserLink :: Record -> String
-getUserLink = mkUserGetSingleLink . fromJust . getIdValue
+-- Create a link to be returned during record creation
+getCreateLink :: (Text -> String) -> Record -> String
+getCreateLink getLink = getLink . fromJust . getIdValue
 
 -- |
--- Validate a user record
+-- Validate a record given a definition
 validateRecord :: RecordDefinition -> Record -> ApiResult
 validateRecord def = vResultToApiItem . validate def

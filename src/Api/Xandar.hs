@@ -12,14 +12,22 @@ module Api.Xandar
   , XandarPostApi
   , XandarFeedApi
   , XandarApiPath
+  , XandarApi
   , UserApiPath
   , GetMultiple
   , GetSingle
+  , ApiGetMultipleLink
   , appName
+  , apiProxy
   , apiUserProxy
   , apiFeedProxy
+  , apiPostProxy
   , mkUserGetSingleLink
   , mkUserGetMultipleLink
+  , mkFeedGetSingleLink
+  , mkFeedGetMultipleLink
+  , mkPostGetSingleLink
+  , mkPostGetMultipleLink
   ) where
 
 import Api.Common
@@ -45,6 +53,12 @@ type XandarUserApi = XandarApiPath :> UserApiPath :> GenericApi
 type XandarFeedApi = XandarApiPath :> FeedApiPath :> GenericApi
 
 type XandarPostApi = XandarApiPath :> PostApiPath :> GenericApi
+
+type XandarApi = XandarUserApi :<|> XandarFeedApi
+
+type ApiGetMultipleLink = [Text] -> Maybe Text -> [Text] -> Maybe Int -> Maybe Int -> String
+
+apiProxy = Proxy :: Proxy XandarApi
 
 apiUserProxy = Proxy :: Proxy XandarUserApi
 
@@ -79,26 +93,11 @@ mkFeedGetSingleLink = mkLink1 apiFeedProxy apiFeedProxyGetSingle
 mkPostGetSingleLink :: Text -> String
 mkPostGetSingleLink = mkLink1 apiPostProxy apiPostProxyGetSingle
 
-mkUserGetMultipleLink :: [Text]
-                      -> Maybe Text
-                      -> [Text]
-                      -> Maybe Int
-                      -> Maybe Int
-                      -> String
+mkUserGetMultipleLink :: ApiGetMultipleLink
 mkUserGetMultipleLink = mkLink5 apiUserProxy apiUserProxyGetMultiple
 
-mkFeedGetMultipleLink :: [Text]
-                      -> Maybe Text
-                      -> [Text]
-                      -> Maybe Int
-                      -> Maybe Int
-                      -> String
+mkFeedGetMultipleLink :: ApiGetMultipleLink
 mkFeedGetMultipleLink = mkLink5 apiFeedProxy apiFeedProxyGetMultiple
 
-mkPostGetMultipleLink :: [Text]
-                      -> Maybe Text
-                      -> [Text]
-                      -> Maybe Int
-                      -> Maybe Int
-                      -> String
+mkPostGetMultipleLink :: ApiGetMultipleLink
 mkPostGetMultipleLink = mkLink5 apiPostProxy apiPostProxyGetMultiple

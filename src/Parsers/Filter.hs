@@ -96,7 +96,7 @@ num = do
     mkTerm = either TermFloat TermInt . floatingOrInteger
 
 mkOp :: (Text, a) -> Parser a
-mkOp (s, v) = asciiCI s >> return v
+mkOp (s, v) = (asciiCI s >> return v) <?> T.unpack s
 
 bool :: Parser FilterTerm
 bool = TermBool <$> (bool' "true" True <|> bool' "false" False) <?> "bool"

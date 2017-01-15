@@ -18,8 +18,8 @@ feedIndices :: [Index]
 feedIndices =
   [ Index
     { iColl = feedColl
-    , iKey = ["email" =: (1 :: Int)]
-    , iName = "email_unique"
+    , iKey = ["uri" =: (1 :: Int)]
+    , iName = "uri_unique"
     , iUnique = True
     , iDropDups = True
     , iExpireAfterSeconds = Nothing
