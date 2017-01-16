@@ -17,7 +17,7 @@ GET http://:host/:path
 #
 # Get all feeds - sort & partial response
 #
-GET http://:host/:path?sort=title&include=title,uri
+GET http://:host/:path?sort=title&include=title,uri&page=4&per_page=10
 
 #
 # Get feeds filtered by status

@@ -1,7 +1,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 
--- | Functionality for interacting with MongoDB
+-- |
+-- Functionality for interacting with MongoDB
 module Persistence.MongoDB
   ( mkPipe
   , dbAccess
