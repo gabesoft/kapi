@@ -17,12 +17,12 @@ GET http://:host/:path
 #
 # Get all posts - sort & partial response
 #
-GET http://:host/:path?sort=title&include=title,uri
+GET http://:host/:path?sort=image.url&include=title,link,image
 
 #
 # Get posts filtered by status
 #
-GET http://:host/:path?where=(lastReadStatus.readStatus eq "success")&include=title,lastReadStatus,uri
+GET http://:host/:path?where=(title contains "taking")&include=title,link
 
 #
 # Get posts created afte a date
@@ -83,62 +83,34 @@ POST http://:host/:path
 Content-Type: :json
 [
   {
-    "author": null,
-    "data": {
-      "etag": null,
-      "last-modified": "Mon, 19 Sep 2016 23:30:42 GMT"
-    },
-    "date": "2016-09-19T23:30:42.000Z",
-    "description": "Haskell and assembly tricks",
-    "failedAttempts": 0,
-    "favicon": null,
-    "format": "rss-2.0",
-    "generator": "http://wordpress.com/",
-    "guid": "https://hbtvl.wordpress.com",
+    "author": "Adam Dachis & Darren Herczeg",
+    "comments": null,
+    "date": "2016-03-03T00:15:00.000Z",
+    "description": "post description",
+    "feedId": "56d7d88bc788cb1d6eb9199c",
+    "guid": "http://5by5.tv/supercharged/97",
     "image": {
-      "title": "hbtvl",
-      "url": "https://s2.wp.com/i/buttonw-com.png"
+      "url": "http://icebox.5by5.tv/images/broadcasts/69/cover.jpg"
     },
-    "language": "en",
-    "lastPostDate": "2015-12-14T21:17:23.000Z",
-    "lastReadDate": "2017-01-15T01:48:05.200Z",
-    "lastReadStatus": {
-      "readStatus": "success",
-      "readStatusError": null
-    },
-    "link": "https://hbtvl.wordpress.com",
-    "postCount": 6,
-    "title": "hbtvl",
-    "uri": "https://hbtvl.wordpress.com/feed/"
+    "link": "http://5by5.tv/supercharged/97",
+    "pubdate": "2016-03-03T00:15:00.000Z",
+    "summary": "post summary",
+    "title": "Supercharged 97: Nothing Happened This Week"
   },
   {
-    "author": "Dennis Gosnell",
-    "data": {
-      "etag": null,
-      "last-modified": null
-    },
-    "date": "2016-11-09T00:00:00.000Z",
-    "description": null,
-    "failedAttempts": 0,
-    "favicon": null,
-    "format": "atom-1.0",
-    "generator": null,
-    "guid": "https://functor.tokyo/blog",
+    "author": "Darryl Thomas",
+    "comments": null,
+    "date": "2016-03-02T16:00:00.000Z",
+    "description": "post description",
+    "feedId": "56d7d88bc788cb1d6eb9199c",
+    "guid": "http://5by5.tv/iohyes/103",
     "image": {
-      "title": "",
-      "url": "https://functor.tokyo/static/img/functor.tokyo.logo.png?etag=-HTQgqMp"
+      "url": "http://icebox.5by5.tv/images/broadcasts/77/cover.jpg"
     },
-    "language": null,
-    "lastPostDate": "2016-11-09T00:00:00.000Z",
-    "lastReadDate": "2017-01-15T01:48:05.595Z",
-    "lastReadStatus": {
-      "readStatus": "success",
-      "readStatusError": null
-    },
-    "link": "https://functor.tokyo/blog",
-    "postCount": 16,
-    "title": "functor.tokyo blog feed",
-    "uri": "https://functor.tokyo/blog/feed"
+    "link": "http://5by5.tv/iohyes/103",
+    "pubdate": "2016-03-02T16:00:00.000Z",
+    "summary": "post summary",
+    "title": "iOhYes 103: Don\"t Hate Us, Nolan"
   }
 ]
 

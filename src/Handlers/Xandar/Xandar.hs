@@ -17,46 +17,26 @@ app = app' apiProxy (userHandlers :<|> feedHandlers :<|> postHandlers)
   where
     userHandlers :: ServerT XandarUserApi Api
     userHandlers =
-      getMultiple mkUserGetMultipleLink userColl :<|>
-      getSingle userColl :<|>
-      deleteSingle userColl :<|>
-      createSingleOrMultiple userDefinition userColl mkUserGetSingleLink :<|>
-      replaceSingle userDefinition userColl :<|>
-      replaceMultiple userDefinition userColl :<|>
-      modifySingle userDefinition userColl :<|>
-      modifyMultiple userDefinition userColl :<|>
-      headSingle userColl :<|>
-      headMultiple userColl :<|>
-      optionsSingle :<|>
-      optionsMultiple
+      handlers userDefinition userColl mkUserGetSingleLink mkUserGetMultipleLink
     feedHandlers :: ServerT XandarFeedApi Api
     feedHandlers =
-      getMultiple mkFeedGetMultipleLink feedColl :<|>
-      getSingle feedColl :<|>
-      deleteSingle feedColl :<|>
-      createSingleOrMultiple feedDefinition feedColl mkFeedGetSingleLink :<|>
-      replaceSingle feedDefinition feedColl :<|>
-      replaceMultiple feedDefinition feedColl :<|>
-      modifySingle feedDefinition feedColl :<|>
-      modifyMultiple feedDefinition feedColl :<|>
-      headSingle feedColl :<|>
-      headMultiple feedColl :<|>
-      optionsSingle :<|>
-      optionsMultiple
+      handlers feedDefinition feedColl mkFeedGetSingleLink mkFeedGetMultipleLink
     postHandlers :: ServerT XandarPostApi Api
     postHandlers =
-      getMultiple mkPostGetMultipleLink postColl :<|>
-      getSingle postColl :<|>
-      deleteSingle postColl :<|>
-      createSingleOrMultiple postDefinition postColl mkPostGetSingleLink :<|>
-      replaceSingle postDefinition postColl :<|>
-      replaceMultiple postDefinition postColl :<|>
-      modifySingle postDefinition postColl :<|>
-      modifyMultiple postDefinition postColl :<|>
-      headSingle postColl :<|>
-      headMultiple postColl :<|>
-      optionsSingle :<|>
-      optionsMultiple
+      handlers postDefinition postColl mkPostGetSingleLink mkPostGetMultipleLink
+    handlers def coll mkGetSingleLink mkGetMultipleLink =
+        getMultiple mkGetMultipleLink coll :<|>
+        getSingle coll :<|>
+        deleteSingle coll :<|>
+        createSingleOrMultiple def coll mkGetSingleLink :<|>
+        replaceSingle def coll :<|>
+        replaceMultiple def coll :<|>
+        modifySingle def coll :<|>
+        modifyMultiple def coll :<|>
+        headSingle coll :<|>
+        headMultiple coll :<|>
+        optionsSingle :<|>
+        optionsMultiple
 
 -- |
 -- Perform any initialization to be done on server start
