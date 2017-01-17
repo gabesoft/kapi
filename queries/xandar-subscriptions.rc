@@ -17,7 +17,7 @@ GET http://:host/:path
 #
 # Get all subscriptions - sort & partial response
 #
-GET http://:host/:path?sort=title&include=title,uri&page=4&per_page=10
+GET http://:host/:path?sort=title&include=title,uri,userId&page=4&per_page=10
 
 #
 # Get subscriptions filtered by status
@@ -35,59 +35,43 @@ GET http://:host/:path?where=(_createdAt ge 2017-01-08T07:47:45.928Z)
 GET http://:host/:path?page=4&per_page=5
 
 #
-# Get a single feed
+# Get a single subscription
 #
 GET http://:host/:path/5869ec3e59841810dc000009
 
 #
-# Get a single feed using ETag
+# Get a single subscription using ETag
 #
 GET http://:host/:path/5869ec3e59841810dc000009
 If-None-Match: ef19b2e0ce2baa83fa90abfa82a5141d4f18842d
 
 #
-# Delete a non-existent feed
+# Delete a non-existent subscription
 #
 DELETE http://:host/:path/non-existent
 
 #
-# Delete an existent feed
+# Delete an existent subscription
 #
 DELETE http://:host/:path/587ad5bd5984186b15000001 
 
 #
-# Create a single feed
+# Create a single subscription
 #
 POST http://:host/:path
 Content-Type: :json
 {
-  "author": null,
-  "data": {
-    "etag": "\"6b188e14abb0321740881b7893cbc0ab\"",
-    "last-modified": "Fri, 13 Jan 2017 02:09:05 GMT"
-  },
-  "date": "2017-01-13T02:09:05.000Z",
-  "description": "Personal blog for Christie Koehler. \"It's a poor sort of memory that only works backward.\"",
-  "failedAttempts": 0,
-  "favicon": null,
-  "format": "rss-2.0",
-  "generator": "https://wordpress.org/?v=4.7",
-  "guid": "https://subfictional.com",
-  "image": {
-    "title": "Subfictional Studios",
-    "url": "https://subfictional.com/files/2016/07/cropped-sf-logo-2016-sf-sq-512px-32x32.jpg"
-  },
-  "language": "en-US",
-  "lastPostDate": "2017-01-13T02:09:05.000Z",
-  "lastReadDate": "2017-01-14T20:01:06.227Z",
-  "lastReadStatus": {
-    "readStatus": "failure",
-    "readStatusError": "StatusCodeException (Status {statusCode = 304, statusMessage = \"Not Modified\"}) [(\"Date\",\"Sat, 14 Jan 2017 20:01:07 GMT\"),(\"Server\",\"Apache/2.4.7 (Ubuntu)\"),(\"ETag\",\"\\\"6b188e14abb0321740881b7893cbc0ab\\\"\"),(\"Expires\",\"Thu, 19 Nov 1981 08:52:00 GMT\"),(\"Cache-Control\",\"no-store, no-cache, must-revalidate, post-check=0, pre-check=0\"),(\"Vary\",\"User-Agent\"),(\"Set-Cookie\",\"PHPSESSID=cfiki8nufmmqr5qb3sifrnhha6; path=/\"),(\"X-Response-Body-Start\",\"\"),(\"X-Request-URL\",\"GET https://subfictional.com:443/feed/\")] (CJ {expose = [Cookie {cookie_name = \"PHPSESSID\", cookie_value = \"cfiki8nufmmqr5qb3sifrnhha6\", cookie_expiry_time = 3016-05-17 00:00:00 UTC, cookie_domain = \"subfictional.com\", cookie_path = \"/\", cookie_creation_time = 2017-01-14 20:01:07.288073354 UTC, cookie_last_access_time = 2017-01-14 20:01:07.288073354 UTC, cookie_persistent = False, cookie_host_only = True, cookie_secure_only = False, cookie_http_only = False}]})"
-  },
-  "link": "https://subfictional.com",
-  "postCount": 17,
-  "title": "Subfictional Studios",
-  "uri": "https://subfictional.com/feed/"
+  "createdAt": "2016-03-03T06:49:30.234Z",
+  "disabled": false,
+  "__v": 1,
+  "userId": "56d7cc3fccee17506699e735",
+  "feedId": "56d7de7ac788cb1d6eb91d90",
+  "updatedAt": "2016-03-03T21:36:14.046Z",
+  "title": "Emacs Ninja",
+  "tags": [
+    "editor",
+    "emacs"
+  ]
 }
 
 #
@@ -97,67 +81,37 @@ POST http://:host/:path
 Content-Type: :json
 [
   {
-    "author": null,
-    "data": {
-      "etag": null,
-      "last-modified": "Mon, 19 Sep 2016 23:30:42 GMT"
-    },
-    "date": "2016-09-19T23:30:42.000Z",
-    "description": "Haskell and assembly tricks",
-    "failedAttempts": 0,
-    "favicon": null,
-    "format": "rss-2.0",
-    "generator": "http://wordpress.com/",
-    "guid": "https://hbtvl.wordpress.com",
-    "image": {
-      "title": "hbtvl",
-      "url": "https://s2.wp.com/i/buttonw-com.png"
-    },
-    "language": "en",
-    "lastPostDate": "2015-12-14T21:17:23.000Z",
-    "lastReadDate": "2017-01-15T01:48:05.200Z",
-    "lastReadStatus": {
-      "readStatus": "success",
-      "readStatusError": null
-    },
-    "link": "https://hbtvl.wordpress.com",
-    "postCount": 6,
-    "title": "hbtvl",
-    "uri": "https://hbtvl.wordpress.com/feed/"
+    "_id": "56d7de26c788cb1d6eb91bdc",
+    "createdAt": "2016-03-03T06:48:06.989Z",
+    "disabled": true,
+    "__v": 0,
+    "userId": "56d7cc3fccee17506699e735",
+    "feedId": "56d7de26c788cb1d6eb91bcc",
+    "updatedAt": "2016-03-03T06:50:20.017Z",
+    "title": "Nodejitsu",
+    "tags": []
   },
   {
-    "author": "Dennis Gosnell",
-    "data": {
-      "etag": null,
-      "last-modified": null
-    },
-    "date": "2016-11-09T00:00:00.000Z",
-    "description": null,
-    "failedAttempts": 0,
-    "favicon": null,
-    "format": "atom-1.0",
-    "generator": null,
-    "guid": "https://functor.tokyo/blog",
-    "image": {
-      "title": "",
-      "url": "https://functor.tokyo/static/img/functor.tokyo.logo.png?etag=-HTQgqMp"
-    },
-    "language": null,
-    "lastPostDate": "2016-11-09T00:00:00.000Z",
-    "lastReadDate": "2017-01-15T01:48:05.595Z",
-    "lastReadStatus": {
-      "readStatus": "success",
-      "readStatusError": null
-    },
-    "link": "https://functor.tokyo/blog",
-    "postCount": 16,
-    "title": "functor.tokyo blog feed",
-    "uri": "https://functor.tokyo/blog/feed"
+    "_id": "56d7de2cc788cb1d6eb91c08",
+    "createdAt": "2016-03-03T06:48:12.405Z",
+    "disabled": false,
+    "__v": 1,
+    "userId": "56d7cc3fccee17506699e735",
+    "feedId": "56d7de2cc788cb1d6eb91bf3",
+    "updatedAt": "2016-03-13T18:42:38.415Z",
+    "title": "The npm Blog",
+    "tags": [
+      "software",
+      "javascript",
+      "nodejs",
+      "programming",
+      "node"
+    ]
   }
 ]
 
 #
-# Replace a single feed
+# Replace a single subscription
 #
 PUT http://:host/:path/587a810d598418739b000001
 Content-Type: :json
@@ -167,7 +121,7 @@ Content-Type: :json
 }
 
 #
-# Modify a single feed
+# Modify a single subscription
 #
 PATCH http://:host/:path/587ad83859841886c7000003
 Content-Type: :json
