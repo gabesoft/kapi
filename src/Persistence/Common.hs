@@ -33,9 +33,14 @@ apiItem _ g (Succ a) = g a
 -- Create a field definition
 mkFieldDef
   :: Val a
-  => Label -> Bool -> Maybe a -> (Label, FieldDefinition)
-mkFieldDef name required def =
-  (name, FieldDefinition name required (val <$> def))
+  => Label -> Bool -> Bool -> Maybe a -> (Label, FieldDefinition)
+mkFieldDef name required isId defaultValue =
+  (name, FieldDefinition name required (val <$> defaultValue) isId)
+
+-- |
+-- Create a definition for an id field used as a foreign key
+mkIdDef :: Label -> (Label, FieldDefinition)
+mkIdDef name = mkFieldDef name True True (Nothing :: Maybe String)
 
 -- |
 -- Create a definition for a required field without a default value
@@ -47,7 +52,7 @@ mkReqDef' name = mkReqDef name (Nothing :: Maybe String)
 mkReqDef
   :: Val a
   => Label -> Maybe a -> (Label, FieldDefinition)
-mkReqDef name = mkFieldDef name True
+mkReqDef name = mkFieldDef name True False
 
 -- |
 -- Create a definition for an optional field without a default value
@@ -59,7 +64,7 @@ mkOptDef' name = mkOptDef name (Nothing :: Maybe String)
 mkOptDef
   :: Val a
   => Label -> Maybe a -> (Label, FieldDefinition)
-mkOptDef name = mkFieldDef name False
+mkOptDef name = mkFieldDef name False False
 
 -- |
 -- Convert the result of a validation to an @Either@ value
@@ -78,20 +83,21 @@ confGetDb name = fromJust . Map.lookup name . mongoDbs
 validate :: RecordDefinition -> Record -> (Record, ValidationResult)
 validate def r = (r, ValidationErrors $ catMaybes results)
   where
-    names = nub $ Map.keys def ++ recordLabels r
+    names = nub $ Map.keys (recordFields def) ++ recordLabels r
     results = validateField True def r <$> names
 
 validateField :: Bool -> RecordDefinition -> Record -> Label -> Maybe Field
 validateField ignoreId def r name
   | ignoreId && name == "_id" = Nothing
   | name `elem` ignore = Nothing
-  | not (Map.member name def) = Just (mkField "Field is not allowed")
+  | not (Map.member name fields) = Just (mkField "Field is not allowed")
   | isRequired && not (hasValue name r) && noDefault =
     Just (mkField "Field is required")
   | otherwise = Nothing
   where
+    fields = recordFields def
     ignore = ["_updatedAt", "_createdAt"]
-    fieldDef = fromJust $ Map.lookup name def
+    fieldDef = fromJust $ Map.lookup name fields
     isRequired = fieldRequired fieldDef
     noDefault = isNothing (fieldDefault fieldDef)
     mkField :: String -> Field
@@ -102,7 +108,7 @@ validateField ignoreId def r name
 populateDefaults :: RecordDefinition -> Record -> Record
 populateDefaults def r = Map.foldl populate r defaults
   where
-    defaults = Map.filter (isJust . fieldDefault) def
+    defaults = Map.filter (isJust . fieldDefault) (recordFields def)
     populate acc field = modField (fieldLabel field) (set field) acc
     set field = fromMaybe (fieldDefault field)
 

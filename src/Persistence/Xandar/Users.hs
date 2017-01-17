@@ -6,18 +6,14 @@ module Persistence.Xandar.Users where
 
 import Data.Bson
 import qualified Data.Map.Strict as Map
-import Data.Text (Text)
-import Database.MongoDB
+import Database.MongoDB (Index(..))
 import Persistence.Common
 import Types.Common
-
-userColl :: Collection
-userColl = "users"
 
 userIndices :: [Index]
 userIndices =
   [ Index
-    { iColl = userColl
+    { iColl = recordCollection userDefinition
     , iKey = ["email" =: (1 :: Int)]
     , iName = "email_unique"
     , iUnique = True
@@ -28,6 +24,7 @@ userIndices =
 
 userDefinition :: RecordDefinition
 userDefinition =
+  RecordDefinition "users" $
   Map.fromList
     [ mkReqDef' "email"
     , mkReqDef "disabled" (Just False)

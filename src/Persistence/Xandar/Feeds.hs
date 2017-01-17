@@ -6,18 +6,14 @@ module Persistence.Xandar.Feeds where
 
 import Data.Bson
 import qualified Data.Map.Strict as Map
-import Data.Text (Text)
-import Database.MongoDB
+import Database.MongoDB (Index(..))
 import Persistence.Common
 import Types.Common
-
-feedColl :: Collection
-feedColl = "feeds"
 
 feedIndices :: [Index]
 feedIndices =
   [ Index
-    { iColl = feedColl
+    { iColl = recordCollection feedDefinition
     , iKey = ["uri" =: (1 :: Int)]
     , iName = "uri_unique"
     , iUnique = True
@@ -28,12 +24,13 @@ feedIndices =
 
 feedDefinition :: RecordDefinition
 feedDefinition =
+  RecordDefinition "feeds" $
   Map.fromList
     [ mkOptDef' "author"
     , mkOptDef' "data"
     , mkOptDef' "date"
     , mkOptDef' "description"
-    , mkReqDef  "failedAttempts" (Just 0 :: Maybe Int)
+    , mkReqDef "failedAttempts" (Just 0 :: Maybe Int)
     , mkOptDef' "favicon"
     , mkOptDef' "format"
     , mkOptDef' "generator"
@@ -44,7 +41,7 @@ feedDefinition =
     , mkOptDef' "lastReadDate"
     , mkOptDef' "lastReadStatus"
     , mkOptDef' "link"
-    , mkReqDef  "postCount" (Just 0 :: Maybe Int)
+    , mkReqDef "postCount" (Just 0 :: Maybe Int)
     , mkOptDef' "title"
     , mkReqDef' "uri"
     ]

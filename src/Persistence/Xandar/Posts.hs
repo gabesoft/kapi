@@ -6,17 +6,14 @@ module Persistence.Xandar.Posts where
 
 import Data.Bson
 import qualified Data.Map.Strict as Map
-import Database.MongoDB
+import Database.MongoDB (Index(..))
 import Persistence.Common
 import Types.Common
-
-postColl :: Collection
-postColl = "posts"
 
 postIndices :: [Index]
 postIndices =
   [ Index
-    { iColl = postColl
+    { iColl = recordCollection postDefinition
     , iKey = ["guid" =: (1 :: Int)]
     , iName = "guid_unique"
     , iUnique = True
@@ -24,7 +21,7 @@ postIndices =
     , iExpireAfterSeconds = Nothing
     }
   , Index
-    { iColl = postColl
+    { iColl = recordCollection postDefinition
     , iKey = ["link" =: (1 :: Int)]
     , iName = "link_unique"
     , iUnique = True
@@ -35,12 +32,13 @@ postIndices =
 
 postDefinition :: RecordDefinition
 postDefinition =
+  RecordDefinition "posts" $
   Map.fromList
     [ mkOptDef' "author"
     , mkOptDef' "comments"
     , mkOptDef' "date"
     , mkOptDef' "description"
-    , mkReqDef' "feedId"
+    , mkIdDef "feedId"
     , mkReqDef' "guid"
     , mkOptDef' "image"
     , mkOptDef' "inlineStatus"

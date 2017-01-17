@@ -4,9 +4,9 @@ module Handlers.Xandar.Xandar where
 
 import Api.Xandar
 import Handlers.Xandar.Common
-import Persistence.Xandar.Feeds (feedDefinition, feedIndices, feedColl)
-import Persistence.Xandar.Posts (postDefinition, postIndices, postColl)
-import Persistence.Xandar.Users (userDefinition, userIndices, userColl)
+import Persistence.Xandar.Feeds (feedDefinition, feedIndices)
+import Persistence.Xandar.Posts (postDefinition, postIndices)
+import Persistence.Xandar.Users (userDefinition, userIndices)
 import Servant
 import Types.Common
 
@@ -17,24 +17,24 @@ app = app' apiProxy (userHandlers :<|> feedHandlers :<|> postHandlers)
   where
     userHandlers :: ServerT XandarUserApi Api
     userHandlers =
-      handlers userDefinition userColl mkUserGetSingleLink mkUserGetMultipleLink
+      handlers userDefinition mkUserGetSingleLink mkUserGetMultipleLink
     feedHandlers :: ServerT XandarFeedApi Api
     feedHandlers =
-      handlers feedDefinition feedColl mkFeedGetSingleLink mkFeedGetMultipleLink
+      handlers feedDefinition mkFeedGetSingleLink mkFeedGetMultipleLink
     postHandlers :: ServerT XandarPostApi Api
     postHandlers =
-      handlers postDefinition postColl mkPostGetSingleLink mkPostGetMultipleLink
-    handlers def coll mkGetSingleLink mkGetMultipleLink =
-        getMultiple mkGetMultipleLink coll :<|>
-        getSingle coll :<|>
-        deleteSingle coll :<|>
-        createSingleOrMultiple def coll mkGetSingleLink :<|>
-        replaceSingle def coll :<|>
-        replaceMultiple def coll :<|>
-        modifySingle def coll :<|>
-        modifyMultiple def coll :<|>
-        headSingle coll :<|>
-        headMultiple coll :<|>
+      handlers postDefinition mkPostGetSingleLink mkPostGetMultipleLink
+    handlers def mkGetSingleLink mkGetMultipleLink =
+        getMultiple mkGetMultipleLink def :<|>
+        getSingle def :<|>
+        deleteSingle def :<|>
+        createSingleOrMultiple def mkGetSingleLink :<|>
+        replaceSingle def :<|>
+        replaceMultiple def :<|>
+        modifySingle def :<|>
+        modifyMultiple def :<|>
+        headSingle def :<|>
+        headMultiple def :<|>
         optionsSingle :<|>
         optionsMultiple
 

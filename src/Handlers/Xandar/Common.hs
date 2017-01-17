@@ -18,7 +18,7 @@ import Data.List (intercalate)
 import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as T
-import Database.MongoDB (Pipe, Database, Index, Collection)
+import Database.MongoDB (Pipe, Database, Index)
 import Database.MongoDB.Query (Failure(..))
 import Network.HTTP.Types.Status
 import Persistence.Common
@@ -47,11 +47,11 @@ server' handlers config = enter (toHandler config) handlers
 
 -- |
 -- Get multiple records
-getMultiple :: ApiGetMultipleLink -> Collection -> ServerT GetMultiple Api
-getMultiple getLink coll include query sort page perPage = do
+getMultiple :: ApiGetMultipleLink -> RecordDefinition -> ServerT GetMultiple Api
+getMultiple getLink def include query sort page perPage = do
   conf <- ask
   pipe <- dbPipe conf
-  count <- dbCount (dbName conf) coll pipe
+  count <- dbCount (dbName conf) def pipe
   let pagination = paginate (fromMaybe 1 page) (fromMaybe 50 perPage) count
   let start = paginationStart pagination
   let limit = paginationLimit pagination
@@ -59,7 +59,7 @@ getMultiple getLink coll include query sort page perPage = do
     Left err -> throwApiError $ ApiError (LBS.pack err) status400
     Right filter' -> do
       records <-
-        dbFind (dbName conf) coll filter' sort' include' start limit pipe
+        dbFind (dbName conf) def filter' sort' include' start limit pipe
       return $
         addHeader (show $ paginationPage pagination) $
         addHeader (show $ paginationTotal pagination) $
@@ -81,9 +81,9 @@ getMultiple getLink coll include query sort page perPage = do
 
 -- |
 -- Get a single record by id
-getSingle :: Collection -> Maybe Text -> Text -> Api (Headers '[Header "ETag" String] Record)
-getSingle coll etag uid = do
-  record <- getSingle' coll uid
+getSingle :: RecordDefinition -> Maybe Text -> Text -> Api (Headers '[Header "ETag" String] Record)
+getSingle def etag uid = do
+  record <- getSingle' def uid
   let sha = recToSha record
   let res = addHeader sha record
   case etag of
@@ -95,31 +95,30 @@ getSingle coll etag uid = do
 
 -- |
 -- Delete a single record
-deleteSingle :: Collection -> Text -> Api NoContent
-deleteSingle coll uid = do
-  _ <- getSingle' coll uid
+deleteSingle :: RecordDefinition -> Text -> Api NoContent
+deleteSingle def uid = do
+  _ <- getSingle' def uid
   conf <- ask
   pipe <- dbPipe conf
-  dbDeleteById (dbName conf) coll uid pipe >> return NoContent
+  dbDeleteById (dbName conf) def uid pipe >> return NoContent
 
 -- |
 -- Create one or more records
 createSingleOrMultiple
-  :: RecordDefinition -> Collection -> (Text -> String) -> ApiData Record
+  :: RecordDefinition -> (Text -> String) -> ApiData Record
   -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData ApiResult))
-createSingleOrMultiple def coll getLink (Single r) = createSingle def coll getLink r
-createSingleOrMultiple def coll getLink (Multiple rs) = createMultiple def coll getLink rs
+createSingleOrMultiple def getLink (Single r) = createSingle def getLink r
+createSingleOrMultiple def getLink (Multiple rs) = createMultiple def getLink rs
 
 -- |
 -- Create a single record
 createSingle
   :: RecordDefinition
-  -> Collection
   -> (Text -> String)
   -> Record
   -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData ApiResult))
-createSingle def coll getLink input = do
-  record <- insertSingle def coll input
+createSingle def getLink input = do
+  record <- insertSingle def input
   apiItem throwApiError (return . mkResult) record
   where
     mkResult r = addHeader (getCreateLink getLink r) $ noHeader (Single $ Succ r)
@@ -128,51 +127,50 @@ createSingle def coll getLink input = do
 -- Create multiple records
 createMultiple
   :: RecordDefinition
-  -> Collection
   -> (Text -> String)
   -> [Record]
   -> Api (Headers '[ Header "Location" String, Header "Link" String] (ApiData ApiResult))
-createMultiple def coll getLink inputs = do
-  records <- mapM (insertSingle def coll) inputs
+createMultiple def getLink inputs = do
+  records <- mapM (insertSingle def) inputs
   let links = apiItem (const "<>") (mkLink . getCreateLink getLink) <$> records
   return . noHeader $ addHeader (intercalate ", " links) (Multiple records)
 
 -- |
 -- Update (replace) a single record
-replaceSingle :: RecordDefinition -> Collection -> Text -> Record -> Api Record
-replaceSingle def coll = updateSingle def coll True
+replaceSingle :: RecordDefinition -> Text -> Record -> Api Record
+replaceSingle def = updateSingle def True
 
 -- |
 -- Update (modify) a single record
-modifySingle :: RecordDefinition -> Collection -> Text -> Record -> Api Record
-modifySingle def coll = updateSingle def coll False
+modifySingle :: RecordDefinition -> Text -> Record -> Api Record
+modifySingle def = updateSingle def False
 
 -- |
 -- Update (replace) multiple records
-replaceMultiple :: RecordDefinition -> Collection -> [Record] -> Api [ApiResult]
-replaceMultiple def coll = updateMultiple def coll True
+replaceMultiple :: RecordDefinition -> [Record] -> Api [ApiResult]
+replaceMultiple def = updateMultiple def True
 
 -- |
 -- Update (modify) multiple records
-modifyMultiple :: RecordDefinition -> Collection -> [Record] -> Api [ApiResult]
-modifyMultiple def coll = updateMultiple def coll False
+modifyMultiple :: RecordDefinition -> [Record] -> Api [ApiResult]
+modifyMultiple def = updateMultiple def False
 
 -- |
 -- Handle a head request for a single record endpoint
 headSingle
-  :: Collection -> Text
+  :: RecordDefinition -> Text
   -> Api (Headers '[Header "ETag" String] NoContent)
-headSingle coll uid = do
-  record <- getSingle' coll uid
+headSingle def uid = do
+  record <- getSingle' def uid
   return $ addHeader (recToSha record) NoContent
 
 -- |
 -- Handle a head request for a multiple records endpoint
-headMultiple :: Collection -> Api (Headers '[Header "X-Total-Count" String] NoContent)
-headMultiple coll = do
+headMultiple :: RecordDefinition -> Api (Headers '[Header "X-Total-Count" String] NoContent)
+headMultiple def = do
   conf <- ask
   pipe <- dbPipe conf
-  count <- dbCount (dbName conf) coll pipe
+  count <- dbCount (dbName conf) def pipe
   return $ addHeader (show count) NoContent
 
 -- |
@@ -189,33 +187,33 @@ optionsMultiple = return $ addHeader "GET, POST, PATCH, PUT" NoContent
 -- |
 -- Insert a single valid record
 -- populating any missing fields with default values
-insertSingle :: RecordDefinition -> Collection -> Record -> Api ApiResult
-insertSingle def coll =
-  chainResult (insertOrUpdateSingle def coll dbInsert) . validateRecord def
+insertSingle :: RecordDefinition -> Record -> Api ApiResult
+insertSingle def =
+  chainResult (insertOrUpdateSingle def dbInsert) . validateRecord def
 
 -- |
 -- Modify or replace a single record
-updateSingle :: RecordDefinition -> Collection -> Bool -> Text -> Record -> Api Record
-updateSingle def coll replace uid record =
-  updateSingle' def coll replace uid record >>= apiItem throwApiError return
+updateSingle :: RecordDefinition -> Bool -> Text -> Record -> Api Record
+updateSingle def replace uid record =
+  updateSingle' def replace uid record >>= apiItem throwApiError return
 
 -- |
 -- Modify or replace multiple records
-updateMultiple :: RecordDefinition -> Collection -> Bool -> [Record] -> Api [ApiResult]
-updateMultiple def coll replace = mapM modify
+updateMultiple :: RecordDefinition -> Bool -> [Record] -> Api [ApiResult]
+updateMultiple def replace = mapM modify
   where
     modify u =
       chainResult
-        (updateSingle' def coll replace $ fromJust (getIdValue u))
+        (updateSingle' def replace $ fromJust (getIdValue u))
         (vResultToApiItem $ validateHasId u)
 
 -- |
 -- Modify or replace a single record
-updateSingle' :: RecordDefinition -> Collection -> Bool -> Text -> Record -> Api ApiResult
-updateSingle' def coll replace uid updated = do
-  existing <- getSingle' coll uid
+updateSingle' :: RecordDefinition -> Bool -> Text -> Record -> Api ApiResult
+updateSingle' def replace uid updated = do
+  existing <- getSingle' def uid
   chainResult
-    (insertOrUpdateSingle def coll dbUpdate)
+    (insertOrUpdateSingle def dbUpdate)
     (validateRecord def $ merge existing updated)
   where
     merge =
@@ -226,24 +224,24 @@ updateSingle' def coll replace uid updated = do
 -- |
 -- Insert or update a valid @record@ record according to @action@
 insertOrUpdateSingle
-  :: RecordDefinition -> Collection -> (Database -> Collection -> Record -> Pipe -> Api (Either Failure RecordId))
+  :: RecordDefinition -> (Database -> RecordDefinition -> Record -> Pipe -> Api (Either Failure RecordId))
   -> Record
   -> Api ApiResult
-insertOrUpdateSingle def coll action record = do
+insertOrUpdateSingle def action record = do
   conf <- ask
   pipe <- dbPipe conf
-  result <- action (dbName conf) coll (populateDefaults def record) pipe
+  result <- action (dbName conf) def (populateDefaults def record) pipe
   case result of
     Left err -> return $ Fail (failedToApiError err)
-    Right uid -> Succ . fromJust <$> dbGetById (dbName conf) coll uid pipe
+    Right uid -> Succ . fromJust <$> dbGetById (dbName conf) def uid pipe
 
 -- |
 -- Get a record by id
-getSingle' :: Collection -> Text -> Api Record
-getSingle' coll uid = do
+getSingle' :: RecordDefinition -> Text -> Api Record
+getSingle' def uid = do
   conf <- ask
   pipe <- dbPipe conf
-  record <- dbGetById (dbName conf) coll uid pipe
+  record <- dbGetById (dbName conf) def uid pipe
   maybe (throwError err404) return record
 
 -- |

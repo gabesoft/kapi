@@ -12,6 +12,7 @@ import Types.Common
 -- | definitions
 def1 :: RecordDefinition
 def1 =
+  RecordDefinition mempty $
   Map.fromList
     [ mkOptDef "admin" (Just False)
     , mkReqDef "disabled" (Just False)
@@ -20,6 +21,7 @@ def1 =
 
 def2 :: RecordDefinition
 def2 =
+  RecordDefinition mempty $
   Map.fromList
     [ mkReqDef "admin" (Just False)
     , mkOptDef "disabled" (Just False)
@@ -134,7 +136,6 @@ rec11 =
     f = mkStrField
 
 -- | Delete field results
-
 delRes1 :: Record
 delRes1 =
   Record [mkStrField "_id" "584e58195984185eb8000005", mkStrField "y" "2"]
@@ -193,7 +194,6 @@ delRes6 =
     ]
 
 -- | Exclude fields results
-
 excludeRes1 :: Record
 excludeRes1 = Record [mkStrField "_id" "584e58195984185eb8000005"]
 
@@ -205,7 +205,6 @@ excludeRes2 =
     ]
 
 -- | Merge records results
-
 mergeRes1 :: Record
 mergeRes1 =
   Record
@@ -229,7 +228,6 @@ mergeRes2 =
     ]
 
 -- | Pagination results
-
 pgeRes1 =
   Pagination
   { paginationTotal = 15
@@ -244,7 +242,6 @@ pgeRes1 =
   }
 
 -- | Populate defaults results
-
 popRes1 =
   Record
     [ mkStrField "_id" "31889d94-dada-481d-a7d8-0b5e48ee54f3"
@@ -254,7 +251,6 @@ popRes1 =
     ]
 
 -- | Replace results
-
 replaceRes1 :: Record
 replaceRes1 =
   Record
@@ -270,7 +266,6 @@ replaceRes1 =
     f = mkStrField
 
 -- | Set field results
-
 setRes1 :: Record
 setRes1 =
   Record
@@ -331,7 +326,6 @@ setRes6 =
     ]
 
 -- | Validate results
-
 valRes1 :: ValidationResult
 valRes1 =
   ValidationErrors

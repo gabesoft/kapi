@@ -19,6 +19,8 @@ module Persistence.MongoDB
   , validateHasId
   , mkOutRecord
   , mkInDocument
+  , recordToDocument
+  , documentToRecord
   ) where
 
 import Control.Exception.Lifted (handleJust)
@@ -63,20 +65,20 @@ dbAddIndex dbName idx = dbAccess dbName (createIndex idx)
 -- Insert a record into a collection and return the _id value
 dbInsert'
   :: MonadIO m
-  => Database -> Collection -> Record -> Pipe -> m (Maybe RecordId)
-dbInsert' dbName collName input pipe = do
-  doc <- mkInDocument True input
-  objId <- dbAccess dbName (insert collName doc) pipe
+  => Database -> RecordDefinition -> Record -> Pipe -> m (Maybe RecordId)
+dbInsert' dbName def input pipe = do
+  doc <- mkInDocument def True input
+  objId <- dbAccess dbName (insert (recordCollection def) doc) pipe
   return (objIdToRecId objId)
 
 -- |
 -- Insert a record into a collection and return the _id value or a @Failure@
 dbInsert
   :: (MonadIO m, MonadBaseControl IO m)
-  => Database -> Collection -> Record -> Pipe -> m (Either Failure RecordId)
-dbInsert dbName collName doc pipe =
+  => Database -> RecordDefinition -> Record -> Pipe -> m (Either Failure RecordId)
+dbInsert dbName def doc pipe =
   dbAction $
-  do maybeId <- dbInsert' dbName collName doc pipe
+  do maybeId <- dbInsert' dbName def doc pipe
      maybe (error "Unexpected missing document") (return . Right) maybeId
 
 -- |
@@ -84,64 +86,64 @@ dbInsert dbName collName doc pipe =
 -- The input record is assumed to have the id field populated
 dbUpdate'
   :: MonadIO m
-  => Database -> Collection -> Record -> Pipe -> m RecordId
-dbUpdate' dbName collName input pipe = do
-  doc <- mkInDocument False input
-  dbAccess dbName (save collName doc) pipe
+  => Database -> RecordDefinition -> Record -> Pipe -> m RecordId
+dbUpdate' dbName def input pipe = do
+  doc <- mkInDocument def False input
+  dbAccess dbName (save (recordCollection def) doc) pipe
   return (fromJust $ getIdValue input)
 
 -- |
 -- Save an existing record or insert a new record into the database
 dbUpdate
   :: (MonadIO m, MonadBaseControl IO m)
-  => Database -> Collection -> Record -> Pipe -> m (Either Failure RecordId)
-dbUpdate dbName collName doc pipe =
-  dbAction $ Right <$> dbUpdate' dbName collName doc pipe
+  => Database -> RecordDefinition -> Record -> Pipe -> m (Either Failure RecordId)
+dbUpdate dbName def doc pipe =
+  dbAction $ Right <$> dbUpdate' dbName def doc pipe
 
 -- |
 -- Select multiple records
 dbFind
   :: (MonadBaseControl IO f, MonadIO f)
-  => Database -> Collection -> [Field] -> [Field] -> [Field] -> Int -> Int -> Pipe -> f [Record]
-dbFind dbName collName filter sort fields skip limit pipe = do
+  => Database -> RecordDefinition -> [Field] -> [Field] -> [Field] -> Int -> Int -> Pipe -> f [Record]
+dbFind dbName def filter' sort' fields skip' limit' pipe = do
   docs <-
     dbAccess
       dbName
       (find
-         (select filter collName)
-         { sort = sort
+         (select filter' $ recordCollection def)
+         { sort = sort'
          }
          { project = fields
          }
-         { skip = fromIntegral skip
+         { skip = fromIntegral skip'
          }
-         { limit = fromIntegral limit
+         { limit = fromIntegral limit'
          } >>=
        rest)
       pipe
-  return $ mkOutRecord <$> docs
+  return $ mkOutRecord def <$> docs
 
 -- |
 -- Count the number of records in a collection
-dbCount :: MonadIO m => Database -> Collection -> Pipe -> m Int
-dbCount dbName collName = dbAccess dbName (count (select [] collName))
+dbCount :: MonadIO m => Database -> RecordDefinition -> Pipe -> m Int
+dbCount dbName def = dbAccess dbName (count (select [] $ recordCollection def))
 
 -- |
 -- Get a record by id
 dbGetById
   :: MonadIO m
-  => Database -> Collection -> RecordId -> Pipe -> m (Maybe Record)
-dbGetById dbName collName recId pipe = do
-  doc <- dbAccess dbName (findOne $ idQuery collName recId) pipe
-  return $ mkOutRecord <$> doc
+  => Database -> RecordDefinition -> RecordId -> Pipe -> m (Maybe Record)
+dbGetById dbName def recId pipe = do
+  doc <- dbAccess dbName (findOne $ idQuery (recordCollection def) recId) pipe
+  return $ mkOutRecord def <$> doc
 
 -- |
 -- Delete a record by id
 dbDeleteById
   :: MonadIO m
-  => Database -> Collection -> RecordId -> Pipe -> m ()
-dbDeleteById dbName collName recId =
-  dbAccess dbName (delete $ idQuery collName recId)
+  => Database -> RecordDefinition -> RecordId -> Pipe -> m ()
+dbDeleteById dbName def recId =
+  dbAccess dbName (delete $ idQuery (recordCollection def) recId)
 
 -- |
 -- Perform a database action that could result in a @Failure@
@@ -156,19 +158,36 @@ failureHandler _ = Nothing
 
 -- |
 -- Create a record ready to be returned from a query action
-mkOutRecord :: Document -> Record
-mkOutRecord = mapIdToRecId . Record
+mkOutRecord :: RecordDefinition -> Document -> Record
+mkOutRecord = documentToRecord
 
 -- |
 -- Create a document ready to be saved or updated
-mkInDocument :: MonadIO m => Bool -> Record -> m Document
-mkInDocument insert = fmap getDocument . setTimestamp' insert . mapIdToObjId
+mkInDocument :: MonadIO m => RecordDefinition -> Bool -> Record -> m Document
+mkInDocument def isNew = fmap (recordToDocument def) . setTimestamp' isNew
 
 -- |
--- Set the updatedAt and createdAt fields
+-- Convert a BSON @Document@ to a @Record@
+documentToRecord :: RecordDefinition -> Document -> Record
+documentToRecord def document =
+  foldr mapIdToRecId (Record document) ("_id" : getIdLabels def)
+
+-- |
+-- Convert a @Record@ to a BSON @Document@
+recordToDocument :: RecordDefinition -> Record -> Document
+recordToDocument def record =
+  getDocument (foldr mapIdToObjId record $ "_id" : getIdLabels def)
+
+-- |
+-- Get the labels of all fields of type @ObjectId@ in a @RecordDefinition@
+getIdLabels :: RecordDefinition -> [Label]
+getIdLabels = Map.keys . Map.filter isObjectId . recordFields
+
+-- |
+-- Set the updatedAt field. For new records also set a createdAt field.
 setTimestamp' :: MonadIO m => Bool -> Record -> m Record
-setTimestamp' insert =
-  if insert
+setTimestamp' isNew =
+  if isNew
     then setUpdatedAt >=> setCreatedAt
     else setUpdatedAt
 
@@ -192,21 +211,21 @@ objIdToRecId _ = Nothing
 
 -- |
 -- Convert the id within a record to a @RecordId@
-mapIdToRecId :: Record -> Record
-mapIdToRecId = modField "_id" (>>= objIdToRecId)
+mapIdToRecId :: Label -> Record -> Record
+mapIdToRecId name = modField name (>>= objIdToRecId)
 
 -- |
 -- Convert the id within a record to an @ObjectId@
-mapIdToObjId :: Record -> Record
-mapIdToObjId = modField "_id" (>>= recIdToObjId)
+mapIdToObjId :: Label -> Record -> Record
+mapIdToObjId name = modField name (>>= recIdToObjId)
 
 -- |
 -- Validate that a record has a valid id field
 validateHasId :: Record -> (Record, ValidationResult)
 validateHasId r = (r, ValidationErrors $ catMaybes [valField])
   where
-    valField = validateField False def (mapIdToObjId r) "_id"
-    def = Map.fromList [mkReqDef' "_id"]
+    valField = validateField False def (mapIdToObjId "_id" r) "_id"
+    def = RecordDefinition mempty $ Map.fromList [mkReqDef' "_id"]
 
 -- |
 -- Make a field that will be used for sorting
@@ -272,6 +291,6 @@ termToField GreaterThanOrEqual (ColumnName col _) term = Right (col =: ("$gte" =
 termToField LessThan (ColumnName col _) term = Right (col =: ("$lt" =: term))
 termToField LessThanOrEqual (ColumnName col _) term = Right (col =: ("$lte" =: term))
 termToField Contains (ColumnName col _) (TermStr s) = Right (col =: Regex s "i")
-termToField Contains (ColumnName col _) _ = Left "contains: expected a string term"
+termToField Contains (ColumnName _ _) _ = Left "contains: expected a string term"
 termToField NotContains (ColumnName col _) (TermStr s) = Right (col =: ("$not" =: Regex s "i"))
-termToField NotContains (ColumnName col _) _ = Left "~contains: expected a string term"
+termToField NotContains (ColumnName _ _) _ = Left "~contains: expected a string term"

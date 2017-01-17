@@ -18,7 +18,10 @@ mkId :: String -> Value
 mkId v = ObjId (read v)
 
 mkObjId :: String -> Field
-mkObjId v = "_id" =: mkId v
+mkObjId v = mkObjId' "_id" v
+
+mkObjId' :: Label -> String -> Field
+mkObjId' name v = name =: mkId v
 
 mkRecId :: String -> Field
 mkRecId = mkStrField "_id"

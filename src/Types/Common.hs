@@ -33,9 +33,13 @@ data FieldDefinition = FieldDefinition
   { fieldLabel :: Label
   , fieldRequired :: Bool
   , fieldDefault :: Maybe BSON.Value
+  , isObjectId :: Bool
   } deriving (Eq, Show)
 
-type RecordDefinition = Map.Map Label FieldDefinition
+data RecordDefinition = RecordDefinition
+  { recordCollection :: Text
+  , recordFields :: Map.Map Label FieldDefinition
+  } deriving (Eq, Show)
 
 data ApiData a
   = Single a
