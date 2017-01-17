@@ -27,6 +27,7 @@ library
                      , Persistence.ElasticSearch
                      , Persistence.Xandar.Users
                      , Persistence.Xandar.Feeds
+                     , Persistence.Xandar.FeedSubscriptions
                      , Persistence.Xandar.Posts
                      , Types.Common
   build-depends:       base >= 4.7 && < 5

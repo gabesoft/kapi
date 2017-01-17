@@ -11,6 +11,7 @@ module Api.Xandar
   ( XandarUserApi
   , XandarPostApi
   , XandarFeedApi
+  , XandarSubscriptionApi
   , XandarApiPath
   , XandarApi
   , UserApiPath
@@ -22,12 +23,15 @@ module Api.Xandar
   , apiUserProxy
   , apiFeedProxy
   , apiPostProxy
+  , apiSubscriptionProxy
   , mkUserGetSingleLink
   , mkUserGetMultipleLink
   , mkFeedGetSingleLink
   , mkFeedGetMultipleLink
   , mkPostGetSingleLink
   , mkPostGetMultipleLink
+  , mkSubscriptionGetSingleLink
+  , mkSubscriptionGetMultipleLink
   ) where
 
 import Api.Common
@@ -46,6 +50,8 @@ type UserApiPath = "users"
 
 type FeedApiPath = "feeds"
 
+type SubscriptionApiPath = "subscriptions"
+
 type PostApiPath = "posts"
 
 type XandarUserApi = XandarApiPath :> UserApiPath :> GenericApi
@@ -54,7 +60,9 @@ type XandarFeedApi = XandarApiPath :> FeedApiPath :> GenericApi
 
 type XandarPostApi = XandarApiPath :> PostApiPath :> GenericApi
 
-type XandarApi = XandarUserApi :<|> XandarFeedApi :<|> XandarPostApi
+type XandarSubscriptionApi = XandarApiPath :> SubscriptionApiPath :> GenericApi
+
+type XandarApi = XandarUserApi :<|> XandarFeedApi :<|> XandarPostApi :<|> XandarSubscriptionApi
 
 type ApiGetMultipleLink = [Text] -> Maybe Text -> [Text] -> Maybe Int -> Maybe Int -> String
 
@@ -66,6 +74,8 @@ apiFeedProxy = Proxy :: Proxy XandarFeedApi
 
 apiPostProxy = Proxy :: Proxy XandarPostApi
 
+apiSubscriptionProxy = Proxy :: Proxy XandarSubscriptionApi
+
 apiUserProxyGetSingle =
   Proxy :: Proxy (XandarApiPath :> UserApiPath :> GetSingle)
 
@@ -74,6 +84,9 @@ apiFeedProxyGetSingle =
 
 apiPostProxyGetSingle =
   Proxy :: Proxy (XandarApiPath :> PostApiPath :> GetSingle)
+
+apiSubscriptionProxyGetSingle =
+  Proxy :: Proxy (XandarApiPath :> SubscriptionApiPath :> GetSingle)
 
 apiUserProxyGetMultiple =
   Proxy :: Proxy (XandarApiPath :> UserApiPath :> GetMultiple)
@@ -84,6 +97,9 @@ apiFeedProxyGetMultiple =
 apiPostProxyGetMultiple =
   Proxy :: Proxy (XandarApiPath :> PostApiPath :> GetMultiple)
 
+apiSubscriptionProxyGetMultiple =
+  Proxy :: Proxy (XandarApiPath :> SubscriptionApiPath :> GetMultiple)
+
 mkUserGetSingleLink :: Text -> String
 mkUserGetSingleLink = mkLink1 apiUserProxy apiUserProxyGetSingle
 
@@ -93,6 +109,9 @@ mkFeedGetSingleLink = mkLink1 apiFeedProxy apiFeedProxyGetSingle
 mkPostGetSingleLink :: Text -> String
 mkPostGetSingleLink = mkLink1 apiPostProxy apiPostProxyGetSingle
 
+mkSubscriptionGetSingleLink :: Text -> String
+mkSubscriptionGetSingleLink = mkLink1 apiSubscriptionProxy apiSubscriptionProxyGetSingle
+
 mkUserGetMultipleLink :: ApiGetMultipleLink
 mkUserGetMultipleLink = mkLink5 apiUserProxy apiUserProxyGetMultiple
 
@@ -101,3 +120,6 @@ mkFeedGetMultipleLink = mkLink5 apiFeedProxy apiFeedProxyGetMultiple
 
 mkPostGetMultipleLink :: ApiGetMultipleLink
 mkPostGetMultipleLink = mkLink5 apiPostProxy apiPostProxyGetMultiple
+
+mkSubscriptionGetMultipleLink :: ApiGetMultipleLink
+mkSubscriptionGetMultipleLink = mkLink5 apiSubscriptionProxy apiSubscriptionProxyGetMultiple

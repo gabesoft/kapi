@@ -49,101 +49,75 @@ mkPipe addr port = connect (Host addr $ PortNumber port)
 -- |
 -- Perform an action with master access on a database
 -- using the supplied connection pipe
-dbAccess
-  :: MonadIO m
-  => Database -> Action m a -> Pipe -> m a
+dbAccess :: MonadIO m => Database -> Action m a -> Pipe -> m a
 dbAccess database action pipe = access pipe master database action
 
 -- |
 -- Create an index on the database using the supplied pipe
-dbAddIndex
-  :: MonadIO m
-  => Database -> Index -> Pipe -> m ()
+dbAddIndex :: MonadIO m => Database -> Index -> Pipe -> m ()
 dbAddIndex dbName idx = dbAccess dbName (createIndex idx)
 
 -- |
--- Insert a record into a collection and return the _id value
-dbInsert'
-  :: MonadIO m
-  => Database -> RecordDefinition -> Record -> Pipe -> m (Maybe RecordId)
-dbInsert' dbName def input pipe = do
-  doc <- mkInDocument def True input
-  objId <- dbAccess dbName (insert (recordCollection def) doc) pipe
-  return (objIdToRecId objId)
-
--- |
 -- Insert a record into a collection and return the _id value or a @Failure@
-dbInsert
-  :: (MonadIO m, MonadBaseControl IO m)
-  => Database -> RecordDefinition -> Record -> Pipe -> m (Either Failure RecordId)
-dbInsert dbName def doc pipe =
-  dbAction $
-  do maybeId <- dbInsert' dbName def doc pipe
-     maybe (error "Unexpected missing document") (return . Right) maybeId
+dbInsert :: (MonadIO m, MonadBaseControl IO m) => Database -> RecordDefinition -> Record -> Pipe -> m (Either Failure RecordId)
+dbInsert dbName def input pipe =
+  dbAction $ do
+    doc <- mkInDocument def True input
+    docId <- objIdToRecId <$> run doc pipe
+    maybe (error "Unexpected missing document") (return . Right) docId
+  where
+    collName = recordCollection def
+    run doc = dbAccess dbName (insert collName doc)
 
 -- |
 -- Save an existing record into the database
 -- The input record is assumed to have the id field populated
-dbUpdate'
-  :: MonadIO m
-  => Database -> RecordDefinition -> Record -> Pipe -> m RecordId
-dbUpdate' dbName def input pipe = do
-  doc <- mkInDocument def False input
-  dbAccess dbName (save (recordCollection def) doc) pipe
-  return (fromJust $ getIdValue input)
-
--- |
--- Save an existing record or insert a new record into the database
-dbUpdate
-  :: (MonadIO m, MonadBaseControl IO m)
-  => Database -> RecordDefinition -> Record -> Pipe -> m (Either Failure RecordId)
-dbUpdate dbName def doc pipe =
-  dbAction $ Right <$> dbUpdate' dbName def doc pipe
+dbUpdate :: (MonadIO m, MonadBaseControl IO m) => Database -> RecordDefinition -> Record -> Pipe -> m (Either Failure RecordId)
+dbUpdate dbName def input pipe =
+  dbAction $ do
+    doc <- mkInDocument def False input
+    run doc pipe
+    return $ Right (fromJust $ getIdValue input)
+  where
+    collName = recordCollection def
+    run = dbAccess dbName . save collName
 
 -- |
 -- Select multiple records
 dbFind
-  :: (MonadBaseControl IO f, MonadIO f)
-  => Database -> RecordDefinition -> [Field] -> [Field] -> [Field] -> Int -> Int -> Pipe -> f [Record]
-dbFind dbName def filter' sort' fields skip' limit' pipe = do
-  docs <-
-    dbAccess
-      dbName
-      (find
-         (select filter' $ recordCollection def)
-         { sort = sort'
-         }
-         { project = fields
-         }
-         { skip = fromIntegral skip'
-         }
-         { limit = fromIntegral limit'
-         } >>=
-       rest)
-      pipe
-  return $ mkOutRecord def <$> docs
+  :: (MonadBaseControl IO m, MonadIO m)
+  => Database -> RecordDefinition -> [Field] -> [Field] -> [Field] -> Int -> Int -> Pipe -> m [Record]
+dbFind dbName def filter' sort' fields skip' limit' pipe =
+  fmap (mkOutRecord def) <$> run pipe
+  where
+    collName = recordCollection def
+    run =
+      dbAccess dbName $
+      find
+        (select filter' collName)
+        {sort = sort'}
+        {project = fields}
+        {skip = fromIntegral skip'}
+        {limit = fromIntegral limit'} >>= rest
+
+-- |
+-- Get a record by id
+dbGetById :: MonadIO m => Database -> RecordDefinition -> RecordId -> Pipe -> m (Maybe Record)
+dbGetById dbName def recId pipe = fmap (mkOutRecord def) <$> run pipe
+  where
+    collName = recordCollection def
+    run = dbAccess dbName (findOne $ idQuery collName recId)
+
+-- |
+-- Delete a record by id
+dbDeleteById :: MonadIO m => Database -> RecordDefinition -> RecordId -> Pipe -> m ()
+dbDeleteById dbName def recId =
+  dbAccess dbName (delete $ idQuery (recordCollection def) recId)
 
 -- |
 -- Count the number of records in a collection
 dbCount :: MonadIO m => Database -> RecordDefinition -> Pipe -> m Int
 dbCount dbName def = dbAccess dbName (count (select [] $ recordCollection def))
-
--- |
--- Get a record by id
-dbGetById
-  :: MonadIO m
-  => Database -> RecordDefinition -> RecordId -> Pipe -> m (Maybe Record)
-dbGetById dbName def recId pipe = do
-  doc <- dbAccess dbName (findOne $ idQuery (recordCollection def) recId) pipe
-  return $ mkOutRecord def <$> doc
-
--- |
--- Delete a record by id
-dbDeleteById
-  :: MonadIO m
-  => Database -> RecordDefinition -> RecordId -> Pipe -> m ()
-dbDeleteById dbName def recId =
-  dbAccess dbName (delete $ idQuery (recordCollection def) recId)
 
 -- |
 -- Perform a database action that could result in a @Failure@
