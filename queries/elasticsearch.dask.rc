@@ -1,0 +1,23 @@
+# -*- restclient -*-
+#
+# Elasticsearch queries against the dask index
+#
+
+# variables
+:host = localhost:9200
+:index = .prod-dask-rss-v1
+
+#
+# Get all indices
+#
+GET http://:host/_cat/indices?v
+
+#
+# Get all mappings
+#
+GET http://:host/:index/_all/_mapping
+
+#
+# Get all posts matching a query
+#
+GET http://:host/:index/_search?q=title:haskell

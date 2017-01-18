@@ -38,6 +38,7 @@ library
                      , bson
                      , bytestring >= 0.10
                      , containers >= 0.5
+                     , http-client >= 0.5
                      , http-types >= 0.9
                      , iso8601-time
                      , lifted-base >= 0.2
