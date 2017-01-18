@@ -5,6 +5,7 @@ module Persistence.ElasticSearch
   , refreshIndex
   , putMapping
   , putMappingFromFile
+  , indexDocument
   ) where
 
 import Data.Aeson (ToJSON)

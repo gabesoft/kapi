@@ -5,7 +5,36 @@
 
 # variables
 :host = localhost:9200
-:index = .prod-dask-rss-v1
+:coll = post
+:index1 = .prod-dask-rss-v1
+:index2 = kapi-xandar
+
+#
+# Get cluster health
+#
+GET http://:host/_cluster/health?pretty
+
+#
+# Display all shards
+#
+GET http://:host/_cat/shards
+
+#
+# Assign shards
+#
+POST http://:host/_cluster/reroute
+{
+  "commands": [
+    {
+      "allocate": {
+        "index": ":index2",
+        "shard": 0,
+        "node": "esnode-nix",
+        "allow_primary": true
+      }
+    }
+  ]
+}
 
 #
 # Get all indices
@@ -15,9 +44,46 @@ GET http://:host/_cat/indices?v
 #
 # Get all mappings
 #
-GET http://:host/:index/_all/_mapping
+GET http://:host/:index1/_all/_mapping
 
 #
 # Get all posts matching a query
 #
-GET http://:host/:index/_search?q=title:haskell
+GET http://:host/:index1/_search?q=title:haskell
+
+#
+# Index a document
+#
+PUT http://:host/:index2/:coll/1
+{
+  "post": {
+    "summary": null,
+    "image": null,
+    "inlineStatus": null,
+    "link": "https://www.reddit.com/r/haskell/comments/54niix/what_do_you_use_arithmoi_for/",
+    "date": "2016-09-26T23:05:53.000Z",
+    "guid": "t3_54niix",
+    "author": "/u/Bodigrim",
+    "comments": null,
+    "title": "What do you use arithmoi for?",
+    "description": "<!-- SC_OFF --><div class=\"md\"><p>I am the co-maintainer (with @cartazio) of <code>arithmoi</code>package (<a href=\"https://hackage.haskell.org/package/arithmoi\">https://hackage.haskell.org/package/arithmoi</a>), which provides utilities for number-theoretical computations. I am looking for areas to improve, and getting some feedback is invaluable for clear vision. </p><p>I'd be incredibly grateful for answers to the following questions.</p><p>What are you using <code>arithmoi</code> for? What are the main issues from the user's perspective? Which (number-theoretical) domains require better support?</p></div><!-- SC_ON -->   submitted by   <a href=\"https://www.reddit.com/user/Bodigrim\"> /u/Bodigrim </a><br/><span><a href=\"https://www.reddit.com/r/haskell/comments/54niix/what_do_you_use_arithmoi_for/\">[link]</a></span><span><a href=\"https://www.reddit.com/r/haskell/comments/54niix/what_do_you_use_arithmoi_for/\">[comments]</a></span>",
+    "version": 0
+  },
+  "postId": "57e9f803d5ec56510904c9db",
+  "subscriptionId": "57e9f803d5ec56510904c9f4",
+  "feedId": "57e9f802d5ec56510904c9d9",
+  "updatedAt": "2016-09-27T04:53:11.163Z",
+  "createdAt": "2016-09-27T04:39:31.460Z",
+  "userId": "56d7cc3fccee17506699e735",
+  "title": "Haskell  Reddit",
+  "tags": [
+    "haskell",
+    "reddit"
+  ],
+  "read": true
+}
+
+#
+# Get a document by id
+#
+GET http://:host/:index2/:coll/2

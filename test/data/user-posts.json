@@ -1,0 +1,290 @@
+[
+  {
+    "post": {
+      "summary": null,
+      "image": null,
+      "inlineStatus": null,
+      "link": "https://www.reddit.com/r/haskell/comments/54niix/what_do_you_use_arithmoi_for/",
+      "date": "2016-09-26T23:05:53.000Z",
+      "guid": "t3_54niix",
+      "author": "/u/Bodigrim",
+      "comments": null,
+      "title": "What do you use arithmoi for?",
+      "description": "<!-- SC_OFF --><div class=\"md\"><p>I am the co-maintainer (with @cartazio) of <code>arithmoi</code>package (<a href=\"https://hackage.haskell.org/package/arithmoi\">https://hackage.haskell.org/package/arithmoi</a>), which provides utilities for number-theoretical computations. I am looking for areas to improve, and getting some feedback is invaluable for clear vision. </p><p>I'd be incredibly grateful for answers to the following questions.</p><p>What are you using <code>arithmoi</code> for? What are the main issues from the user's perspective? Which (number-theoretical) domains require better support?</p></div><!-- SC_ON -->   submitted by   <a href=\"https://www.reddit.com/user/Bodigrim\"> /u/Bodigrim </a><br/><span><a href=\"https://www.reddit.com/r/haskell/comments/54niix/what_do_you_use_arithmoi_for/\">[link]</a></span><span><a href=\"https://www.reddit.com/r/haskell/comments/54niix/what_do_you_use_arithmoi_for/\">[comments]</a></span>",
+      "version": 0
+    },
+    "postId": "57e9f803d5ec56510904c9db",
+    "subscriptionId": "57e9f803d5ec56510904c9f4",
+    "feedId": "57e9f802d5ec56510904c9d9",
+    "updatedAt": "2016-09-27T04:53:11.163Z",
+    "createdAt": "2016-09-27T04:39:31.460Z",
+    "userId": "56d7cc3fccee17506699e735",
+    "title": "Haskell  Reddit",
+    "tags": [
+      "haskell",
+      "reddit"
+    ],
+    "read": true
+  },
+  {
+    "post": {
+      "summary": null,
+      "image": null,
+      "inlineStatus": null,
+      "link": "https://www.reddit.com/r/haskell/comments/54cxo8/anybody_applying_cs_theory_outside_of/",
+      "date": "2016-09-25T00:41:02.000Z",
+      "guid": "t3_54cxo8",
+      "author": "/u/nish2575",
+      "comments": null,
+      "title": "Anybody applying CS theory outside of cryptography, distributed systems, machine learning, compilers/DSLs/type theory, formal methods?",
+      "description": "<!-- SC_OFF --><div class=\"md\"><p>Any companies out there whose focus is to apply some other topic besides the above? For example, anybody spend a lot of time on approximation algorithms, online algorithms?</p></div><!-- SC_ON -->   submitted by   <a href=\"https://www.reddit.com/user/nish2575\"> /u/nish2575 </a><br/><span><a href=\"https://www.reddit.com/r/haskell/comments/54cxo8/anybody_applying_cs_theory_outside_of/\">[link]</a></span><span><a href=\"https://www.reddit.com/r/haskell/comments/54cxo8/anybody_applying_cs_theory_outside_of/\">[comments]</a></span>",
+      "version": 0
+    },
+    "postId": "57e9f803d5ec56510904c9ea",
+    "subscriptionId": "57e9f803d5ec56510904c9f4",
+    "feedId": "57e9f802d5ec56510904c9d9",
+    "updatedAt": "2016-09-27T04:53:11.163Z",
+    "createdAt": "2016-09-27T04:39:31.460Z",
+    "userId": "56d7cc3fccee17506699e735",
+    "title": "Haskell  Reddit",
+    "tags": [
+      "haskell",
+      "reddit"
+    ],
+    "read": true
+  },
+  {
+    "post": {
+      "summary": null,
+      "image": null,
+      "inlineStatus": null,
+      "link": "https://www.reddit.com/r/haskell/comments/54z77o/why_is_the_do_notation_arrow_not_reversed/",
+      "date": "2016-09-28T23:01:55.000Z",
+      "guid": "t3_54z77o",
+      "author": "/u/LeanderKu",
+      "comments": null,
+      "title": "Why is the Do notation Arrow not reversed",
+      "description": "<!-- SC_OFF --><div class=\"md\"><p>(language design) Simple question, why is the arrow not reversed? so from:</p><pre><code>do text1 &lt;- getLine text2 &lt;- getLine return text1 ++ test2 </code></pre><p>to:</p><pre><code>do getLine -> text1 getLine -> text2 return text1 ++ test2 </code></pre><p>Some historical quirk? Or is there a reason? This always bothered me. I think the second one is easier to read and to understand as you just \"follow\" the code,but might just be my imagination. </p></div><!-- SC_ON -->   submitted by   <a href=\"https://www.reddit.com/user/LeanderKu\"> /u/LeanderKu </a><br/><span><a href=\"https://www.reddit.com/r/haskell/comments/54z77o/why_is_the_do_notation_arrow_not_reversed/\">[link]</a></span><span><a href=\"https://www.reddit.com/r/haskell/comments/54z77o/why_is_the_do_notation_arrow_not_reversed/\">[comments]</a></span>",
+      "version": 0
+    },
+    "postId": "57ec4caeb9d714a86ed969e0",
+    "subscriptionId": "57e9f803d5ec56510904c9f4",
+    "feedId": "57e9f802d5ec56510904c9d9",
+    "userId": "56d7cc3fccee17506699e735",
+    "title": "Haskell  Reddit",
+    "updatedAt": "2016-09-27T04:53:11.163Z",
+    "createdAt": "2016-09-27T04:39:31.460Z",
+    "tags": [
+      "haskell",
+      "reddit"
+    ],
+    "version": 1,
+    "read": true,
+    "codeBlocks": [
+      {
+        "lang": "haskell",
+        "userEdited": true
+      },
+      {
+        "lang": "haskell",
+        "userEdited": true
+      }
+    ]
+  },
+  {
+    "post": {
+      "summary": null,
+      "image": null,
+      "inlineStatus": null,
+      "link": "https://www.reddit.com/r/haskell/comments/551asu/allowed_chars_in_a_string/",
+      "date": "2016-09-29T09:02:55.000Z",
+      "guid": "t3_551asu",
+      "author": "/u/joecefnhedog",
+      "comments": null,
+      "title": "Allowed Chars In A String",
+      "description": "<!-- SC_OFF --><div class=\"md\"><p>Hello</p><p>I want to print a string with these chars, i'm recieving an error on the '\\'. Is there a way around it?</p><pre><code>\"\\hat{p}\" </code></pre><p>Thanks, Joe</p></div><!-- SC_ON -->   submitted by   <a href=\"https://www.reddit.com/user/joecefnhedog\"> /u/joecefnhedog </a><br/><span><a href=\"https://www.reddit.com/r/haskell/comments/551asu/allowed_chars_in_a_string/\">[link]</a></span><span><a href=\"https://www.reddit.com/r/haskell/comments/551asu/allowed_chars_in_a_string/\">[comments]</a></span>",
+      "version": 0
+    },
+    "postId": "57ece090b9d714a86ed96b3a",
+    "subscriptionId": "57e9f803d5ec56510904c9f4",
+    "feedId": "57e9f802d5ec56510904c9d9",
+    "userId": "56d7cc3fccee17506699e735",
+    "title": "Haskell  Reddit",
+    "updatedAt": "2016-09-27T04:53:11.163Z",
+    "createdAt": "2016-09-27T04:39:31.460Z",
+    "tags": [
+      "haskell",
+      "reddit"
+    ],
+    "version": 1,
+    "read": true
+  },
+  {
+    "post": {
+      "summary": null,
+      "image": null,
+      "inlineStatus": null,
+      "link": "https://www.reddit.com/r/haskell/comments/55523o/using_aeson_to_decode_json_records_with_shared/",
+      "date": "2016-09-29T23:17:27.000Z",
+      "guid": "t3_55523o",
+      "author": "/u/m0d2",
+      "comments": null,
+      "title": "Using aeson to decode json records with shared field names",
+      "description": "<!-- SC_OFF --><div class=\"md\"><p>I want to use Aeson to decode a bunch of JSON records that come from a REST endpoint. Unfortunatly, all of the records share the fields <code>id</code> and <code>name</code>. Given that <a href=\"https://www.reddit.com/r/haskell/comments/2pnjdk/is_overloadedrecordfields_getting_it_into_7101/?\"><code>OverloadedRecordFields</code> is not implemented in GHC 7.10</a>, what is the best option to handle the issue?</p><p>I don't want to define a module for each record since that would be a pain for so many records. I can definitely use the traditional style of <code>prefixId</code> and <code>prefixName</code> for the field names, but then I have to write custom <code>FromJson</code> and <code>ToJson</code> for each record. Is there any better option?</p></div><!-- SC_ON -->   submitted by   <a href=\"https://www.reddit.com/user/m0d2\"> /u/m0d2 </a><br/><span><a href=\"https://www.reddit.com/r/haskell/comments/55523o/using_aeson_to_decode_json_records_with_shared/\">[link]</a></span><span><a href=\"https://www.reddit.com/r/haskell/comments/55523o/using_aeson_to_decode_json_records_with_shared/\">[comments]</a></span>",
+      "version": 0
+    },
+    "postId": "57eda7e0b9d714a86ed96dd6",
+    "subscriptionId": "57e9f803d5ec56510904c9f4",
+    "feedId": "57e9f802d5ec56510904c9d9",
+    "userId": "56d7cc3fccee17506699e735",
+    "title": "Haskell  Reddit",
+    "updatedAt": "2016-09-27T04:53:11.163Z",
+    "createdAt": "2016-09-27T04:39:31.460Z",
+    "tags": [
+      "haskell",
+      "reddit"
+    ],
+    "version": 1,
+    "read": true
+  },
+  {
+    "post": {
+      "summary": null,
+      "image": null,
+      "inlineStatus": null,
+      "link": "https://www.reddit.com/r/haskell/comments/555rj3/someone_ought_to_do_an_nlab_writeup_on_the_way/",
+      "date": "2016-09-30T02:06:43.000Z",
+      "guid": "t3_555rj3",
+      "author": "/u/flexibeast",
+      "comments": null,
+      "title": "\"Someone ought to do an nLab write-up on the way that monads are typically presented in Haskell or other programming environments, since it’s not the usual way that monads are presented by category theorists\"",
+      "description": "  submitted by   <a href=\"https://www.reddit.com/user/flexibeast\"> /u/flexibeast </a><br/><span><a href=\"https://nforum.ncatlab.org/discussion/7284/monad-transformer/?Focus=59169#Comment_59169\">[link]</a></span><span><a href=\"https://www.reddit.com/r/haskell/comments/555rj3/someone_ought_to_do_an_nlab_writeup_on_the_way/\">[comments]</a></span>",
+      "version": 0
+    },
+    "postId": "57edc94eb9d714a86ed96e42",
+    "subscriptionId": "57e9f803d5ec56510904c9f4",
+    "feedId": "57e9f802d5ec56510904c9d9",
+    "userId": "56d7cc3fccee17506699e735",
+    "title": "Haskell  Reddit",
+    "updatedAt": "2016-09-27T04:53:11.163Z",
+    "createdAt": "2016-09-27T04:39:31.460Z",
+    "tags": [
+      "haskell",
+      "reddit"
+    ],
+    "version": 1,
+    "read": true
+  },
+  {
+    "post": {
+      "summary": null,
+      "image": null,
+      "inlineStatus": null,
+      "link": "https://www.reddit.com/r/haskell/comments/557gwl/numeric_numerical_math_data_etc_or_how_to_browse/",
+      "date": "2016-09-30T11:34:58.000Z",
+      "guid": "t3_557gwl",
+      "author": "/u/ocramz",
+      "comments": null,
+      "title": "Numeric, Numerical, Math, Data, etc. or, how to browse modules and namespaces across packages?",
+      "description": "<!-- SC_OFF --><div class=\"md\"><p>I find there's quite a bit of overlapping work on Hackage (I'll restrict my scope to its numerical subset), and often it's scattered across different namespaces which only adds to the confusion.</p><p>When importing from multiple packages, the re-export trick only hides the underlying mess.</p><p>I suspect that if, let's say, the topmost module name were identical to the package name, \"discoverability\" (pardon the term) would be easier. A bit like in .. eh, Python. You <code>import skynet</code> (package<code>skynet</code>) and all the internal modules will have <code>skynet</code> as root name.</p><p>Arbitrary categorization by the package authors leads to N+1 standards. Hayoo helps a lot but it still takes quite some time to find what you need in the Haystack.</p><p>How do you deal with this in general? </p></div><!-- SC_ON -->   submitted by   <a href=\"https://www.reddit.com/user/ocramz\"> /u/ocramz </a><br/><span><a href=\"https://www.reddit.com/r/haskell/comments/557gwl/numeric_numerical_math_data_etc_or_how_to_browse/\">[link]</a></span><span><a href=\"https://www.reddit.com/r/haskell/comments/557gwl/numeric_numerical_math_data_etc_or_how_to_browse/\">[comments]</a></span>",
+      "version": 0
+    },
+    "postId": "57ee504fb9d714a86ed970d3",
+    "subscriptionId": "57e9f803d5ec56510904c9f4",
+    "feedId": "57e9f802d5ec56510904c9d9",
+    "userId": "56d7cc3fccee17506699e735",
+    "title": "Haskell  Reddit",
+    "updatedAt": "2016-09-27T04:53:11.163Z",
+    "createdAt": "2016-09-27T04:39:31.460Z",
+    "tags": [
+      "haskell",
+      "reddit"
+    ],
+    "version": 1,
+    "read": false
+  },
+  {
+    "post": {
+      "summary": null,
+      "image": null,
+      "inlineStatus": null,
+      "link": "https://www.reddit.com/r/haskell/comments/55bvt4/typesafe_printf_with_typeintype/",
+      "date": "2016-10-01T04:59:54.000Z",
+      "guid": "t3_55bvt4",
+      "author": "/u/gergoerdi",
+      "comments": null,
+      "title": "Typesafe Printf with TypeInType",
+      "description": "<!-- SC_OFF --><div class=\"md\"><p>At the Haskell Implementors Workshop 2016, <a href=\"https://www.reddit.com/u/goldfirere\">/u/goldfirere</a> mentioned in his \"Dependent Haskell triptych\" talk that typed <code>printf</code> might now be possible with <code>TypeInType</code>, so I thought I'd take a shot at it.</p><p>My code is available as a Gist <a href=\"https://gist.github.com/gergoerdi/5a0785ae9366776ebd4f1090d75979d3\">here</a>. The punchline is that it allows you to write</p><pre><code>x = printf @[Lit \"Hello, \", Str, Lit \". You have \" , Shown Int, Lit \" new messages.\" ] sing </code></pre><p>and GHC correctly infers its type as <code>String -> Int -> String</code>. </p><p>Unfortunately, <a href=\"http://stackoverflow.com/q/39686354/477476\"><code>Symbol</code> is not an inductively defined kind</a>, so you can't parse <code>Symbol</code>s, i.e. you can't write</p><pre><code>x = printf @\"Hello, %s. You have %d new messages.\" sing </code></pre><p>Another possible future improvement will be if <code>pi</code> binders are added alongside <code>forall</code>, to get rid of these <code>sing</code> arguments; i.e. to be able to write</p><pre><code>printf :: pi fmt. (SingI fmt) => Printf fmt printf = printf' [] (sing :: SingI fmt) </code></pre></div><!-- SC_ON -->   submitted by   <a href=\"https://www.reddit.com/user/gergoerdi\"> /u/gergoerdi </a><br/><span><a href=\"https://www.reddit.com/r/haskell/comments/55bvt4/typesafe_printf_with_typeintype/\">[link]</a></span><span><a href=\"https://www.reddit.com/r/haskell/comments/55bvt4/typesafe_printf_with_typeintype/\">[comments]</a></span>",
+      "version": 0
+    },
+    "postId": "57ef4645b9d714a86ed973ff",
+    "subscriptionId": "57e9f803d5ec56510904c9f4",
+    "feedId": "57e9f802d5ec56510904c9d9",
+    "userId": "56d7cc3fccee17506699e735",
+    "title": "Haskell  Reddit",
+    "updatedAt": "2016-09-27T04:53:11.163Z",
+    "createdAt": "2016-09-27T04:39:31.460Z",
+    "tags": [
+      "haskell",
+      "reddit"
+    ],
+    "version": 1,
+    "read": true
+  },
+  {
+    "post": {
+      "summary": null,
+      "image": null,
+      "inlineStatus": null,
+      "link": "https://www.reddit.com/r/haskell/comments/55p0jb/stackghc_on_termux/",
+      "date": "2016-10-03T18:08:43.000Z",
+      "guid": "t3_55p0jb",
+      "author": "/u/newestHaskeller",
+      "comments": null,
+      "title": "Stack/GHC on Termux?",
+      "description": "<!-- SC_OFF --><div class=\"md\"><p>I would love to have a ghci on my <a href=\"https://termux.com/\">termux</a> (Android terminal emulator + Linux environment).</p><p>Has anyone been able to do this, or are there significant cross-compilation (etc) hurdles in the way?</p><p>I'm on a long Greyhound bus ride now, with slow internet, but I did take the first step of trying to install stack:</p><pre><code>curl -sSL https://get.haskellstack.org/ > stack.hs termux-fix-shebang stack.hs sh stack.hs </code></pre><p>Predictably, it did not recognize the Linux distribution, and ran the generic install. Afterwards, it said that a manual install of some dependencies may be required for GHC: gcc, make, libffi, zlib, libgmp and libtinfo. Of these, gcc, libtinfo and zlib aren't available from the termux repo. However clang is available as an alternative for gcc. Is there a way to obtain these packages for this environment?</p><p>I haven't gone further than that, yet. I'll wait until I have proper wifi.</p><p>Versions:</p><ul><li>Nexus 6P</li><li>Android 7.0</li><li>termux 0.42</li></ul></div><!-- SC_ON -->   submitted by   <a href=\"https://www.reddit.com/user/newestHaskeller\"> /u/newestHaskeller </a><br/><span><a href=\"https://www.reddit.com/r/haskell/comments/55p0jb/stackghc_on_termux/\">[link]</a></span><span><a href=\"https://www.reddit.com/r/haskell/comments/55p0jb/stackghc_on_termux/\">[comments]</a></span>",
+      "version": 0
+    },
+    "postId": "57f2a753966d70b95f5e4d68",
+    "subscriptionId": "57e9f803d5ec56510904c9f4",
+    "feedId": "57e9f802d5ec56510904c9d9",
+    "userId": "56d7cc3fccee17506699e735",
+    "title": "Haskell  Reddit",
+    "updatedAt": "2016-09-27T04:53:11.163Z",
+    "createdAt": "2016-09-27T04:39:31.460Z",
+    "tags": [
+      "haskell",
+      "reddit"
+    ],
+    "version": 1,
+    "read": true
+  },
+  {
+    "post": {
+      "summary": null,
+      "image": null,
+      "inlineStatus": null,
+      "link": "https://www.reddit.com/r/haskell/comments/55xk4z/erratum_to_sharing_memory_leaks_and_conduit_and/",
+      "date": "2016-10-05T03:23:36.000Z",
+      "guid": "t3_55xk4z",
+      "author": "/u/edsko",
+      "comments": null,
+      "title": "Erratum to \"Sharing, Memory Leaks, and Conduit and friends\"",
+      "description": "<!-- SC_OFF --><div class=\"md\"><p>A few days ago <a href=\"https://www.reddit.com/r/haskell/comments/550wsj/new_blog_post_sharing_memory_leaks_and_conduit/\">I posted a blog post</a> analysing memory leaks in conduit code. To the best of my knowledge, that analysis is still correct. However, the advice at the end of the blog post sadly is insufficient to stop these memory leaks from happening.</p><p>The blog post finished with the following conclusion:</p><blockquote><p>Conduit code typically looks like</p><pre><code>runMyConduit :: Some -> Args -> IO r runMyConduit some args = runConduit $ stage1 some =$= stage2 args ... =$= stageN </code></pre><p>You should put all top-level calls to runConduit into a module of their own, and disable full laziness in that module by declaring</p><pre><code>{-# OPTIONS_GHC -fno-full-laziness #-} </code></pre><p>at the top of the file.</p></blockquote><p>This is good advice. However, it then continued: </p><blockquote><p>It is not necessary to disable full laziness anywhere else. In particular, the conduit stages themselves (stage1 etc.) can be defined in modules where full laziness is enabled as usual.</p></blockquote><p>This is not correct.</p><p>Consider the example above, where <code>stage1</code> and <code>stage2</code> have arguments, but <code>stageN</code> does not. This means that <code>stageN</code> is a CAF (Constant Applicative Form); a top-level definition</p><pre><code>stageN = ... </code></pre><p>If that CAF points to a potentially large conduit, then this code once again suffers from a space leak (until the very last reference to that CAF disappears from the running program).</p><p>What's worse, we cannot fix this <em>in any way</em> in the module where <code>runMyConduit</code> is defined: no matter what we do, as long as we reference that CAF we have a space leak. The only way to fix this is by giving <code>stageN</code> a dummy argument (<code>stageN :: () -> ...</code>), <em>and then declaring <code>-fno-full-laziness</code> again</em> in the module where <code>stageN</code> is defined (or else that <code>()</code> argument will be useless).</p><p>What's more, we have to make sure to avoid <em>all</em> CAFs (or at least, all CAFs that point to potentially large structures). In the example above, although <code>stage1</code> has arguments, if the definition of <code>stage1</code> internally refers to some kind of top-level definition of a conduit (i.e., another CAF), we might once again have a space leak. It is therefore crucial to make sure not to have <em>any</em> top-level argument-less definitions of potentially large conduits; in order to do that, we might have to introduce dummy arguments and moreover disable full laziness.</p><p>Worse still, disabling full laziness is potentially required <em>even if</em> a conduit has genuine (non-dummy) arguments; if part of that conduit's definition is independent of those arguments, full laziness might float that part out and reintroduce an unwanted CAF and possibly reintroduce a spaceleak. Like <a href=\"https://www.reddit.com/u/tomejaguar\">/u/tomejaguar</a> says, \"Full laziness really is responsible for a lot of pain\"...</p><p>I think I therefore have to reluctantly agree with <a href=\"https://www.reddit.com/u/AndrasKovacs\">/u/AndrasKovacs</a> after all and advise to disable full laziness in any module where a conduit is defined, notwithstanding the downsides of this <a href=\"https://www.reddit.com/r/haskell/comments/550wsj/new_blog_post_sharing_memory_leaks_and_conduit/d86q5kq\">that were pointed out</a> by <a href=\"https://www.reddit.com/u/tomejaguar\">/u/tomejaguar</a> and myself.</p><p>There might be an alternative approach, by means of marking the conduit type as \"never update conduit thunks\"; see <a href=\"https://ghc.haskell.org/trac/ghc/ticket/12620#comment:22\">https://ghc.haskell.org/trac/ghc/ticket/12620#comment:22</a> . However, right now this is nothing more than wishful thinking.</p><p>I will update the blog post, but I figured I'd invite some discussion first. </p></div><!-- SC_ON -->   submitted by   <a href=\"https://www.reddit.com/user/edsko\"> /u/edsko </a><br/><span><a href=\"https://www.reddit.com/r/haskell/comments/55xk4z/erratum_to_sharing_memory_leaks_and_conduit_and/\">[link]</a></span><span><a href=\"https://www.reddit.com/r/haskell/comments/55xk4z/erratum_to_sharing_memory_leaks_and_conduit_and/\">[comments]</a></span>",
+      "version": 0
+    },
+    "postId": "57f47578966d70b95f5e5344",
+    "subscriptionId": "57e9f803d5ec56510904c9f4",
+    "feedId": "57e9f802d5ec56510904c9d9",
+    "userId": "56d7cc3fccee17506699e735",
+    "title": "Haskell  Reddit",
+    "updatedAt": "2016-09-27T04:53:11.163Z",
+    "createdAt": "2016-09-27T04:39:31.460Z",
+    "tags": [
+      "haskell",
+      "reddit"
+    ],
+    "version": 1,
+    "read": true
+  }
+]
