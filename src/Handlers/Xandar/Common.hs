@@ -218,7 +218,7 @@ updateSingle' def replace uid updated = do
   where
     merge =
       if replace
-        then replaceRecords ["_createdAt", "_updatedAt", "_id"]
+        then replaceRecords [createdAtLabel, updatedAtLabel, idLabel]
         else mergeRecords
 
 -- |

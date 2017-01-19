@@ -36,7 +36,9 @@ app =
         mkSubscriptionGetSingleLink
         mkSubscriptionGetMultipleLink
     handlers def mkGetSingleLink mkGetMultipleLink =
-      getMultiple mkGetMultipleLink def :<|> getSingle def :<|> deleteSingle def :<|>
+      getMultiple mkGetMultipleLink def :<|>
+      getSingle def :<|>
+      deleteSingle def :<|>
       createSingleOrMultiple def mkGetSingleLink :<|>
       replaceSingle def :<|>
       replaceMultiple def :<|>
@@ -50,4 +52,7 @@ app =
 -- |
 -- Perform any initialization to be done on server start
 appInit :: ApiConfig -> IO ()
-appInit = addDbIndices userIndices >> addDbIndices feedIndices >> addDbIndices postIndices
+appInit =
+  addDbIndices userIndices >> addDbIndices feedIndices >>
+  addDbIndices postIndices >>
+  addDbIndices feedSubscriptionIndices

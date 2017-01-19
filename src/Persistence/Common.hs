@@ -18,6 +18,15 @@ import Database.MongoDB (Database)
 import Network.HTTP.Types.Status
 import Types.Common
 
+createdAtLabel :: Label
+createdAtLabel = "_createdAt"
+
+updatedAtLabel :: Label
+updatedAtLabel = "_updatedAt"
+
+idLabel :: Label
+idLabel = "_id"
+
 -- |
 -- Extract the record fields
 getDocument :: Record -> Document
@@ -88,7 +97,7 @@ validate def r = (r, ValidationErrors $ catMaybes results)
 
 validateField :: Bool -> RecordDefinition -> Record -> Label -> Maybe Field
 validateField ignoreId def r name
-  | ignoreId && name == "_id" = Nothing
+  | ignoreId && name == idLabel = Nothing
   | name `elem` ignore = Nothing
   | not (Map.member name fields) = Just (mkField "Field is not allowed")
   | isRequired && not (hasValue name r) && noDefault =
@@ -96,7 +105,7 @@ validateField ignoreId def r name
   | otherwise = Nothing
   where
     fields = recordFields def
-    ignore = ["_updatedAt", "_createdAt"]
+    ignore = [updatedAtLabel, createdAtLabel]
     fieldDef = fromJust $ Map.lookup name fields
     isRequired = fieldRequired fieldDef
     noDefault = isNothing (fieldDefault fieldDef)
@@ -122,27 +131,33 @@ recordLabels (Record xs) = label <$> xs
 setIdValue
   :: Val a
   => a -> Record -> Record
-setIdValue = setValue "_id"
+setIdValue = setValue idLabel
 
 -- |
 -- Get the value of the id field
 getIdValue :: Record -> Maybe RecordId
-getIdValue = getValue "_id"
+getIdValue = getValue idLabel
 
-setTimestamp :: MonadIO m => Text -> Record -> m Record
+setTimestamp
+  :: MonadIO m
+  => Text -> Record -> m Record
 setTimestamp name r = do
   time <- liftIO getCurrentTime
   return (setValue name time r)
 
 -- |
 -- Set the value of the updatedAt field
-setUpdatedAt :: MonadIO m => Record -> m Record
-setUpdatedAt = setTimestamp "_updatedAt"
+setUpdatedAt
+  :: MonadIO m
+  => Record -> m Record
+setUpdatedAt = setTimestamp updatedAtLabel
 
 -- |
 -- Set the value of the createdAt field
-setCreatedAt :: MonadIO m => Record -> m Record
-setCreatedAt = setTimestamp "_createdAt"
+setCreatedAt
+  :: MonadIO m
+  => Record -> m Record
+setCreatedAt = setTimestamp createdAtLabel
 
 -- |
 -- Modify the value of a field or remove it
@@ -300,8 +315,7 @@ getLabels' (Record d) = foldl add (label <$> d) d
   where
     pre k l = T.concat [k, ".", l]
     add labels f@(k := v)
-      | valIsDoc v =
-        labels ++ (pre k <$> getLabels' (docToRec k f))
+      | valIsDoc v = labels ++ (pre k <$> getLabels' (docToRec k f))
       | otherwise = labels
 
 -- |

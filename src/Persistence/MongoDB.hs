@@ -144,13 +144,13 @@ mkInDocument def isNew = fmap (recordToDocument def) . setTimestamp' isNew
 -- Convert a BSON @Document@ to a @Record@
 documentToRecord :: RecordDefinition -> Document -> Record
 documentToRecord def document =
-  foldr mapIdToRecId (Record document) ("_id" : getIdLabels def)
+  foldr mapIdToRecId (Record document) (idLabel : getIdLabels def)
 
 -- |
 -- Convert a @Record@ to a BSON @Document@
 recordToDocument :: RecordDefinition -> Record -> Document
 recordToDocument def record =
-  getDocument (foldr mapIdToObjId record $ "_id" : getIdLabels def)
+  getDocument (foldr mapIdToObjId record $ idLabel : getIdLabels def)
 
 -- |
 -- Get the labels of all fields of type @ObjectId@ in a @RecordDefinition@
@@ -170,7 +170,7 @@ setTimestamp' isNew =
 idQuery
   :: Select a
   => Collection -> RecordId -> a
-idQuery collName recId = select ["_id" =: recIdToObjId recId] collName
+idQuery collName recId = select [idLabel =: recIdToObjId recId] collName
 
 -- |
 -- Convert a record id to an object id value
@@ -198,8 +198,8 @@ mapIdToObjId name = modField name (>>= recIdToObjId)
 validateHasId :: Record -> (Record, ValidationResult)
 validateHasId r = (r, ValidationErrors $ catMaybes [valField])
   where
-    valField = validateField False def (mapIdToObjId "_id" r) "_id"
-    def = RecordDefinition mempty $ Map.fromList [mkReqDef' "_id"]
+    valField = validateField False def (mapIdToObjId idLabel r) idLabel
+    def = RecordDefinition mempty $ Map.fromList [mkReqDef' idLabel]
 
 -- |
 -- Make a field that will be used for sorting

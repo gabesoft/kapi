@@ -61,11 +61,11 @@ verifyMkInDocument
 verifyMkInDocument r exp = do
   doc <- mkInDocument recDef (not $ hasField "_id" r) r
   return $
-    (modDate "_createdAt" . modDate "_updatedAt") (Record doc) `shouldBe` exp
+    (modDate createdAtLabel . modDate updatedAtLabel) (Record doc) `shouldBe` exp
 
 verifyMkOutDocument :: Document -> Record -> Expectation
 verifyMkOutDocument doc exp =
-  modDate "_createdAt" (mkOutRecord recDef doc) `shouldBe` exp
+  modDate createdAtLabel (mkOutRecord recDef doc) `shouldBe` exp
 
 verifyMkSortField :: Text -> Field -> Expectation
 verifyMkSortField name exp = mkSortField name `shouldBe` Just exp
@@ -141,7 +141,7 @@ rec3 :: Record
 rec3 = Record [mkRecId sampleId1]
 
 rec4 :: Record
-rec4 = Record [mkStrField "email" "a@e.com", mkStrField "_createdAt" "1234"]
+rec4 = Record [mkStrField "email" "a@e.com", mkStrField createdAtLabel "1234"]
 
 rec5 :: Document
 rec5 = [mkObjId sampleId1]
@@ -156,7 +156,7 @@ res1 :: ValidationResult
 res1 = ValidationErrors [mkRecId "Field is required"]
 
 res2 :: RecordData Field
-res2 = Record [mkStrField "email" "a@e.com", mkStrField "_updatedAt" "12345"]
+res2 = Record [mkStrField "email" "a@e.com", mkStrField updatedAtLabel "12345"]
 
 res3 :: RecordData Field
 res3 = Record [mkRecId sampleId1]
@@ -166,15 +166,15 @@ res4 =
   Record
     [ mkStrField "email" "a@e.com"
     , mkObjId sampleId1
-    , mkStrField "_updatedAt" "12345"
+    , mkStrField updatedAtLabel "12345"
     ]
 
 res5 :: RecordData Field
 res5 =
   Record
     [ mkStrField "email" "a@e.com"
-    , mkStrField "_createdAt" "12345"
-    , mkStrField "_updatedAt" "12345"
+    , mkStrField createdAtLabel "12345"
+    , mkStrField updatedAtLabel "12345"
     ]
 
 res6 :: Document
