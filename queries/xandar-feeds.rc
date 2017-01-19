@@ -27,7 +27,7 @@ GET http://:host/:path?where=(lastReadStatus.readStatus eq "success")&include=ti
 #
 # Get feeds created afte a date
 #
-GET http://:host/:path?where=(_createdAt ge 2017-01-08T07:47:45.928Z)
+GET http://:host/:path?where=(createdAt ge 2017-01-08T07:47:45.928Z)
 
 #
 # Get all feeds - pagination

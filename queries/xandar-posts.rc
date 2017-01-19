@@ -27,7 +27,7 @@ GET http://:host/:path?where=(title contains "taking")&include=title,link
 #
 # Get posts created afte a date
 #
-GET http://:host/:path?where=(_createdAt ge 2017-01-08T07:47:45.928Z)
+GET http://:host/:path?where=(createdAt ge 2017-01-08T07:47:45.928Z)
 
 #
 # Get all posts - pagination

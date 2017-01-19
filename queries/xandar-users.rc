@@ -32,7 +32,7 @@ GET http://:host/:path?where=(email contains "updated") or (email contains "admi
 #
 # Get users created afte a date
 #
-GET http://:host/:path?where=(_createdAt ge 2017-01-08T07:47:45.928Z)
+GET http://:host/:path?where=(createdAt ge 2017-01-08T07:47:45.928Z)
 
 #
 # Get all users - pagination

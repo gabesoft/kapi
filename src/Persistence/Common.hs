@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
--- | Common functionality for the persistence layer
+-- |
+-- Common functionality for the persistence layer
 module Persistence.Common where
 
 import Control.Monad (join)
@@ -19,10 +20,10 @@ import Network.HTTP.Types.Status
 import Types.Common
 
 createdAtLabel :: Label
-createdAtLabel = "_createdAt"
+createdAtLabel = "createdAt"
 
 updatedAtLabel :: Label
-updatedAtLabel = "_updatedAt"
+updatedAtLabel = "updatedAt"
 
 idLabel :: Label
 idLabel = "_id"

@@ -10,19 +10,22 @@ module Persistence.ElasticSearch
   , putMapping
   , putMappingFromFile
   , refreshIndex
+  , searchDocuments
   ) where
 
 import Data.Aeson (ToJSON)
 import qualified Data.Aeson as A
+import Data.Bifunctor
 import qualified Data.ByteString.Lazy.Char8 as L
+import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Text.Encoding (decodeUtf8)
+import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import qualified Data.Vector as V
 import Database.Bloodhound
        (IndexName(..), Server(..), EsError(..), Reply, MappingName(..),
         DocId(..), IndexSettings(..), ShardCount(..), ReplicaCount(..),
-        BulkOperation(..), BH)
+        BulkOperation(..), Search(..), SearchResult(..), BH)
 import qualified Database.Bloodhound as B
 import Network.HTTP.Client
 import Network.HTTP.Types.Status
@@ -126,14 +129,36 @@ deleteDocuments server index mappingName recordIds =
       BulkDelete (IndexName index) (MappingName mappingName) (DocId recordId)
     stream = V.fromList (op <$> recordIds)
 
+-- |
+-- Search documents given a search query
+searchDocuments :: Text
+                -> Text
+                -> Text
+                -> Search
+                -> IO (Either EsError (SearchResult Record))
+searchDocuments server index mappingName search = do
+  body <-
+    withBH server $
+    B.searchByType (IndexName index) (MappingName mappingName) search
+  return $ body >>= toResult
+  where
+    toErr msg = EsError 500 (T.pack msg)
+    toResult body = first toErr (A.eitherDecode $ textToBytes body)
+
 withBH :: Text -> BH IO Reply -> IO (Either EsError Text)
 withBH server action = do
   reply <- B.withBH defaultManagerSettings (Server server) action
   return $ fromReply reply
   where
-    body = decodeUtf8 . L.toStrict . responseBody
+    body = bytesToText . responseBody
     code = statusCode . responseStatus
     ok s = (s == status200) || (s == status201)
     fromReply reply
       | ok (responseStatus reply) = Right (body reply)
       | otherwise = Left $ EsError (code reply) (body reply)
+
+bytesToText :: L.ByteString -> Text
+bytesToText = decodeUtf8 . L.toStrict
+
+textToBytes :: Text -> L.ByteString
+textToBytes = L.fromStrict . encodeUtf8
