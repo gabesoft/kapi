@@ -20,23 +20,6 @@ GET http://:host/_cluster/health?pretty
 GET http://:host/_cat/shards
 
 #
-# Assign shards
-#
-POST http://:host/_cluster/reroute
-{
-  "commands": [
-    {
-      "allocate": {
-        "index": ":index2",
-        "shard": 0,
-        "node": "esnode-nix",
-        "allow_primary": true
-      }
-    }
-  ]
-}
-
-#
 # Get all indices
 #
 GET http://:host/_cat/indices?v
@@ -44,12 +27,12 @@ GET http://:host/_cat/indices?v
 #
 # Get all mappings
 #
-GET http://:host/:index1/_all/_mapping
+GET http://:host/:index2/_all/_mapping
 
 #
 # Get all posts matching a query
 #
-GET http://:host/:index1/_search?q=title:haskell
+GET http://:host/:index2/_search?q=title:haskell
 
 #
 # Index a document
