@@ -3,7 +3,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 
--- | Common types
+-- ^ Common types
 module Types.Common where
 
 import Control.Monad.Reader
@@ -24,10 +24,10 @@ import Network.HTTP.Types.Status
 import Network.Socket (HostName, PortNumber)
 import Servant
 
--- | Api type
+-- ^ Api type
 type Api = ReaderT ApiConfig Handler
 
--- |
+-- ^
 -- Representation of a record schema
 data FieldDefinition = FieldDefinition
   { fieldLabel :: Label
@@ -57,7 +57,7 @@ instance FromJSON a =>
   parseJSON a@(AESON.Array _) = Multiple <$> parseJSON a
   parseJSON _ = fail "Could not parse ApiData"
 
--- |
+-- ^
 -- Representation for a data item
 data RecordData a =
   Record [a]
@@ -81,7 +81,7 @@ instance Monoid (RecordData Field) where
   mempty = Record mempty
   mappend (Record xs) (Record ys) = Record (BSON.merge ys xs)
 
--- |
+-- ^
 -- Representation for an API error
 data ApiError = ApiError
   { apiErrorMessage :: LBS.ByteString
@@ -91,7 +91,7 @@ data ApiError = ApiError
 instance ToJSON ApiError where
   toJSON err = object ["message" .= LBS.unpack (apiErrorMessage err)]
 
--- |
+-- ^
 -- The result of a record validation
 data ValidationResult =
   ValidationErrors [Field]
@@ -106,7 +106,7 @@ instance Monoid ValidationResult where
   mappend (ValidationErrors xs) (ValidationErrors ys) =
     ValidationErrors (xs <> ys)
 
--- |
+-- ^
 -- Representation for an API item result
 -- An item result could be an error or a record
 data ApiItem e a
@@ -138,11 +138,11 @@ instance (ToJSON a) =>
   toJSON (Fail e) = object ["error" .= toJSON e]
   toJSON (Succ a) = toJSON a
 
--- |
+-- ^
 -- Application name
 type AppName = Text
 
--- |
+-- ^
 -- Api configuration data
 data ApiConfig = ApiConfig
   { apiPort :: PortNumber
@@ -151,7 +151,7 @@ data ApiConfig = ApiConfig
   , mongoDbs :: Map.Map AppName Database
   } deriving (Eq, Show)
 
--- |
+-- ^
 -- Pagination data
 data Pagination = Pagination
   { paginationTotal :: Int
@@ -165,7 +165,7 @@ data Pagination = Pagination
   , paginationLimit :: Int
   } deriving (Eq, Show, Read)
 
--- |
+-- ^
 -- Filter expressions
 data FilterExpr
   = FilterBoolOp FilterBooleanOperator
@@ -176,7 +176,7 @@ data FilterExpr
                 FilterTerm
   deriving (Eq, Read, Show)
 
--- |
+-- ^
 -- Relational operators
 data FilterRelationalOperator
   = Equal
@@ -191,24 +191,26 @@ data FilterRelationalOperator
   | NotContains
   deriving (Eq, Read, Show)
 
--- |
+-- ^
 -- Boolean operators
 data FilterBooleanOperator
   = And
   | Or
   deriving (Eq, Read, Show)
 
--- |
+-- ^
 -- Field or column name
 data ColumnName =
   ColumnName Text
-             Int
+             ColumnBoost
   deriving (Eq, Read, Show)
+
+type ColumnBoost = Int
 
 instance IsString ColumnName where
   fromString name = ColumnName (T.pack name) 1
 
--- |
+-- ^
 -- Filter term
 data FilterTerm
   = TermInt Int

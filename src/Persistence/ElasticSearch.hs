@@ -1,4 +1,4 @@
--- |
+-- ^
 -- Functions for interacting with Elasticsearch
 module Persistence.ElasticSearch
   ( createIndex
@@ -7,6 +7,7 @@ module Persistence.ElasticSearch
   , deleteIndex
   , indexDocument
   , indexDocuments
+  , mkSearch
   , putMapping
   , putMappingFromFile
   , refreshIndex
@@ -25,34 +26,35 @@ import qualified Data.Vector as V
 import Database.Bloodhound
        (IndexName(..), Server(..), EsError(..), Reply, MappingName(..),
         DocId(..), IndexSettings(..), ShardCount(..), ReplicaCount(..),
-        BulkOperation(..), Search(..), SearchResult(..), BH)
+        BulkOperation(..), Search(..), SearchResult(..), From(..),
+        Size(..), SearchType(..), Query(..), Filter(..), BH)
 import qualified Database.Bloodhound as B
 import Network.HTTP.Client
 import Network.HTTP.Types.Status
 import Types.Common
 
--- |
+-- ^
 -- Default settings for creating an index on a single node instance
 singleNodeIndexSettings :: IndexSettings
 singleNodeIndexSettings = IndexSettings (ShardCount 1) (ReplicaCount 0)
 
--- |
+-- ^
 -- Create an index
 createIndex :: Text -> Text -> IO (Either EsError Text)
 createIndex server index =
   withBH server (B.createIndex singleNodeIndexSettings $ IndexName index)
 
--- |
+-- ^
 -- Delete an index
 deleteIndex :: Text -> Text -> IO (Either EsError Text)
 deleteIndex server index = withBH server (B.deleteIndex $ IndexName index)
 
--- |
+-- ^
 -- Refresh an index. Should be called after writing to an index.
 refreshIndex :: Text -> Text -> IO (Either EsError Text)
 refreshIndex server index = withBH server (B.refreshIndex $ IndexName index)
 
--- |
+-- ^
 -- Add a new type to an existing index
 putMapping
   :: ToJSON a
@@ -62,7 +64,7 @@ putMapping server index mappingName mapping =
     server
     (B.putMapping (IndexName index) (MappingName mappingName) mapping)
 
--- |
+-- ^
 -- Add a new type from a file to an existing index
 putMappingFromFile :: Text
                    -> Text
@@ -78,7 +80,7 @@ putMappingFromFile server index mappingName file = do
       return $
       Left (EsError 400 $ T.pack $ "File " ++ file ++ " contains invalid json")
 
--- |
+-- ^
 -- Index a document
 indexDocument :: Text
               -> Text
@@ -95,7 +97,7 @@ indexDocument server index mappingName record recordId =
     record
     (DocId recordId)
 
--- |
+-- ^
 -- Index multiple documents
 indexDocuments :: Text
                -> Text
@@ -112,14 +114,14 @@ indexDocuments server index mappingName items = withBH server (B.bulk stream)
         (A.toJSON record)
     stream = V.fromList (op <$> items)
 
--- |
+-- ^
 -- Delete a document
 deleteDocument :: Text -> Text -> Text -> Text -> IO (Either EsError Text)
 deleteDocument server index mappingName recordId =
   withBH server $
   B.deleteDocument (IndexName index) (MappingName mappingName) (DocId recordId)
 
--- |
+-- ^
 -- Delete multiple documents
 deleteDocuments :: Text -> Text -> Text -> [Text] -> IO (Either EsError Text)
 deleteDocuments server index mappingName recordIds =
@@ -129,8 +131,8 @@ deleteDocuments server index mappingName recordIds =
       BulkDelete (IndexName index) (MappingName mappingName) (DocId recordId)
     stream = V.fromList (op <$> recordIds)
 
--- |
--- Search documents given a search query
+-- ^
+-- Search documents given a 'Search' object
 searchDocuments :: Text
                 -> Text
                 -> Text
@@ -144,6 +146,23 @@ searchDocuments server index mappingName search = do
   where
     toErr msg = EsError 500 (T.pack $ "Failed to decode search results " ++ msg)
     toResult body = first toErr (A.eitherDecode $ textToBytes body)
+
+-- ^
+-- Create a search object
+mkSearch :: Maybe Query -> Maybe Filter -> Int -> Int -> Search
+mkSearch query filter start limit =
+  Search
+    query
+    filter
+    Nothing
+    Nothing
+    Nothing
+    False
+    (From start)
+    (Size limit)
+    SearchTypeDfsQueryThenFetch
+    Nothing
+    Nothing
 
 withBH :: Text -> BH IO Reply -> IO (Either EsError Text)
 withBH server action = do
