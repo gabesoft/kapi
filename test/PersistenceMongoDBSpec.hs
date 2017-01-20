@@ -41,6 +41,10 @@ main =
       verifyMkSortField "-email" (mkIntField "email" (negate 1))
     it "converts a query to a document" $
       verifyQueryToDoc "(a eq \"b\") and (b gt 1) or (c:2 lt 2.4)" res6
+    it "converts a query to a document - null" $
+      verifyQueryToDoc "a eq null" ["a" =: Null]
+    it "converts a query to a document - not null" $
+      verifyQueryToDoc "a ~eq null" ["a" =: ["$ne" =: Null]]
     it "converts a document to a record - new" $
       verifyDocumentToRecord recDef sampleNewDoc sampleNewRec
     it "converts a document to a record - old" $

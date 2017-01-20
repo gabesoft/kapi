@@ -32,6 +32,7 @@ validCases =
   , ("colFloat lt 123.93", FilterRelOp LessThan "colFloat" (TermFloat 123.93))
   , ("colBool eq true", FilterRelOp Equal "colBool" (TermBool True))
   , ("colNull eq null", FilterRelOp Equal "colNull" TermNull)
+  , ("colNotNull ~eq null", FilterRelOp NotEqual "colNotNull" TermNull)
   , ( "colDate ge 2017-01-08T02:26:16.302Z"
     , FilterRelOp GreaterThanOrEqual "colDate" (date "2017-01-08T02:26:16.302Z"))
   , ( "colDate ~le 1994-11-05T08:15:30-05:00"

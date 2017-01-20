@@ -30,6 +30,16 @@ GET http://:host/:path?where=(lastReadStatus.readStatus eq "success")&include=ti
 GET http://:host/:path?where=(createdAt ge 2017-01-08T07:47:45.928Z)
 
 #
+# Get feeds without an author
+#
+GET http://:host/:path?where=(author eq null)&include=title,author
+
+#
+# Get feeds with an author
+#
+GET http://:host/:path?where=(author ~eq null)&include=title,author
+
+#
 # Get all feeds - pagination
 #
 GET http://:host/:path?page=4&per_page=5

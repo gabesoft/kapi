@@ -142,7 +142,7 @@ searchDocuments server index mappingName search = do
     B.searchByType (IndexName index) (MappingName mappingName) search
   return $ body >>= toResult
   where
-    toErr msg = EsError 500 (T.pack msg)
+    toErr msg = EsError 500 (T.pack $ "Failed to decode search results " ++ msg)
     toResult body = first toErr (A.eitherDecode $ textToBytes body)
 
 withBH :: Text -> BH IO Reply -> IO (Either EsError Text)
