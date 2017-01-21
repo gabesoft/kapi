@@ -4,23 +4,20 @@
 module Parsers.Filter where
 
 import Control.Applicative ((<|>))
-import Control.Monad (void, when, replicateM)
+import Control.Monad (void, replicateM)
 import Data.Attoparsec.Text
-       (Parser, choice, skipWhile, char, asciiCI, many', many1, satisfy,
-        scientific, scan, anyChar, takeWhile, takeWhile1, inClass, option,
+       (Parser, choice, skipWhile, char, asciiCI, many', satisfy,
+        scientific, takeWhile1, inClass, option,
         notInClass, (<?>))
 import qualified Data.Attoparsec.Text as A
 import Data.Char (isSpace, chr, isHexDigit)
-import Data.Functor.Identity
-import Data.List (find, foldr)
+import Data.List (find)
 import Data.Maybe
 import Data.Scientific (floatingOrInteger)
 import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Time (UTCTime)
 import Data.Time.ISO8601
 import Numeric (readHex)
-import Parsers.Unescape
 import Prelude ()
 import Prelude.Compat
 import Types.Common

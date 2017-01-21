@@ -166,6 +166,20 @@ data Pagination = Pagination
   } deriving (Eq, Show, Read)
 
 -- ^
+-- Sort expression
+data SortExpr =
+  SortExpr Label
+           SortDirection
+  deriving (Eq, Read, Show)
+
+-- ^
+-- Sort direction
+data SortDirection
+  = SortAscending
+  | SortDescending
+  deriving (Eq, Read, Show)
+
+-- ^
 -- Filter expressions
 data FilterExpr
   = FilterBoolOp FilterBooleanOperator

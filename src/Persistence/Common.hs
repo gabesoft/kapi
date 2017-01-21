@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
--- |
+-- ^
 -- Common functionality for the persistence layer
 module Persistence.Common where
 
@@ -28,18 +28,18 @@ updatedAtLabel = "updatedAt"
 idLabel :: Label
 idLabel = "_id"
 
--- |
+-- ^
 -- Extract the record fields
 getDocument :: Record -> Document
 getDocument (Record xs) = xs
 
--- |
+-- ^
 -- Case analysis for the @ApiItem@ type
 apiItem :: (e -> c) -> (a -> c) -> ApiItem e a -> c
 apiItem f _ (Fail e) = f e
 apiItem _ g (Succ a) = g a
 
--- |
+-- ^
 -- Create a field definition
 mkFieldDef
   :: Val a
@@ -47,48 +47,48 @@ mkFieldDef
 mkFieldDef name required isId defaultValue =
   (name, FieldDefinition name required (val <$> defaultValue) isId)
 
--- |
+-- ^
 -- Create a definition for an id field used as a foreign key
 mkIdDef :: Label -> (Label, FieldDefinition)
 mkIdDef name = mkFieldDef name True True (Nothing :: Maybe String)
 
--- |
+-- ^
 -- Create a definition for a required field without a default value
 mkReqDef' :: Label -> (Label, FieldDefinition)
 mkReqDef' name = mkReqDef name (Nothing :: Maybe String)
 
--- |
+-- ^
 -- Create a definition for a required field
 mkReqDef
   :: Val a
   => Label -> Maybe a -> (Label, FieldDefinition)
 mkReqDef name = mkFieldDef name True False
 
--- |
+-- ^
 -- Create a definition for an optional field without a default value
 mkOptDef' :: Label -> (Label, FieldDefinition)
 mkOptDef' name = mkOptDef name (Nothing :: Maybe String)
 
--- |
+-- ^
 -- Create a definition for an optional field
 mkOptDef
   :: Val a
   => Label -> Maybe a -> (Label, FieldDefinition)
 mkOptDef name = mkFieldDef name False False
 
--- |
+-- ^
 -- Convert the result of a validation to an @Either@ value
 vResultToApiItem :: (a, ValidationResult) -> ApiItem ApiError a
 vResultToApiItem (a, ValidationErrors []) = Succ a
 vResultToApiItem (_, err) = Fail (ApiError (encode err) status400)
 
--- |
+-- ^
 -- Get the MongoDB database name for an app name
 -- from a configuration object
 confGetDb :: AppName -> ApiConfig -> Database
 confGetDb name = fromJust . Map.lookup name . mongoDbs
 
--- |
+-- ^
 -- Validate a record against it's definition
 validate :: RecordDefinition -> Record -> (Record, ValidationResult)
 validate def r = (r, ValidationErrors $ catMaybes results)
@@ -113,7 +113,7 @@ validateField ignoreId def r name
     mkField :: String -> Field
     mkField msg = name =: msg
 
--- |
+-- ^
 -- Populate defaults for all missing fields that have a default value
 populateDefaults :: RecordDefinition -> Record -> Record
 populateDefaults def r = Map.foldl populate r defaults
@@ -122,19 +122,19 @@ populateDefaults def r = Map.foldl populate r defaults
     populate acc field = modField (fieldLabel field) (set field) acc
     set field = fromMaybe (fieldDefault field)
 
--- |
+-- ^
 -- Get the names of all fields in a record
 recordLabels :: Record -> [Label]
 recordLabels (Record xs) = label <$> xs
 
--- |
+-- ^
 -- Set the value of the id field
 setIdValue
   :: Val a
   => a -> Record -> Record
 setIdValue = setValue idLabel
 
--- |
+-- ^
 -- Get the value of the id field
 getIdValue :: Record -> Maybe RecordId
 getIdValue = getValue idLabel
@@ -146,21 +146,21 @@ setTimestamp name r = do
   time <- liftIO getCurrentTime
   return (setValue name time r)
 
--- |
+-- ^
 -- Set the value of the updatedAt field
 setUpdatedAt
   :: MonadIO m
   => Record -> m Record
 setUpdatedAt = setTimestamp updatedAtLabel
 
--- |
+-- ^
 -- Set the value of the createdAt field
 setCreatedAt
   :: MonadIO m
   => Record -> m Record
 setCreatedAt = setTimestamp createdAtLabel
 
--- |
+-- ^
 -- Modify the value of a field or remove it
 modField
   :: (Val a, Val b)
@@ -170,7 +170,7 @@ modField name f r =
     Nothing -> delField name r
     Just v -> setValue name v r
 
--- |
+-- ^
 -- Change the name of a field if it exists
 renameField :: Label -> Label -> Record -> Record
 renameField old new (Record doc) = withField old doc Record rename
@@ -178,7 +178,7 @@ renameField old new (Record doc) = withField old doc Record rename
     rename :: ([Field], Field, [Field]) -> (Int, Document) -> Record
     rename (xs, _ := v, ys) _ = Record $ xs ++ [new := v] ++ ys
 
--- |
+-- ^
 -- Get a field by name. Nested fields are supported.
 --
 -- >>> getField "inner.email" (Record [ inner : [ email : "bson@email.com" ]])
@@ -201,7 +201,7 @@ getField name (Record d) = findField d (splitAtDot name)
       | valIsDoc v = getField fname (docToRec k f)
       | otherwise = Nothing
 
--- |
+-- ^
 -- Get the value of a field by name. Nested fields are supported.
 --
 -- >>> getValue "inner.email" (Record [ inner : [ email : "bson@email.com" ]])
@@ -226,12 +226,12 @@ getValue name r = join $ get <$> getField name r
       => Field -> Maybe a
     get (_ := v) = cast v
 
--- |
+-- ^
 -- Set a field in a record. Overwrite the existing value if any.
 setField :: Field -> Record -> Record
 setField field = flip mergeRecords (Record [field])
 
--- |
+-- ^
 -- Set the value of a field in a record. Create the field if necessary.
 setValue
   :: Val a
@@ -242,23 +242,23 @@ setValue fname fvalue = setField (mkField $ T.split (== '.') fname)
     mkField (name:[]) = name =: fvalue
     mkField (name:ns) = name =: mkField ns
 
--- |
+-- ^
 -- Delete a field by name
 delField :: Label -> Record -> Record
 delField = excludeFields . (: [])
 
--- |
+-- ^
 -- Set the value of a field to @Null@.
 -- If the field does not exist it will be created.
 delValue :: Label -> Record -> Record
 delValue = flip setValue BSON.Null
 
--- |
+-- ^
 -- Determine whether a field exists within a record
 hasField :: Label -> Record -> Bool
 hasField name = isJust . getField name
 
--- |
+-- ^
 -- Determine whether a field exists within a record
 -- and it has a non-null value
 hasValue :: Label -> Record -> Bool
@@ -268,7 +268,7 @@ hasValue name r = hasField name r && has (getValue name r)
     has (Just BSON.Null) = False
     has _ = True
 
--- |
+-- ^
 -- Merge two records with the record on the right overwriting any
 -- existing fields in the left record. Nested records are supported.
 mergeRecords :: Record -> Record -> Record
@@ -281,7 +281,7 @@ mergeRecords (Record d1) (Record d2) = Record $ foldl add d1 d2
         rk := recToDoc (mergeRecords (docToRec lk lf) (docToRec rk rf))
       | otherwise = rk := rv
 
--- |
+-- ^
 -- Replace one record with another keeping some fields fields unmodified
 replaceRecords :: [Label] -> Record -> Record -> Record
 replaceRecords preserveLabels r1 r2 = exclude' (mergeRecords r1 r2')
@@ -290,7 +290,7 @@ replaceRecords preserveLabels r1 r2 = exclude' (mergeRecords r1 r2')
     keep name = elem name (getLabels' r2) || elem name preserveLabels
     exclude' r = excludeFields (filter (not . keep) (getLabels' r)) r
 
--- |
+-- ^
 -- Exclude all specified fields from a record
 excludeFields :: [Label] -> Record -> Record
 excludeFields labels (Record d) =
@@ -304,12 +304,12 @@ excludeFields labels (Record d) =
       | valIsDoc v = k := recToDoc (excludeFields names (docToRec k f))
       | otherwise = k := v
 
--- |
+-- ^
 -- Extract the field names from a record
 getLabels :: Record -> [Label]
 getLabels = fmap label . getDocument
 
--- |
+-- ^
 -- Extract the field names from a record and all of its children
 getLabels' :: Record -> [Label]
 getLabels' (Record d) = foldl add (label <$> d) d
@@ -319,7 +319,7 @@ getLabels' (Record d) = foldl add (label <$> d) d
       | valIsDoc v = labels ++ (pre k <$> getLabels' (docToRec k f))
       | otherwise = labels
 
--- |
+-- ^
 -- Find the field with @name@ in @doc@ and do a case analysis
 -- based on whether the field is found or not
 withField
@@ -335,7 +335,7 @@ withField name doc f g =
       let (xs, y:ys) = splitAt i doc
       in g (xs, y, ys) (i, doc)
 
--- |
+-- ^
 -- Split a nested label at the first dot
 --
 -- >>> splitAtDot "a.b.c"
@@ -352,33 +352,33 @@ splitAtDot name =
       let (x, y) = T.splitAt i name
       in [x, T.tail y]
 
--- |
+-- ^
 -- Determine whether a bson value is of type @Document@
 valIsDoc :: BSON.Value -> Bool
 valIsDoc (Doc _) = True
 valIsDoc _ = False
 
--- |
+-- ^
 -- Convert a record to a document value
 recToDoc :: Record -> BSON.Value
 recToDoc = Doc . getDocument
 
--- |
+-- ^
 -- Extract the document from a field value and convert it to a record
 docToRec :: Label -> Field -> Record
 docToRec name field = Record (at name [field])
 
--- |
+-- ^
 -- Compute the sha-1 hash of a record
 recToSha' :: Record -> Digest SHA1State
 recToSha' = sha1 . encode
 
--- |
+-- ^
 -- Compute the sha-1 hash of a record as a string
 recToSha :: Record -> String
 recToSha = showDigest . recToSha'
 
--- |
+-- ^
 -- Compute the pagination data given a current page,
 -- the page size, and the total number of records
 paginate :: Int -> Int -> Int -> Pagination
@@ -404,3 +404,25 @@ paginate page' size' total' =
     prev = max first (page - 1)
     start = max 0 ((page - 1) * size)
     limit = size
+
+-- ^
+-- Make a sort expression
+--
+-- >>> mkSortExpr "+title"
+-- Just (SortExpr "title" SortAscending)
+--
+-- >>> mkSortExpr "-title"
+-- Just (SortExpr "title" SortDescending)
+--
+-- >>> mkSortExpr ""
+-- Nothing
+--
+mkSortExpr :: Text -> Maybe SortExpr
+mkSortExpr name
+  | T.null name = Nothing
+  | T.head name == '-' = Just $ SortExpr (getName name) SortDescending
+  | otherwise = Just $ SortExpr (getName name) SortAscending
+  where
+    getName xs
+      | T.head xs == '+' || T.head xs == '-' = T.tail xs
+      | otherwise = xs

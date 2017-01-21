@@ -27,10 +27,12 @@ import Database.Bloodhound
        (IndexName(..), Server(..), EsError(..), Reply, MappingName(..),
         DocId(..), IndexSettings(..), ShardCount(..), ReplicaCount(..),
         BulkOperation(..), Search(..), SearchResult(..), From(..),
-        Size(..), SearchType(..), Query(..), Filter(..), BH)
+        Size(..), SearchType(..), Query(..), Filter(..), FieldName(..),
+        SortOrder(..), BH)
 import qualified Database.Bloodhound as B
 import Network.HTTP.Client
 import Network.HTTP.Types.Status
+import Persistence.Common
 import Types.Common
 
 -- ^
@@ -189,3 +191,9 @@ bytesToText = decodeUtf8 . L.toStrict
 
 textToBytes :: Text -> L.ByteString
 textToBytes = L.fromStrict . encodeUtf8
+
+mkSearch' expr sort start limit = undefined
+  where
+    mkSort (SortExpr n SortAscending) = B.mkSort (FieldName n) Ascending
+    mkSort (SortExpr n SortDescending) = B.mkSort (FieldName n) Descending
+    sort' = mkSort <$> mkSortExpr sort
