@@ -70,3 +70,16 @@ PUT http://:host/:index2/:coll/1
 # Get a document by id
 #
 GET http://:host/:index2/:coll/2
+
+#
+# Get a document by _uid
+#
+GET http://:host/:index2/_search
+{
+  "query": {
+    "ids": {
+      "type": "post",
+      "values": ["1", "2", "5"]
+    }
+  }
+}

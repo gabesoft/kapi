@@ -132,6 +132,14 @@ deleteDocuments server index mappingName recordIds =
     stream = V.fromList (op <$> recordIds)
 
 -- ^
+-- Get documents by id
+getById server index mappingName ids =
+  searchDocuments server index mappingName search
+  where
+    query = IdsQuery (MappingName mappingName) (DocId <$> ids)
+    search = B.mkSearch (Just query) Nothing
+
+-- ^
 -- Search documents given a 'Search' object
 searchDocuments :: Text
                 -> Text
