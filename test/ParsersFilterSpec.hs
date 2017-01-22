@@ -29,6 +29,7 @@ validCases =
   , ( "(col1 ~eq \"Blue and CO.\")" , FilterRelOp NotEqual "col1" (TermStr "Blue and CO."))
   , ( "(col1 ~eq 'a \\u0010 \\u0a1f e')" , FilterRelOp NotEqual "col1" (TermStr "a \DLE \2591 e"))
   , ("colInt lt 123", FilterRelOp LessThan "colInt" (TermInt 123))
+  , ("colInt:0.3 lt 123", FilterRelOp LessThan (ColumnName "colInt" 0.3) (TermInt 123))
   , ("colFloat lt 123.93", FilterRelOp LessThan "colFloat" (TermFloat 123.93))
   , ("colBool eq true", FilterRelOp Equal "colBool" (TermBool True))
   , ("colNull eq null", FilterRelOp Equal "colNull" TermNull)

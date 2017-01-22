@@ -10,6 +10,11 @@
 :index2 = kapi-xandar
 
 #
+# Get version
+#
+GET http://:host
+
+#
 # Get cluster health
 #
 GET http://:host/_cluster/health?pretty

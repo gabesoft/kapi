@@ -13,7 +13,7 @@ import qualified Data.Attoparsec.Text as A
 import Data.Char (isSpace, chr, isHexDigit)
 import Data.List (find)
 import Data.Maybe
-import Data.Scientific (floatingOrInteger)
+import Data.Scientific (floatingOrInteger, Scientific)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time.ISO8601
@@ -81,9 +81,11 @@ col = do
   where
     excluded = "():{}[] \t\r\n"
     boost = option 1 $ char ':' *> value
+    floatOrInt :: Scientific -> Either Double Integer
+    floatOrInt = floatingOrInteger
     value = do
       x <- scientific
-      either (fail "expected a natural number") return $ floatingOrInteger x
+      either return (return . fromIntegral) (floatOrInt x)
 
 num :: Parser FilterTerm
 num = do

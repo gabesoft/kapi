@@ -155,15 +155,23 @@ data ApiConfig = ApiConfig
 -- Pagination data
 data Pagination = Pagination
   { paginationTotal :: Int
-  , paginationPage :: Int
-  , paginationSize :: Int
+  , paginationPage :: PageNumber
+  , paginationSize :: PageSize
   , paginationNext :: Int
   , paginationPrev :: Int
   , paginationFirst :: Int
   , paginationLast :: Int
-  , paginationStart :: Int
-  , paginationLimit :: Int
+  , paginationStart :: RecordStart
+  , paginationLimit :: ResultLimit
   } deriving (Eq, Show, Read)
+
+type PageNumber = Int
+
+type PageSize = Int
+
+type RecordStart = Int
+
+type ResultLimit = Int
 
 -- ^
 -- Sort expression
@@ -219,7 +227,7 @@ data ColumnName =
              ColumnBoost
   deriving (Eq, Read, Show)
 
-type ColumnBoost = Int
+type ColumnBoost = Double
 
 instance IsString ColumnName where
   fromString name = ColumnName (T.pack name) 1

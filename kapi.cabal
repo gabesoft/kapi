@@ -34,7 +34,7 @@ library
                      , base-compat >= 0.9
                      , aeson >= 1.0.2
                      , attoparsec >= 0.13
-                     , bloodhound
+                     , bloodhound >= 0.12
                      , bson
                      , bytestring >= 0.10
                      , containers >= 0.5

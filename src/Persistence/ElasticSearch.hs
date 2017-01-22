@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 -- ^
 -- Functions for interacting with Elasticsearch
 module Persistence.ElasticSearch
@@ -5,6 +7,7 @@ module Persistence.ElasticSearch
   , deleteDocument
   , deleteDocuments
   , deleteIndex
+  , getById
   , indexDocument
   , indexDocuments
   , mkSearch
@@ -18,17 +21,21 @@ import Data.Aeson (ToJSON)
 import qualified Data.Aeson as A
 import Data.Bifunctor
 import qualified Data.ByteString.Lazy.Char8 as L
+import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
+import Data.Time (UTCTime)
 import qualified Data.Vector as V
 import Database.Bloodhound
        (IndexName(..), Server(..), EsError(..), Reply, MappingName(..),
         DocId(..), IndexSettings(..), ShardCount(..), ReplicaCount(..),
         BulkOperation(..), Search(..), SearchResult(..), From(..),
         Size(..), SearchType(..), Query(..), Filter(..), FieldName(..),
-        SortOrder(..), BH)
+        SortOrder(..), Sort, SortSpec(..), Term(..), Boost(..),
+        RangeQuery(..), RangeValue(..), QueryString(..), MatchQuery(..),
+        BoolQuery(..), BH)
 import qualified Database.Bloodhound as B
 import Network.HTTP.Client
 import Network.HTTP.Types.Status
@@ -135,6 +142,11 @@ deleteDocuments server index mappingName recordIds =
 
 -- ^
 -- Get documents by id
+getById :: Text
+        -> Text
+        -> Text
+        -> [Text]
+        -> IO (Either EsError (SearchResult Record))
 getById server index mappingName ids =
   searchDocuments server index mappingName search
   where
@@ -150,29 +162,11 @@ searchDocuments :: Text
                 -> IO (Either EsError (SearchResult Record))
 searchDocuments server index mappingName search = do
   body <-
-    withBH server $
-    B.searchByType (IndexName index) (MappingName mappingName) search
+    withBH server $ B.searchByType (IndexName index) (MappingName mappingName) search
   return $ body >>= toResult
   where
     toErr msg = EsError 500 (T.pack $ "Failed to decode search results " ++ msg)
     toResult body = first toErr (A.eitherDecode $ textToBytes body)
-
--- ^
--- Create a search object
-mkSearch :: Maybe Query -> Maybe Filter -> Int -> Int -> Search
-mkSearch query filter start limit =
-  Search
-    query
-    filter
-    Nothing
-    Nothing
-    Nothing
-    False
-    (From start)
-    (Size limit)
-    SearchTypeDfsQueryThenFetch
-    Nothing
-    Nothing
 
 withBH :: Text -> BH IO Reply -> IO (Either EsError Text)
 withBH server action = do
@@ -192,8 +186,126 @@ bytesToText = decodeUtf8 . L.toStrict
 textToBytes :: Text -> L.ByteString
 textToBytes = L.fromStrict . encodeUtf8
 
-mkSearch' expr sort start limit = undefined
+anyToText
+  :: Show a
+  => a -> Text
+anyToText = T.pack . show
+
+termToText (TermInt t) = anyToText t
+termToText (TermFloat t) = anyToText t
+termToText (TermStr t) = t
+termToText (TermBool t) = anyToText t
+termToText (TermDate t) = anyToText t
+termToText TermNull = "null"
+termToText t = error $ "cannot convert term " ++ show t ++ "to text"
+
+-- ^
+-- Create a search object
+mkSearch :: FilterExpr -> [Text] -> RecordStart -> ResultLimit -> Search
+mkSearch expr sort = mkSearch' query Nothing sort'
   where
-    mkSort (SortExpr n SortAscending) = B.mkSort (FieldName n) Ascending
-    mkSort (SortExpr n SortDescending) = B.mkSort (FieldName n) Descending
-    sort' = mkSort <$> mkSortExpr sort
+    query = exprToQuery expr
+    sort' = toMaybe $ exprToSort <$> catMaybes (mkSortExpr <$> sort)
+    toMaybe [] = Nothing
+    toMaybe xs = Just xs
+
+exprToQuery :: FilterExpr -> Maybe Query
+exprToQuery = toQuery
+  where
+    toQuery (FilterRelOp Equal col val) = mkEqQuery col val
+    toQuery (FilterRelOp In col val) = mkInQuery col val
+    toQuery (FilterRelOp Contains col val) = mkMatchQuery' col val
+    toQuery (FilterRelOp NotEqual col val) =
+      mkNotQuery <$> exprToQuery (FilterRelOp Equal col val)
+    toQuery (FilterRelOp NotIn col val) =
+      mkNotQuery <$> exprToQuery (FilterRelOp In col val)
+    toQuery (FilterRelOp NotContains col val) =
+      mkNotQuery <$> exprToQuery (FilterRelOp Contains col val)
+    toQuery (FilterRelOp op col val) = mkRangeQuery' col val op
+    toQuery (FilterBoolOp Or e1 e2) =
+      mkOrQuery (exprToQuery e1) (exprToQuery e2)
+    toQuery (FilterBoolOp And e1 e2) =
+      mkAndQuery (exprToQuery e1) (exprToQuery e2)
+    mkBoost 1 = Nothing
+    mkBoost n = Just $ Boost n
+    mkBoost' n = fromMaybe (Boost 1) (mkBoost n)
+    mkNotQuery q = QueryBoolQuery $ B.mkBoolQuery [] [q] []
+    mkCompositeQuery mkQuery (Just q1) (Just q2) =
+      Just . QueryBoolQuery $ mkQuery q1 q2
+    mkCompositeQuery _ (Just q1) _ = Just q1
+    mkCompositeQuery _ _ (Just q2) = Just q2
+    mkCompositeQuery _ _ _ = Nothing
+    mkAndQuery = mkCompositeQuery (\q1 q2 -> B.mkBoolQuery [q1, q2] [] [])
+    mkOrQuery = mkCompositeQuery (\q1 q2 -> B.mkBoolQuery [] [] [q1, q2])
+    mkMatchQuery' (ColumnName c x) (TermStr v) =
+      Just . QueryMatchQuery $ mkMatchQuery c v (mkBoost x)
+    mkInQuery (ColumnName c x) (TermList []) = Nothing
+    mkInQuery (ColumnName c _) (TermList (y:ys)) =
+      Just $ TermsQuery c (termToText <$> y :| ys)
+    mkEqQuery (ColumnName c x) (TermInt v) =
+      Just $ TermQuery (Term c (anyToText v)) (mkBoost x)
+    mkEqQuery (ColumnName c x) (TermFloat v) =
+      Just $ TermQuery (Term c (anyToText v)) (mkBoost x)
+    mkEqQuery (ColumnName c x) (TermBool v) =
+      Just $ TermQuery (Term c (anyToText v)) (mkBoost x)
+    mkEqQuery (ColumnName c x) (TermStr v) =
+      Just $ TermQuery (Term c v) (mkBoost x)
+    mkEqQuery (ColumnName c x) (TermDate v) =
+      Just $ TermQuery (Term c (anyToText v)) (mkBoost x)
+    mkEqQuery (ColumnName c _) TermNull = error "null query not supported"
+    mkRangeQuery' col val op = Just . QueryRangeQuery $ mkRangeQuery col val op
+    mkRangeQuery (ColumnName c x) (TermInt v) op =
+      RangeQuery (FieldName c) (mkRangeDouble op (fromIntegral v)) (mkBoost' x)
+    mkRangeQuery (ColumnName c x) (TermFloat v) op =
+      RangeQuery (FieldName c) (mkRangeDouble op v) (mkBoost' x)
+    mkRangeQuery (ColumnName c x) (TermDate v) op =
+      RangeQuery (FieldName c) (mkRangeDate op v) (mkBoost' x)
+    mkRangeQuery _ t _ = error $ "invalid term for range " ++ show t
+
+mkRangeDouble :: FilterRelationalOperator -> Double -> RangeValue
+mkRangeDouble GreaterThan = RangeDoubleGt . B.GreaterThan
+mkRangeDouble GreaterThanOrEqual = RangeDoubleGte . B.GreaterThanEq
+mkRangeDouble LessThan = RangeDoubleLt . B.LessThan
+mkRangeDouble LessThanOrEqual = RangeDoubleLte . B.LessThanEq
+mkRangeDouble op = error $ "invalid range operator " ++ show op
+
+mkRangeDate :: FilterRelationalOperator -> UTCTime -> RangeValue
+mkRangeDate GreaterThan = RangeDateGt . B.GreaterThanD
+mkRangeDate GreaterThanOrEqual = RangeDateGte . B.GreaterThanEqD
+mkRangeDate LessThan = RangeDateLt . B.LessThanD
+mkRangeDate LessThanOrEqual = RangeDateLte . B.LessThanEqD
+mkRangeDate op = error $ "invalid range operator " ++ show op
+
+mkMatchQuery :: Text -> Text -> Maybe Boost -> MatchQuery
+mkMatchQuery field query =
+  MatchQuery
+    (FieldName field)
+    (QueryString query)
+    B.Or
+    B.ZeroTermsNone
+    Nothing
+    Nothing
+    Nothing
+    Nothing
+    Nothing
+
+exprToSort :: SortExpr -> SortSpec
+exprToSort (SortExpr n SortAscending) =
+  DefaultSortSpec $ B.mkSort (FieldName n) Ascending
+exprToSort (SortExpr n SortDescending) =
+  DefaultSortSpec $ B.mkSort (FieldName n) Descending
+
+mkSearch' :: Maybe Query -> Maybe Filter -> Maybe Sort -> Int -> Int -> Search
+mkSearch' query filter' sort start limit =
+  Search
+    query
+    filter'
+    sort
+    Nothing
+    Nothing
+    False
+    (From start)
+    (Size limit)
+    SearchTypeDfsQueryThenFetch
+    Nothing
+    Nothing
