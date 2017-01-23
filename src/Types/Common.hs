@@ -149,6 +149,8 @@ data ApiConfig = ApiConfig
   , mongoHost :: HostName
   , mongoPort :: PortNumber
   , mongoDbs :: Map.Map AppName Database
+  , esIndices :: Map.Map AppName Database
+  , esServer :: Text
   } deriving (Eq, Show)
 
 -- ^

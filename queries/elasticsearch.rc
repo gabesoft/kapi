@@ -40,6 +40,19 @@ GET http://:host/_cat/indices?v
 GET http://:host/:index2/_all/_mapping
 
 #
+# Copy an index
+#
+POST http://:host/_reindex
+{
+  "source": {
+    "index": ":index1"
+  },
+  "dest": {
+    "index": ":index2"
+  }
+}
+
+#
 # Get all posts matching a query
 #
 GET http://:host/:index2/_search?q=title:haskell
@@ -97,7 +110,7 @@ GET http://:host/:index2/_search
 #
 # Perform a search 1
 #
-GET http://:host/:index1/_search
+GET http://:host/:index2/_search
 {
   "size": 10,
   "from": 0,

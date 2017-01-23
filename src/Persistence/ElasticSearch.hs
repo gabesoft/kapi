@@ -7,7 +7,7 @@ module Persistence.ElasticSearch
   , deleteDocument
   , deleteDocuments
   , deleteIndex
-  , getById
+  , getByIds
   , indexDocument
   , indexDocuments
   , mkIdsSearch
@@ -144,12 +144,12 @@ deleteDocuments server index mappingName recordIds =
 
 -- ^
 -- Get documents by id
-getById :: Text
-        -> Text
-        -> Text
-        -> [Text]
-        -> IO (Either EsError (SearchResult Record))
-getById server index mappingName ids =
+getByIds :: Text
+         -> Text
+         -> Text
+         -> [Text]
+         -> IO (Either EsError (SearchResult Record))
+getByIds server index mappingName ids =
   searchDocuments server index mappingName (mkIdsSearch mappingName ids)
 
 -- ^

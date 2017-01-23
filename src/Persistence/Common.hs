@@ -89,6 +89,12 @@ confGetDb :: AppName -> ApiConfig -> Database
 confGetDb name = fromJust . Map.lookup name . mongoDbs
 
 -- ^
+-- Get the elastic-search index name for an app name
+-- from a configuration object
+confGetEsIndex :: AppName -> ApiConfig -> Text
+confGetEsIndex name = fromJust . Map.lookup name . esIndices
+
+-- ^
 -- Validate a record against it's definition
 validate :: RecordDefinition -> Record -> (Record, ValidationResult)
 validate def r = (r, ValidationErrors $ catMaybes results)

@@ -35,28 +35,28 @@ GET http://:host/:path?where=(createdAt ge 2017-01-08T07:47:45.928Z)
 GET http://:host/:path?page=4&per_page=5
 
 #
-# Get a single feed
+# Get a single post
 #
 GET http://:host/:path/5869ec3e59841810dc000009
 
 #
-# Get a single feed using ETag
+# Get a single post using ETag
 #
 GET http://:host/:path/5869ec3e59841810dc000009
 If-None-Match: ef19b2e0ce2baa83fa90abfa82a5141d4f18842d
 
 #
-# Delete a non-existent feed
+# Delete a non-existent post
 #
 DELETE http://:host/:path/non-existent
 
 #
-# Delete an existent feed
+# Delete an existent post
 #
 DELETE http://:host/:path/587ad5bd5984186b15000001
 
 #
-# Create a single feed
+# Create a single post
 #
 POST http://:host/:path
 Content-Type: :json
@@ -115,7 +115,7 @@ Content-Type: :json
 ]
 
 #
-# Replace a single feed
+# Replace a single post
 #
 PUT http://:host/:path/587a810d598418739b000001
 Content-Type: :json
@@ -125,7 +125,7 @@ Content-Type: :json
 }
 
 #
-# Modify a single feed
+# Modify a single post
 #
 PATCH http://:host/:path/587ad83859841886c7000003
 Content-Type: :json

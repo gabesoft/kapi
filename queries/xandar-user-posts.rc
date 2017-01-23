@@ -1,0 +1,21 @@
+# -*- restclient -*-
+#
+# Queries against the /xandar/user-posts endpoints
+#
+
+# variables
+:date := (shell-command-to-string "echo -n (date +%Y-%m-%d-%M-%s)")
+:host = localhost:8001
+:path = xandar/user-posts
+:json = application/json
+
+
+#
+# Get all posts
+#
+GET http://:host/:path
+
+#
+# Get a single post
+#
+GET http://:host/:path/1

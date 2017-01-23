@@ -14,18 +14,21 @@ import Control.Monad.Reader
 import Data.Aeson (encode)
 import Data.Bifunctor
 import qualified Data.ByteString.Lazy.Char8 as LBS
+import Data.Either
 import Data.List (intercalate)
 import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as T
-import Database.MongoDB (Pipe, Database, Index)
-import Database.MongoDB.Query (Failure(..))
+import Database.Bloodhound (SearchResult(..))
+import qualified Database.Bloodhound as B
 import Network.HTTP.Types.Status
 import Persistence.Common
-import Persistence.MongoDB
+import Persistence.ElasticSearch
 import Servant
 import Servant.Utils.Enter (Enter)
 import Types.Common
+
+mappingName = "post"
 
 -- ^
 -- Get multiple records
@@ -35,7 +38,23 @@ getMultiple = undefined
 -- ^
 -- Get a single record by id
 getSingle :: Maybe Text -> Text -> Api (Headers '[Header "ETag" String] Record)
-getSingle etag uid = undefined
+getSingle etag uid = do
+  conf <- ask
+  let server = esServer conf
+  let index = confGetEsIndex appName conf
+  record <- liftIO $ getByIds server index mappingName [uid]
+  case record of
+    Left err -> throwError err500
+    Right res ->
+      case extractRecords res of
+        [] -> throwError err404
+        (x:_) -> return $ addHeader "EtagContent" x
+
+extractRecords :: SearchResult Record -> [Record]
+extractRecords res = concat $ getRecord <$> hits
+  where
+    hits = B.hits (B.searchHits res)
+    getRecord = catMaybes . (: []) . B.hitSource
 
 -- ^
 -- Delete a single record

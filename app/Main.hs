@@ -17,6 +17,8 @@ conf =
   , mongoHost = "127.0.0.1"
   , mongoPort = 27017
   , mongoDbs = Map.fromList [("xandar", "kapi-xandar")]
+  , esServer = "http://localhost:9200"
+  , esIndices = Map.fromList [("xandar", "kapi-xandar")]
   }
 
 main :: IO ()
