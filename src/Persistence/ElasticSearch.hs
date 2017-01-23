@@ -167,38 +167,6 @@ searchDocuments server index mappingName search = do
     toErr msg = EsError 500 (T.pack $ "Failed to decode search results " ++ msg)
     toResult body = first toErr (A.eitherDecode $ textToBytes body)
 
-withBH :: Text -> BH IO Reply -> IO (Either EsError Text)
-withBH server action = do
-  reply <- B.withBH defaultManagerSettings (Server server) action
-  return $ fromReply reply
-  where
-    body = bytesToText . responseBody
-    code = statusCode . responseStatus
-    ok s = (s == status200) || (s == status201)
-    fromReply reply
-      | ok (responseStatus reply) = Right (body reply)
-      | otherwise = Left $ EsError (code reply) (body reply)
-
-bytesToText :: L.ByteString -> Text
-bytesToText = decodeUtf8 . L.toStrict
-
-textToBytes :: Text -> L.ByteString
-textToBytes = L.fromStrict . encodeUtf8
-
-anyToText
-  :: Show a
-  => a -> Text
-anyToText = T.pack . show
-
-termToText :: FilterTerm -> Text
-termToText (TermInt t) = anyToText t
-termToText (TermFloat t) = anyToText t
-termToText (TermStr t) = t
-termToText (TermBool t) = anyToText t
-termToText (TermDate t) = anyToText t
-termToText TermNull = "null"
-termToText t = error $ "cannot convert term " ++ show t ++ "to text"
-
 -- ^
 -- Create a search object for finding records by id
 mkIdsSearch :: Text -> [Text] -> Search
@@ -262,7 +230,7 @@ exprToQuery = toQuery
     mkEqQuery (ColumnName c x) (TermDate v) =
       Just $ TermQuery (Term c (anyToText v)) (mkBoost x)
     mkEqQuery _ TermNull = error "null query not supported"
-    mkEqQuery _ t = error $ "unexpected term " ++ show t
+    mkEqQuery _ t = error $ "invalid term for equal " ++ show t
     mkRangeQuery' col val op = Just . QueryRangeQuery $ mkRangeQuery col val op
     mkRangeQuery (ColumnName c x) (TermInt v) op =
       RangeQuery (FieldName c) (mkRangeDouble op (fromIntegral v)) (mkBoost' x)
@@ -323,3 +291,35 @@ mkSearch' query filter' sort start limit =
     SearchTypeDfsQueryThenFetch
     Nothing
     Nothing
+
+withBH :: Text -> BH IO Reply -> IO (Either EsError Text)
+withBH server action = do
+  reply <- B.withBH defaultManagerSettings (Server server) action
+  return $ fromReply reply
+  where
+    body = bytesToText . responseBody
+    code = statusCode . responseStatus
+    ok s = (s == status200) || (s == status201)
+    fromReply reply
+      | ok (responseStatus reply) = Right (body reply)
+      | otherwise = Left $ EsError (code reply) (body reply)
+
+bytesToText :: L.ByteString -> Text
+bytesToText = decodeUtf8 . L.toStrict
+
+textToBytes :: Text -> L.ByteString
+textToBytes = L.fromStrict . encodeUtf8
+
+anyToText
+  :: Show a
+  => a -> Text
+anyToText = T.pack . show
+
+termToText :: FilterTerm -> Text
+termToText (TermInt t) = anyToText t
+termToText (TermFloat t) = anyToText t
+termToText (TermStr t) = t
+termToText (TermBool t) = anyToText t
+termToText (TermDate t) = anyToText t
+termToText TermNull = "null"
+termToText t = error $ "cannot convert term " ++ show t ++ "to text"

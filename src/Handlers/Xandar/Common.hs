@@ -4,7 +4,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeOperators #-}
 
--- |
+-- ^
 -- Common handlers
 module Handlers.Xandar.Common where
 
@@ -27,7 +27,7 @@ import Servant
 import Servant.Utils.Enter (Enter)
 import Types.Common
 
--- |
+-- ^
 -- Create an application for providing CRUD functionality for a type of record
 -- app
 --   :: (HasServer a '[])
@@ -45,7 +45,7 @@ server' handlers config = enter (toHandler config) handlers
     toHandler :: ApiConfig -> Api :~> Handler
     toHandler conf = Nat (`runReaderT` conf)
 
--- |
+-- ^
 -- Get multiple records
 getMultiple :: ApiGetMultipleLink -> RecordDefinition -> ServerT GetMultiple Api
 getMultiple getLink def include query sort page perPage = do
@@ -79,7 +79,7 @@ getMultiple getLink def include query sort page perPage = do
       , ("prev", paginationPrev pagination)
       ]
 
--- |
+-- ^
 -- Get a single record by id
 getSingle :: RecordDefinition -> Maybe Text -> Text -> Api (Headers '[Header "ETag" String] Record)
 getSingle def etag uid = do
@@ -93,7 +93,7 @@ getSingle def etag uid = do
         then throwError err304
         else return res
 
--- |
+-- ^
 -- Delete a single record
 deleteSingle :: RecordDefinition -> Text -> Api NoContent
 deleteSingle def uid = do
@@ -102,7 +102,7 @@ deleteSingle def uid = do
   pipe <- dbPipe conf
   dbDeleteById (dbName conf) def uid pipe >> return NoContent
 
--- |
+-- ^
 -- Create one or more records
 createSingleOrMultiple
   :: RecordDefinition -> (Text -> String) -> ApiData Record
@@ -110,7 +110,7 @@ createSingleOrMultiple
 createSingleOrMultiple def getLink (Single r) = createSingle def getLink r
 createSingleOrMultiple def getLink (Multiple rs) = createMultiple def getLink rs
 
--- |
+-- ^
 -- Create a single record
 createSingle
   :: RecordDefinition
@@ -123,7 +123,7 @@ createSingle def getLink input = do
   where
     mkResult r = addHeader (getCreateLink getLink r) $ noHeader (Single $ Succ r)
 
--- |
+-- ^
 -- Create multiple records
 createMultiple
   :: RecordDefinition
@@ -135,27 +135,27 @@ createMultiple def getLink inputs = do
   let links = apiItem (const "<>") (mkLink . getCreateLink getLink) <$> records
   return . noHeader $ addHeader (intercalate ", " links) (Multiple records)
 
--- |
+-- ^
 -- Update (replace) a single record
 replaceSingle :: RecordDefinition -> Text -> Record -> Api Record
 replaceSingle def = updateSingle def True
 
--- |
+-- ^
 -- Update (modify) a single record
 modifySingle :: RecordDefinition -> Text -> Record -> Api Record
 modifySingle def = updateSingle def False
 
--- |
+-- ^
 -- Update (replace) multiple records
 replaceMultiple :: RecordDefinition -> [Record] -> Api [ApiResult]
 replaceMultiple def = updateMultiple def True
 
--- |
+-- ^
 -- Update (modify) multiple records
 modifyMultiple :: RecordDefinition -> [Record] -> Api [ApiResult]
 modifyMultiple def = updateMultiple def False
 
--- |
+-- ^
 -- Handle a head request for a single record endpoint
 headSingle
   :: RecordDefinition -> Text
@@ -164,7 +164,7 @@ headSingle def uid = do
   record <- getSingle' def uid
   return $ addHeader (recToSha record) NoContent
 
--- |
+-- ^
 -- Handle a head request for a multiple records endpoint
 headMultiple :: RecordDefinition -> Api (Headers '[Header "X-Total-Count" String] NoContent)
 headMultiple def = do
@@ -173,31 +173,31 @@ headMultiple def = do
   count <- dbCount (dbName conf) def pipe
   return $ addHeader (show count) NoContent
 
--- |
+-- ^
 -- Handle an options request for a single record endpoint
 optionsSingle :: Text
               -> Api (Headers '[Header "Access-Control-Allow-Methods" String] NoContent)
 optionsSingle _ = return $ addHeader "GET, PATCH, PUT, DELETE" NoContent
 
--- |
+-- ^
 -- Handle an options request for a multiple record endpoint
 optionsMultiple :: Api (Headers '[Header "Access-Control-Allow-Methods" String] NoContent)
 optionsMultiple = return $ addHeader "GET, POST, PATCH, PUT" NoContent
 
--- |
+-- ^
 -- Insert a single valid record
 -- populating any missing fields with default values
 insertSingle :: RecordDefinition -> Record -> Api ApiResult
 insertSingle def =
   chainResult (insertOrUpdateSingle def dbInsert) . validateRecord def
 
--- |
+-- ^
 -- Modify or replace a single record
 updateSingle :: RecordDefinition -> Bool -> Text -> Record -> Api Record
 updateSingle def replace uid record =
   updateSingle' def replace uid record >>= apiItem throwApiError return
 
--- |
+-- ^
 -- Modify or replace multiple records
 updateMultiple :: RecordDefinition -> Bool -> [Record] -> Api [ApiResult]
 updateMultiple def replace = mapM modify
@@ -207,7 +207,7 @@ updateMultiple def replace = mapM modify
         (updateSingle' def replace $ fromJust (getIdValue u))
         (vResultToApiItem $ validateHasId u)
 
--- |
+-- ^
 -- Modify or replace a single record
 updateSingle' :: RecordDefinition -> Bool -> Text -> Record -> Api ApiResult
 updateSingle' def replace uid updated = do
@@ -221,7 +221,7 @@ updateSingle' def replace uid updated = do
         then replaceRecords [createdAtLabel, updatedAtLabel, idLabel]
         else mergeRecords
 
--- |
+-- ^
 -- Insert or update a valid @record@ record according to @action@
 insertOrUpdateSingle
   :: RecordDefinition -> (Database -> RecordDefinition -> Record -> Pipe -> Api (Either Failure RecordId))
@@ -235,7 +235,7 @@ insertOrUpdateSingle def action record = do
     Left err -> return $ Fail (failedToApiError err)
     Right uid -> Succ . fromJust <$> dbGetById (dbName conf) def uid pipe
 
--- |
+-- ^
 -- Get a record by id
 getSingle' :: RecordDefinition -> Text -> Api Record
 getSingle' def uid = do
@@ -244,26 +244,26 @@ getSingle' def uid = do
   record <- dbGetById (dbName conf) def uid pipe
   maybe (throwError err404) return record
 
--- |
+-- ^
 -- Get the configured database name for this app
 dbName :: ApiConfig -> Database
 dbName = confGetDb appName
 
--- |
+-- ^
 -- Add database indices
 addDbIndices :: [Index] -> ApiConfig -> IO ()
 addDbIndices indices conf = do
   pipe <- dbPipe conf
   mapM_ (flip (dbAddIndex $ dbName conf) pipe) indices
 
--- |
+-- ^
 -- Create a MongoDB connection pipe
 dbPipe
   :: MonadIO m
   => ApiConfig -> m Pipe
 dbPipe conf = liftIO $ mkPipe (mongoHost conf) (mongoPort conf)
 
--- |
+-- ^
 -- Convert a MongoDB @Failure@ into an @ApiError@
 -- TODO parse the MongoDB error object (the error is in BSON format)
 --      https://docs.mongodb.com/manual/reference/command/getLastError/
@@ -271,7 +271,7 @@ failedToApiError :: Failure -> ApiError
 failedToApiError (WriteFailure _ msg) = ApiError (LBS.pack msg) status400
 failedToApiError err = ApiError (LBS.pack (show err)) status500
 
--- |
+-- ^
 -- Convert an @ApiError@ into a @ServantErr@ and throw
 throwApiError
   :: MonadError ServantErr m
@@ -286,29 +286,29 @@ throwApiError err
       { errBody = encode (Fail aErr :: ApiItem ApiError ())
       }
 
--- |
+-- ^
 -- Chain two API results
 chainResult
   :: Monad m
   => (Record -> m ApiResult) -> ApiResult -> m ApiResult
 chainResult = apiItem (return . Fail)
 
--- |
+-- ^
 -- Create a link element
 mkLink :: String -> String
 mkLink link = "<" ++ link ++ ">"
 
--- |
+-- ^
 -- Create a relative link element
 mkRelLink :: String -> String -> String
 mkRelLink rel link = mkLink link ++ "; rel=\"" ++ rel ++ "\""
 
--- |
+-- ^
 -- Create a link to be returned during record creation
 getCreateLink :: (Text -> String) -> Record -> String
 getCreateLink getLink = getLink . fromJust . getIdValue
 
--- |
+-- ^
 -- Validate a record given a definition
 validateRecord :: RecordDefinition -> Record -> ApiResult
 validateRecord def = vResultToApiItem . validate def

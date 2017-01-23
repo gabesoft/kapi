@@ -4,6 +4,7 @@ module Handlers.Xandar.Xandar where
 
 import Api.Xandar
 import Handlers.Xandar.Common
+import qualified Handlers.Xandar.UserPosts as UP
 import Persistence.Xandar.FeedSubscriptions
        (feedSubscriptionDefinition, feedSubscriptionIndices)
 import Persistence.Xandar.Feeds (feedDefinition, feedIndices)
@@ -18,7 +19,7 @@ app :: ApiConfig -> Application
 app =
   app'
     apiProxy
-    (userHandlers :<|> feedHandlers :<|> postHandlers :<|> subscriptionHandlers)
+    (userHandlers :<|> feedHandlers :<|> postHandlers :<|> subscriptionHandlers :<|> userPostHandlers)
   where
     userHandlers :: ServerT XandarUserApi Api
     userHandlers =
@@ -48,6 +49,19 @@ app =
       headMultiple def :<|>
       optionsSingle :<|>
       optionsMultiple
+    userPostHandlers =
+      UP.getMultiple :<|>
+      UP.getSingle :<|>
+      UP.deleteSingle :<|>
+      UP.createSingleOrMultiple :<|>
+      UP.replaceSingle :<|>
+      UP.replaceMultiple :<|>
+      UP.modifySingle :<|>
+      UP.modifyMultiple :<|>
+      UP.headSingle :<|>
+      UP.headMultiple :<|>
+      UP.optionsSingle :<|>
+      UP.optionsMultiple
 
 -- |
 -- Perform any initialization to be done on server start

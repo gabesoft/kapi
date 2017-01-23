@@ -19,6 +19,7 @@ library
                      , Data.AesonBson
                      , Data.AesonBson.Instances
                      , Handlers.Xandar.Common
+                     , Handlers.Xandar.UserPosts
                      , Handlers.Xandar.Xandar
                      , Parsers.Filter
                      , Parsers.Unescape
