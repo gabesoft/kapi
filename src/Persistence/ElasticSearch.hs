@@ -10,6 +10,7 @@ module Persistence.ElasticSearch
   , getById
   , indexDocument
   , indexDocuments
+  , mkIdsSearch
   , mkSearch
   , putMapping
   , putMappingFromFile
@@ -21,6 +22,7 @@ import Data.Aeson (ToJSON)
 import qualified Data.Aeson as A
 import Data.Bifunctor
 import qualified Data.ByteString.Lazy.Char8 as L
+import Data.Char (isSpace)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe
 import Data.Text (Text)
@@ -35,7 +37,7 @@ import Database.Bloodhound
         Size(..), SearchType(..), Query(..), Filter(..), FieldName(..),
         SortOrder(..), Sort, SortSpec(..), Term(..), Boost(..),
         RangeQuery(..), RangeValue(..), QueryString(..), MatchQuery(..),
-        BoolQuery(..), BH)
+        MatchQueryType(..), BH)
 import qualified Database.Bloodhound as B
 import Network.HTTP.Client
 import Network.HTTP.Types.Status
@@ -148,10 +150,7 @@ getById :: Text
         -> [Text]
         -> IO (Either EsError (SearchResult Record))
 getById server index mappingName ids =
-  searchDocuments server index mappingName search
-  where
-    query = IdsQuery (MappingName mappingName) (DocId <$> ids)
-    search = B.mkSearch (Just query) Nothing
+  searchDocuments server index mappingName (mkIdsSearch mappingName ids)
 
 -- ^
 -- Search documents given a 'Search' object
@@ -191,6 +190,7 @@ anyToText
   => a -> Text
 anyToText = T.pack . show
 
+termToText :: FilterTerm -> Text
 termToText (TermInt t) = anyToText t
 termToText (TermFloat t) = anyToText t
 termToText (TermStr t) = t
@@ -198,6 +198,13 @@ termToText (TermBool t) = anyToText t
 termToText (TermDate t) = anyToText t
 termToText TermNull = "null"
 termToText t = error $ "cannot convert term " ++ show t ++ "to text"
+
+-- ^
+-- Create a search object for finding records by id
+mkIdsSearch :: Text -> [Text] -> Search
+mkIdsSearch mappingName ids = B.mkSearch (Just query) Nothing
+  where
+    query = IdsQuery (MappingName mappingName) (DocId <$> ids)
 
 -- ^
 -- Create a search object
@@ -238,10 +245,12 @@ exprToQuery = toQuery
     mkAndQuery = mkCompositeQuery (\q1 q2 -> B.mkBoolQuery [q1, q2] [] [])
     mkOrQuery = mkCompositeQuery (\q1 q2 -> B.mkBoolQuery [] [] [q1, q2])
     mkMatchQuery' (ColumnName c x) (TermStr v) =
-      Just . QueryMatchQuery $ mkMatchQuery c v (mkBoost x)
-    mkInQuery (ColumnName c x) (TermList []) = Nothing
+      Just . QueryMatchQuery $ (mkMatchQuery c v $ hasSpace v) (mkBoost x)
+    mkMatchQuery' _ t = error $ "invalid term for match query" ++ show t
+    mkInQuery _ (TermList []) = Nothing
     mkInQuery (ColumnName c _) (TermList (y:ys)) =
       Just $ TermsQuery c (termToText <$> y :| ys)
+    mkInQuery _ t = error $ "unexpected non-list term " ++ show t
     mkEqQuery (ColumnName c x) (TermInt v) =
       Just $ TermQuery (Term c (anyToText v)) (mkBoost x)
     mkEqQuery (ColumnName c x) (TermFloat v) =
@@ -252,7 +261,8 @@ exprToQuery = toQuery
       Just $ TermQuery (Term c v) (mkBoost x)
     mkEqQuery (ColumnName c x) (TermDate v) =
       Just $ TermQuery (Term c (anyToText v)) (mkBoost x)
-    mkEqQuery (ColumnName c _) TermNull = error "null query not supported"
+    mkEqQuery _ TermNull = error "null query not supported"
+    mkEqQuery _ t = error $ "unexpected term " ++ show t
     mkRangeQuery' col val op = Just . QueryRangeQuery $ mkRangeQuery col val op
     mkRangeQuery (ColumnName c x) (TermInt v) op =
       RangeQuery (FieldName c) (mkRangeDouble op (fromIntegral v)) (mkBoost' x)
@@ -261,6 +271,7 @@ exprToQuery = toQuery
     mkRangeQuery (ColumnName c x) (TermDate v) op =
       RangeQuery (FieldName c) (mkRangeDate op v) (mkBoost' x)
     mkRangeQuery _ t _ = error $ "invalid term for range " ++ show t
+    hasSpace = isJust . T.find isSpace
 
 mkRangeDouble :: FilterRelationalOperator -> Double -> RangeValue
 mkRangeDouble GreaterThan = RangeDoubleGt . B.GreaterThan
@@ -276,18 +287,21 @@ mkRangeDate LessThan = RangeDateLt . B.LessThanD
 mkRangeDate LessThanOrEqual = RangeDateLte . B.LessThanEqD
 mkRangeDate op = error $ "invalid range operator " ++ show op
 
-mkMatchQuery :: Text -> Text -> Maybe Boost -> MatchQuery
-mkMatchQuery field query =
+mkMatchQuery :: Text -> Text -> Bool -> Maybe Boost -> MatchQuery
+mkMatchQuery field query phrase =
   MatchQuery
     (FieldName field)
     (QueryString query)
     B.Or
     B.ZeroTermsNone
     Nothing
+    (queryType phrase)
     Nothing
     Nothing
     Nothing
-    Nothing
+  where
+    queryType True = Just MatchPhrase
+    queryType False = Nothing
 
 exprToSort :: SortExpr -> SortSpec
 exprToSort (SortExpr n SortAscending) =

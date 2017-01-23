@@ -4,7 +4,10 @@
 module TestHelper where
 
 import Data.Bson
+import Data.Maybe
+import Data.Text (Text, unpack, pack)
 import Data.Time (UTCTime)
+import Data.Time.ISO8601
 import Persistence.Common
 import Types.Common
 
@@ -18,7 +21,11 @@ mkId :: String -> Value
 mkId v = ObjId (read v)
 
 mkObjId :: String -> Field
-mkObjId v = mkObjId' "_id" v
+mkObjId = mkObjId' "_id"
+
+date = fromJust . parseISO8601 . unpack
+
+dateTerm = TermDate . date
 
 mkObjId' :: Label -> String -> Field
 mkObjId' name v = name =: mkId v

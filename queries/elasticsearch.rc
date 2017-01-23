@@ -25,6 +25,11 @@ GET http://:host/_cluster/health?pretty
 GET http://:host/_cat/shards
 
 #
+# Verify index
+#
+GET http://:host/:index2
+
+#
 # Get all indices
 #
 GET http://:host/_cat/indices?v
@@ -85,6 +90,79 @@ GET http://:host/:index2/_search
     "ids": {
       "type": "post",
       "values": ["1", "2", "5"]
+    }
+  }
+}
+
+#
+# Perform a search 1
+#
+GET http://:host/:index1/_search
+{
+  "size": 10,
+  "from": 0,
+  "query": {
+    "bool": {
+      "should": [
+        {
+          "match": {
+            "post.title": {
+              "query": "reader monad",
+              "type": "phrase"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "track_scores": false
+}
+
+#
+# Perform a search 2
+#
+GET http://:host/:index1/_search
+{
+  "size": 10,
+  "from": 0,
+  "query": {
+    "bool": {
+      "should": [
+        {
+          "match": {
+            "post.title": {
+              "query": "reader monad"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "track_scores": false
+}
+
+#
+# Perform a search 3
+#
+GET http://:host/:index1/_search
+{
+  "query": {
+    "bool": {
+      "should": [
+        {
+          "match": {
+            "post.title": "reader monad"
+          }
+        },
+        {
+          "match_phrase": {
+            "post.description": {
+              "query": "reader monad",
+              "boost": 2
+            }
+          }
+        }
+      ]
     }
   }
 }

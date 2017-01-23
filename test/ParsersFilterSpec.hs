@@ -6,9 +6,9 @@ module Main (main) where
 import Data.Maybe
 import Data.Text (Text, unpack, pack)
 import qualified Data.Text as T
-import Data.Time.ISO8601
 import Parsers.Filter (parse)
 import Test.Hspec
+import TestHelper
 import Types.Common
 
 main :: IO ()
@@ -35,9 +35,9 @@ validCases =
   , ("colNull eq null", FilterRelOp Equal "colNull" TermNull)
   , ("colNotNull ~eq null", FilterRelOp NotEqual "colNotNull" TermNull)
   , ( "colDate ge 2017-01-08T02:26:16.302Z"
-    , FilterRelOp GreaterThanOrEqual "colDate" (date "2017-01-08T02:26:16.302Z"))
+    , FilterRelOp GreaterThanOrEqual "colDate" (dateTerm "2017-01-08T02:26:16.302Z"))
   , ( "colDate ~le 1994-11-05T08:15:30-05:00"
-    , FilterRelOp GreaterThan "colDate" (date "1994-11-05T08:15:30-05:00"))
+    , FilterRelOp GreaterThan "colDate" (dateTerm "1994-11-05T08:15:30-05:00"))
   , ( "colBoolList in [true, false]"
     , FilterRelOp In "colBoolList" (TermList [TermBool True, TermBool False]))
   , ( "colDateList in [2017-01-08T02:26:16.302Z, 1994-11-05T08:15:30-05:00,2011-12-19T15:28:46.493Z]"
@@ -45,9 +45,9 @@ validCases =
         In
         "colDateList"
         (TermList
-           [ date "2017-01-08T02:26:16.302Z"
-           , date "1994-11-05T08:15:30-05:00"
-           , date "2011-12-19T15:28:46.493Z"
+           [ dateTerm "2017-01-08T02:26:16.302Z"
+           , dateTerm "1994-11-05T08:15:30-05:00"
+           , dateTerm "2011-12-19T15:28:46.493Z"
            ]))
   , ( "colBoolList ~in [true, 123, 99.33, null, \"x\"]"
     , FilterRelOp
@@ -93,5 +93,3 @@ mkOp
   -> (Text, FilterExpr)
 mkOp (opName, opCtor) (e1, r1) (e2, r2) =
   (T.concat [e1, " ", opName, " ", e2], FilterBoolOp opCtor r1 r2)
-
-date = TermDate . fromJust . parseISO8601 . unpack

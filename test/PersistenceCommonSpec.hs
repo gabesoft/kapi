@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
--- |
+-- ^
 -- Tests for Persistence.Common
 module Main (main) where
 
