@@ -35,10 +35,10 @@ data SpecialCharacter
   deriving (Eq, Ord, Show)
 
 parse :: Text -> Either String FilterExpr
-parse = A.parseOnly expr
+parse = A.parseOnly (expr <* A.endOfInput)
 
 expr :: Parser FilterExpr
-expr = foldl mkExprParser simpleExpr [("and", And), ("or", Or)]
+expr = foldl mkExprParser simpleExpr [("and", And), ("or", Or)] <?> "expr"
 
 mkExprParser :: Parser FilterExpr -> (Text, FilterBooleanOperator) -> Parser FilterExpr
 mkExprParser expr' (opName, opVal) = do
@@ -62,10 +62,10 @@ simpleExpr = parens (expr <* skipSpace) <|> exprSingle
       return $ FilterRelOp o c t
 
 term :: Parser FilterTerm
-term = termSingle <|> termList
+term = termSingle <|> termList <?> "term"
 
 termSingle :: Parser FilterTerm
-termSingle = jsDate <|> bool <|> null' <|> str <|> num
+termSingle = jsDate <|> bool <|> null' <|> str <|> num <?> "term single"
 
 termList :: Parser FilterTerm
 termList = TermList <$> braces (sepByComma item) <?> "list"

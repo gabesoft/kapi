@@ -1,1 +1,5 @@
 :set -XOverloadedStrings
+
+import qualified Database.Bloodhound as B
+
+:load test/ElasticSearchSetup.hs

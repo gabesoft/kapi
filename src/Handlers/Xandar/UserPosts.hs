@@ -47,13 +47,14 @@ getSingle etag uid = do
     Left err -> throwError err500
     Right res ->
       case extractRecords res of
-        [] -> throwError err404
-        (x:_) -> return $ addHeader "EtagContent" x
+        ([], _) -> throwError err404
+        (r:_, _) -> return $ addHeader (recToSha r) r
 
-extractRecords :: SearchResult Record -> [Record]
-extractRecords res = concat $ getRecord <$> hits
+extractRecords :: SearchResult Record -> ([Record], Int)
+extractRecords input = (concat $ getRecord <$> hits, B.hitsTotal result)
   where
-    hits = B.hits (B.searchHits res)
+    result = B.searchHits input
+    hits = B.hits result
     getRecord = catMaybes . (: []) . B.hitSource
 
 -- ^

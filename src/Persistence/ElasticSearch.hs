@@ -4,6 +4,7 @@
 -- Functions for interacting with Elasticsearch
 module Persistence.ElasticSearch
   ( createIndex
+  , countDocuments
   , deleteDocument
   , deleteDocuments
   , deleteIndex
@@ -151,6 +152,17 @@ getByIds :: Text
          -> IO (Either EsError (SearchResult Record))
 getByIds server index mappingName ids =
   searchDocuments server index mappingName (mkIdsSearch mappingName ids)
+
+-- ^
+-- Return the number of documents matching a query
+countDocuments server index mappingName search = do
+  res <- searchDocuments server index mappingName search'
+  return $ either (const 0) (B.hitsTotal . searchHits) res
+  where
+    search' =
+      search
+      { size = Size 0
+      }
 
 -- ^
 -- Search documents given a 'Search' object
