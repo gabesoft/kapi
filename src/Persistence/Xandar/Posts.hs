@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
--- |
+-- ^
 -- Post model schema and indices
 module Persistence.Xandar.Posts where
 

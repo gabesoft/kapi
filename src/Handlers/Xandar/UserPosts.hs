@@ -33,7 +33,8 @@ mappingName = "post"
 -- ^
 -- Get multiple records
 getMultiple :: ServerT GetMultiple Api
-getMultiple = undefined
+getMultiple include query sort page perPage = do
+  undefined
 
 -- ^
 -- Get a single record by id

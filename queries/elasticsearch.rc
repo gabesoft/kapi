@@ -4,7 +4,7 @@
 #
 
 # variables
-:host = localhost:9200
+:host = 127.0.0.1:9200
 :coll = post
 :index1 = .prod-dask-rss-v1
 :index2 = kapi-xandar

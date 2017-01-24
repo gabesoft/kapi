@@ -5,7 +5,7 @@
 
 # variables
 :date := (shell-command-to-string "echo -n (date +%Y-%m-%d-%M-%s)")
-:host = localhost:8001
+:host = 127.0.0.1:8001
 :path = xandar/posts
 :json = application/json
 
