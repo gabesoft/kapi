@@ -250,7 +250,7 @@ exprToQuery = toQuery
     mkEqQuery (ColumnName c x) (TermFloat v) =
       Just $ TermQuery (Term c (anyToText v)) (mkBoost x)
     mkEqQuery (ColumnName c x) (TermBool v) =
-      Just $ TermQuery (Term c (anyToText v)) (mkBoost x)
+      Just $ TermQuery (Term c (boolToText v)) (mkBoost x)
     mkEqQuery (ColumnName c x) (TermStr v) =
       Just $ TermQuery (Term c v) (mkBoost x)
     mkEqQuery (ColumnName c x) (TermDate v) =
@@ -321,9 +321,11 @@ bytesToText = decodeUtf8 . L.toStrict
 textToBytes :: Text -> L.ByteString
 textToBytes = L.fromStrict . encodeUtf8
 
-anyToText
-  :: Show a
-  => a -> Text
+boolToText :: Bool -> Text
+boolToText True = T.pack "true"
+boolToText False = T.pack "false"
+
+anyToText :: Show a => a -> Text
 anyToText = T.pack . show
 
 termToText :: FilterTerm -> Text

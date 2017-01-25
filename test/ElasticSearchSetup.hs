@@ -22,7 +22,7 @@ eMapping :: Text
 eMapping = "post"
 
 src :: Text -> RecordStart -> ResultLimit -> B.Search
-src input = mkSearch (fromRight $ parse input) []
+src input = mkSearch (Just $ fromRight $ parse input) [] []
 
 fromRight :: Show s => Either s a -> a
 fromRight (Right x) = x

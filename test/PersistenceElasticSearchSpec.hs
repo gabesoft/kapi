@@ -23,7 +23,7 @@ runCase c = it (T.unpack $ fst c) (verifySearch c)
 
 verifySearch :: (T.Text, Search) -> Expectation
 verifySearch (filter, exp) =
-  mkSearch (fromRight $ parse filter) [] 3 12 `shouldBe` exp
+  mkSearch (Just $ fromRight $ parse filter) [] [] 3 12 `shouldBe` exp
 
 fromRight :: Either a b -> b
 fromRight (Right x) = x
@@ -37,6 +37,48 @@ cases =
              Term
              { termField = "title"
              , termValue = "haskell"
+             }
+             Nothing)
+      , filterBody = Nothing
+      , sortBody = Nothing
+      , aggBody = Nothing
+      , highlight = Nothing
+      , trackSortScores = False
+      , from = From 3
+      , size = Size 12
+      , searchType = SearchTypeDfsQueryThenFetch
+      , fields = Nothing
+      , source = Nothing
+      })
+  , ( "read eq true"
+    , Search
+      { queryBody =
+        Just
+          (TermQuery
+             Term
+             { termField = "read"
+             , termValue = "true"
+             }
+             Nothing)
+      , filterBody = Nothing
+      , sortBody = Nothing
+      , aggBody = Nothing
+      , highlight = Nothing
+      , trackSortScores = False
+      , from = From 3
+      , size = Size 12
+      , searchType = SearchTypeDfsQueryThenFetch
+      , fields = Nothing
+      , source = Nothing
+      })
+  , ( "read eq false"
+    , Search
+      { queryBody =
+        Just
+          (TermQuery
+             Term
+             { termField = "read"
+             , termValue = "false"
              }
              Nothing)
       , filterBody = Nothing

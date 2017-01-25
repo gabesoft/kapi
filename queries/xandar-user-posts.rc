@@ -21,6 +21,11 @@ GET http://:host/:path
 GET http://:host/:path?where=(post.title contains 'monad')
 
 #
+# Find all unread
+#
+GET http://:host/:path?where=(read eq 'false')&per_page=3
+
+#
 # Find by title partial result (TODO: fix)
 #
 GET http://:host/:path?where=(post.title contains 'monad')&include=post.title
