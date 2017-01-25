@@ -29,6 +29,9 @@ main =
        verifyExclude rec1 excludeRes1 ["email", "y"]
      it "can exclude nested fields" $
        verifyExclude rec3 excludeRes2 ["email", "nested.guid", "nested.none"]
+     -- include
+     it "can include simple fields" $ verifyInclude rec1 excludeRes1 ["_id"]
+     it "can include nested fields" $ verifyInclude rec3 excludeRes2 ["_id", "nested._id", "nested.name"]
      -- get
      it "can get simple fields - existing" $
        verifyGetField rec1 "y" (Just $ mkStrField "y" "2")
@@ -126,6 +129,9 @@ verifyReplace labels r1 r2 exp = replaceRecords labels r1 r2 `shouldBe` exp
 
 verifyExclude :: Record -> Record -> [Label] -> Expectation
 verifyExclude r exp labels = excludeFields labels r `shouldBe` exp
+
+verifyInclude :: Record -> Record -> [Label] -> Expectation
+verifyInclude r exp labels = includeFields labels r `shouldBe` exp
 
 verifyGetField :: Record -> Label -> Maybe Field -> Expectation
 verifyGetField r name exp = getField name r `shouldBe` exp

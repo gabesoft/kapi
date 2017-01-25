@@ -16,14 +16,19 @@
 GET http://:host/:path
 
 #
-# Find by title
+# Find by post title
 #
 GET http://:host/:path?where=(post.title contains 'monad')
 
 #
 # Find all unread
 #
-GET http://:host/:path?where=(read eq 'false')&per_page=3
+GET http://:host/:path?where=(read eq false)&per_page=3&page=1&include=post.title
+
+#
+# Find by feed title
+#
+GET http://:host/:path?where=(post.title contains 'activity')&per_page=3&page=1
 
 #
 # Find by title partial result (TODO: fix)

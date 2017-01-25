@@ -50,6 +50,7 @@ getMultiple include query sort page perPage = do
             paginate (fromMaybe 1 page) (fromMaybe perPageDefault perPage) count
       let start = paginationStart pagination
       let limit = paginationLimit pagination
+      -- TODO don't include the `include fields` in search and clean up results using `includeFields`
       let search = fromRight $ prepareSearch query sort include start limit
       results <- liftIO $ searchDocuments server index mappingName search
       -- TODO use the error status below

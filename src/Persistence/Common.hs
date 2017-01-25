@@ -9,7 +9,7 @@ import Control.Monad.IO.Class
 import Data.Aeson as AESON
 import Data.Bson as BSON
 import Data.Digest.Pure.SHA
-import Data.List (find, findIndex, foldl, nub)
+import Data.List (find, findIndex, foldl, nub, (\\))
 import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.Text (Text)
@@ -309,6 +309,11 @@ excludeFields labels (Record d) =
     removeNested f@(k := v) names
       | valIsDoc v = k := recToDoc (excludeFields names (docToRec k f))
       | otherwise = k := v
+
+-- ^
+-- Include only the specified fields in a record
+includeFields :: [Label] -> Record -> Record
+includeFields labels record = excludeFields (getLabels' record \\ labels) record
 
 -- ^
 -- Extract the field names from a record

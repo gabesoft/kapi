@@ -179,3 +179,42 @@ GET http://:host/:index1/_search
     }
   }
 }
+
+#
+# Perform a search with partial result
+#
+GET http://:host/:index1/_search
+{
+  "size": 10,
+  "from": 0,
+  "query": {
+    "term": {
+      "post.title": {
+        "value": "monad"
+      }
+    }
+  },
+  "track_scores": false,
+  "fields": [
+    "post.title",
+    "post.guid"
+  ]
+}
+
+#
+# Perform a search with partial result 2
+#
+GET http://:host/:index1/_search
+{
+  "size": 10,
+  "from": 0,
+  "query": {
+    "term": {
+      "title": {
+        "value": "activity"
+      }
+    }
+  },
+  "track_scores": false,
+  "fields": [ "title" ]
+}
