@@ -272,7 +272,7 @@ failedToApiError (WriteFailure _ msg) = ApiError (LBS.pack msg) status400
 failedToApiError err = ApiError (LBS.pack (show err)) status500
 
 -- ^
--- Convert an @ApiError@ into a @ServantErr@ and throw
+-- Convert an 'ApiError' into a 'ServantErr' and throw
 throwApiError
   :: MonadError ServantErr m
   => ApiError -> m a

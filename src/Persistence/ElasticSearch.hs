@@ -155,6 +155,7 @@ getByIds server index mappingName ids =
 
 -- ^
 -- Return the number of documents matching a query
+countDocuments :: Text -> Text -> Text -> Search -> IO Int
 countDocuments server index mappingName search = do
   res <- searchDocuments server index mappingName search'
   return $ either (const 0) (B.hitsTotal . searchHits) res
@@ -188,13 +189,26 @@ mkIdsSearch mappingName ids = B.mkSearch (Just query) Nothing
 
 -- ^
 -- Create a search object
-mkSearch :: FilterExpr -> [Text] -> RecordStart -> ResultLimit -> Search
-mkSearch expr sort = mkSearch' query Nothing sort'
+mkSearch :: Maybe FilterExpr -> [Text] -> [Text] -> RecordStart -> ResultLimit -> Search
+mkSearch expr sort fields' = mkSearch' query Nothing sort' (FieldName <$> fields')
   where
-    query = exprToQuery expr
-    sort' = toMaybe $ exprToSort <$> catMaybes (mkSortExpr <$> sort)
-    toMaybe [] = Nothing
-    toMaybe xs = Just xs
+    query = exprToQuery =<< expr
+    sort' = mToMaybe $ exprToSort <$> catMaybes (mkSortExpr <$> sort)
+
+mkSearch' :: Maybe Query -> Maybe Filter -> Maybe Sort -> [FieldName] -> Int -> Int -> Search
+mkSearch' query filter' sort fields' start limit =
+  Search
+    query
+    filter'
+    sort
+    Nothing
+    Nothing
+    False
+    (From start)
+    (Size limit)
+    SearchTypeDfsQueryThenFetch
+    (mToMaybe fields')
+    Nothing
 
 exprToQuery :: FilterExpr -> Maybe Query
 exprToQuery = toQuery
@@ -289,21 +303,6 @@ exprToSort (SortExpr n SortAscending) =
 exprToSort (SortExpr n SortDescending) =
   DefaultSortSpec $ B.mkSort (FieldName n) Descending
 
-mkSearch' :: Maybe Query -> Maybe Filter -> Maybe Sort -> Int -> Int -> Search
-mkSearch' query filter' sort start limit =
-  Search
-    query
-    filter'
-    sort
-    Nothing
-    Nothing
-    False
-    (From start)
-    (Size limit)
-    SearchTypeDfsQueryThenFetch
-    Nothing
-    Nothing
-
 withBH :: Text -> BH IO Reply -> IO (Either EsError Text)
 withBH server action = do
   reply <- B.withBH defaultManagerSettings (Server server) action
@@ -335,3 +334,8 @@ termToText (TermBool t) = anyToText t
 termToText (TermDate t) = anyToText t
 termToText TermNull = "null"
 termToText t = error $ "cannot convert term " ++ show t ++ "to text"
+
+mToMaybe :: (Eq a, Monoid a) => a -> Maybe a
+mToMaybe a
+  | a == mempty = Nothing
+  | otherwise = Just a

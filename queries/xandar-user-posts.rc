@@ -16,6 +16,17 @@
 GET http://:host/:path
 
 #
+# Find by title
+#
+GET http://:host/:path?where=(post.title contains 'monad')
+
+#
+# Find by title partial result (TODO: fix)
+#
+GET http://:host/:path?where=(post.title contains 'monad')&include=post.title
+
+#
 # Get a single post
 #
 GET http://:host/:path/1
+

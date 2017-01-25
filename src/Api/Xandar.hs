@@ -8,30 +8,35 @@
 -- |
 -- Declaration for all endpoints used by the Xandar app
 module Api.Xandar
-  ( XandarUserApi
-  , XandarPostApi
-  , XandarFeedApi
-  , XandarSubscriptionApi
-  , XandarApiPath
-  , XandarApi
-  , UserApiPath
+  ( ApiGetMultipleLink
   , GetMultiple
   , GetSingle
-  , ApiGetMultipleLink
-  , appName
-  , apiProxy
-  , apiUserProxy
+  , UserApiPath
+  , XandarApi
+  , XandarApiPath
+  , XandarFeedApi
+  , XandarPostApi
+  , XandarSubscriptionApi
+  , XandarUserApi
+  , XandarUserPostApi
   , apiFeedProxy
   , apiPostProxy
+  , apiProxy
   , apiSubscriptionProxy
-  , mkUserGetSingleLink
-  , mkUserGetMultipleLink
-  , mkFeedGetSingleLink
+  , apiUserPostProxy
+  , apiUserProxy
+  , appName
   , mkFeedGetMultipleLink
-  , mkPostGetSingleLink
+  , mkFeedGetSingleLink
   , mkPostGetMultipleLink
-  , mkSubscriptionGetSingleLink
+  , mkPostGetSingleLink
   , mkSubscriptionGetMultipleLink
+  , mkSubscriptionGetSingleLink
+  , mkUserGetMultipleLink
+  , mkUserGetSingleLink
+  , mkUserPostGetMultipleLink
+  , mkUserPostGetSingleLink
+  , perPageDefault
   ) where
 
 import Api.Common
@@ -41,6 +46,9 @@ import Types.Common
 
 appName :: AppName
 appName = "xandar"
+
+perPageDefault :: Int
+perPageDefault = 50
 
 type XandarApiPath = "xandar"
 
@@ -80,6 +88,9 @@ apiFeedProxy = Proxy :: Proxy XandarFeedApi
 apiPostProxy :: Proxy XandarPostApi
 apiPostProxy = Proxy :: Proxy XandarPostApi
 
+apiUserPostProxy :: Proxy XandarUserPostApi
+apiUserPostProxy = Proxy :: Proxy XandarUserPostApi
+
 apiSubscriptionProxy :: Proxy XandarSubscriptionApi
 apiSubscriptionProxy = Proxy :: Proxy XandarSubscriptionApi
 
@@ -97,6 +108,11 @@ apiPostProxyGetSingle
   :: Proxy (XandarApiPath :> (PostApiPath :> GetSingle))
 apiPostProxyGetSingle =
   Proxy :: Proxy (XandarApiPath :> PostApiPath :> GetSingle)
+
+apiUserPostProxyGetSingle
+  :: Proxy (XandarApiPath :> (UserPostApiPath :> GetSingle))
+apiUserPostProxyGetSingle =
+  Proxy :: Proxy (XandarApiPath :> UserPostApiPath :> GetSingle)
 
 apiSubscriptionProxyGetSingle
   :: Proxy (XandarApiPath :> (SubscriptionApiPath :> GetSingle))
@@ -118,6 +134,11 @@ apiPostProxyGetMultiple
 apiPostProxyGetMultiple =
   Proxy :: Proxy (XandarApiPath :> PostApiPath :> GetMultiple)
 
+apiUserPostProxyGetMultiple
+  :: Proxy (XandarApiPath :> (UserPostApiPath :> GetMultiple))
+apiUserPostProxyGetMultiple =
+  Proxy :: Proxy (XandarApiPath :> UserPostApiPath :> GetMultiple)
+
 apiSubscriptionProxyGetMultiple
   :: Proxy (XandarApiPath :> (SubscriptionApiPath :> GetMultiple))
 apiSubscriptionProxyGetMultiple =
@@ -132,6 +153,9 @@ mkFeedGetSingleLink = mkLink1 apiFeedProxy apiFeedProxyGetSingle
 mkPostGetSingleLink :: Text -> String
 mkPostGetSingleLink = mkLink1 apiPostProxy apiPostProxyGetSingle
 
+mkUserPostGetSingleLink :: Text -> String
+mkUserPostGetSingleLink = mkLink1 apiUserPostProxy apiUserPostProxyGetSingle
+
 mkSubscriptionGetSingleLink :: Text -> String
 mkSubscriptionGetSingleLink = mkLink1 apiSubscriptionProxy apiSubscriptionProxyGetSingle
 
@@ -143,6 +167,9 @@ mkFeedGetMultipleLink = mkLink5 apiFeedProxy apiFeedProxyGetMultiple
 
 mkPostGetMultipleLink :: ApiGetMultipleLink
 mkPostGetMultipleLink = mkLink5 apiPostProxy apiPostProxyGetMultiple
+
+mkUserPostGetMultipleLink :: ApiGetMultipleLink
+mkUserPostGetMultipleLink = mkLink5 apiUserPostProxy apiUserPostProxyGetMultiple
 
 mkSubscriptionGetMultipleLink :: ApiGetMultipleLink
 mkSubscriptionGetMultipleLink = mkLink5 apiSubscriptionProxy apiSubscriptionProxyGetMultiple
