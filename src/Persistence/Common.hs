@@ -311,7 +311,7 @@ excludeFields labels (Record d) =
       | otherwise = k := v
 
 -- ^
--- Include only the specified fields in a record
+-- Include only the specified fields and the id in a record
 includeFields :: [Label] -> Record -> Record
 includeFields [] record = record
 includeFields labels record = excludeFields (getLabels' record \\ include) record

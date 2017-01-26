@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
--- | Common mocks
+-- ^
+-- Common mocks
 module Mocks.Common where
 
 import Data.Bson
@@ -9,7 +10,8 @@ import Persistence.Common
 import TestHelper
 import Types.Common
 
--- | definitions
+-- ^
+-- definitions
 def1 :: RecordDefinition
 def1 =
   RecordDefinition mempty $
@@ -29,7 +31,8 @@ def2 =
     , mkReqDef' "name"
     ]
 
--- | Records
+-- ^
+-- Records
 rec1 :: Record
 rec1 =
   Record
@@ -135,7 +138,8 @@ rec11 =
   where
     f = mkStrField
 
--- | Delete field results
+-- ^
+-- Delete field results
 delRes1 :: Record
 delRes1 =
   Record [mkStrField "_id" "584e58195984185eb8000005", mkStrField "y" "2"]
@@ -193,7 +197,8 @@ delRes6 =
       ]
     ]
 
--- | Exclude fields results
+-- ^
+-- Exclude fields results
 excludeRes1 :: Record
 excludeRes1 = Record [mkStrField "_id" "584e58195984185eb8000005"]
 
@@ -204,7 +209,17 @@ excludeRes2 =
     , "nested" =: [mkStrField "_id" "1234", mkStrField "name" "Alfred"]
     ]
 
--- | Merge records results
+-- ^
+-- Include field results
+includeRes1 :: Record
+includeRes1 =
+  Record
+    [ mkStrField "_id" "584e58195984185eb8000008"
+    , "nested" =: [mkStrField "guid" "a01c793c-58d2-49d6-aba9-4012e8d6ace5"]
+    ]
+
+-- ^
+-- Merge records results
 mergeRes1 :: Record
 mergeRes1 =
   Record
@@ -227,7 +242,8 @@ mergeRes2 =
       ]
     ]
 
--- | Pagination results
+-- ^
+-- Pagination results
 pgeRes1 =
   Pagination
   { paginationTotal = 15
@@ -241,7 +257,8 @@ pgeRes1 =
   , paginationLimit = 3
   }
 
--- | Populate defaults results
+-- ^
+-- Populate defaults results
 popRes1 =
   Record
     [ mkStrField "_id" "31889d94-dada-481d-a7d8-0b5e48ee54f3"
@@ -250,7 +267,8 @@ popRes1 =
     , mkBoolField "disabled" False
     ]
 
--- | Replace results
+-- ^
+-- Replace results
 replaceRes1 :: Record
 replaceRes1 =
   Record
@@ -265,7 +283,8 @@ replaceRes1 =
   where
     f = mkStrField
 
--- | Set field results
+-- ^
+-- Set field results
 setRes1 :: Record
 setRes1 =
   Record
@@ -325,7 +344,8 @@ setRes6 =
       ]
     ]
 
--- | Validate results
+-- ^
+-- Validate results
 valRes1 :: ValidationResult
 valRes1 =
   ValidationErrors
