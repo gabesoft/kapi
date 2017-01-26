@@ -9,7 +9,7 @@ import Control.Monad.IO.Class
 import Data.Aeson as AESON
 import Data.Bson as BSON
 import Data.Digest.Pure.SHA
-import Data.List (find, findIndex, foldl, nub, (\\))
+import Data.List (find, findIndex, foldl, inits, nub, (\\))
 import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.Text (Text)
@@ -313,7 +313,13 @@ excludeFields labels (Record d) =
 -- ^
 -- Include only the specified fields in a record
 includeFields :: [Label] -> Record -> Record
-includeFields labels record = excludeFields (getLabels' record \\ labels) record
+includeFields [] record = record
+includeFields labels record = excludeFields (getLabels' record \\ include) record
+  where
+    sep = "."
+    split = filter (not . null) . inits . T.splitOn sep
+    addPrefixes xs acc = acc ++ (T.intercalate sep <$> split xs)
+    include = [idLabel] ++ foldr addPrefixes [] labels
 
 -- ^
 -- Extract the field names from a record

@@ -42,7 +42,7 @@ getMultiple include query sort page perPage = do
   conf <- ask
   let server = esServer conf
   let index = esIndex conf
-  case prepareSearch query sort include 0 0 of
+  case prepareSearch query sort' include 0 0 of
     Left err -> throwApiError $ ApiError (LBS.pack err) status400
     Right countSearch -> do
       count <- liftIO $ countDocuments server index mappingName countSearch
@@ -50,15 +50,12 @@ getMultiple include query sort page perPage = do
             paginate (fromMaybe 1 page) (fromMaybe perPageDefault perPage) count
       let start = paginationStart pagination
       let limit = paginationLimit pagination
-      -- TODO don't include the `include fields` in search and clean up results using `includeFields`
-      let search = fromRight $ prepareSearch query sort include start limit
+      let search = fromRight $ prepareSearch query sort' [] start limit
       results <- liftIO $ searchDocuments server index mappingName search
-      -- TODO use the error status below
       case results of
-        Left err ->
-          throwApiError $ ApiError (LBS.pack . T.unpack $ B.errorMessage err) status500
+        Left err -> throwEsError err
         Right res -> do
-          let (records, total) = extractRecords res
+          let (records, total) = extractRecords include' res
           return $
             addHeader (show $ paginationPage pagination) $
             addHeader (show $ paginationTotal pagination) $
@@ -66,8 +63,11 @@ getMultiple include query sort page perPage = do
             addHeader (show $ paginationSize pagination) $
             addHeader (intercalate "," $ mkPaginationLinks pagination) records
   where
+    mkFields input = concat (T.splitOn "," <$> input)
+    include' = mkFields include
+    sort' = mkFields sort
     getLink = mkUserPostGetMultipleLink
-    mkUrl page' = getLink include query sort (Just page') perPage
+    mkUrl page' = getLink include query sort' (Just page') perPage
     mkPaginationLinks pagination =
       uncurry mkRelLink . second mkUrl <$>
       [ ("next", paginationNext pagination)
@@ -75,6 +75,11 @@ getMultiple include query sort page perPage = do
       , ("first", paginationFirst pagination)
       , ("prev", paginationPrev pagination)
       ]
+
+-- TODO use the es error status below
+throwEsError :: MonadError ServantErr m => B.EsError -> m a
+throwEsError err =
+  throwApiError $ ApiError (LBS.pack . T.unpack $ B.errorMessage err) status500
 
 -- ^
 -- Create a link element
@@ -124,16 +129,20 @@ getSingle etag uid = do
   case record of
     Left err -> throwError err500
     Right res ->
-      case extractRecords res of
+      case extractRecords [] res of
         ([], _) -> throwError err404
         (r:_, _) -> return $ addHeader (recToSha r) r
 
-extractRecords :: SearchResult Record -> ([Record], Int)
-extractRecords input = (concat $ getRecord <$> hits, B.hitsTotal result)
+extractRecords :: [Text] -> SearchResult Record -> ([Record], Int)
+extractRecords fields input =
+  (includeFields fields <$> records, B.hitsTotal result)
   where
     result = B.searchHits input
     hits = B.hits result
-    getRecord = catMaybes . (: []) . B.hitSource
+    getRecord = catMaybes . (: []) . getRecord'
+    getRecord' hit = setValue idLabel (getId $ B.hitDocId hit) <$> B.hitSource hit
+    getId (B.DocId docId) = docId
+    records = concat (getRecord <$> hits)
 
 -- ^
 -- Delete a single record

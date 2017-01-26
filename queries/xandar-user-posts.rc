@@ -18,12 +18,12 @@ GET http://:host/:path
 #
 # Find by post title
 #
-GET http://:host/:path?where=(post.title contains 'monad')
+GET http://:host/:path?where=(post.title contains 'monad')&per_page=2
 
 #
 # Find all unread
 #
-GET http://:host/:path?where=(read eq false)&per_page=3&page=1&include=post.title
+GET http://:host/:path?where=(read eq false)&per_page=3&page=1&include=title,post.title,post.guid,createdAt&sort=post.title
 
 #
 # Find by feed title
