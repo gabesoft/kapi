@@ -67,7 +67,6 @@ getMultiple include query sortFields page perPage = do
     getLink = mkUserPostGetMultipleLink
     mkUrl page' = getLink include query sortFields (Just page') perPage
 
-
 -- ^
 -- Helper for `getMultiple`
 getMultiple'
@@ -85,80 +84,20 @@ getMultiple' include query sortFields page perPage = do
   results <- runEs . searchDocuments $ search
   return (extractRecords include' results, pagination)
   where
-    getCountSearch = toResult $ prepareSearch include' query sort' 0 0
-    getSearch start = toResult . prepareSearch [] query sort' start
+    getCountSearch = ExceptT . return $ prepareSearch include' query sort' 0 0
+    getSearch start = ExceptT . return . prepareSearch [] query sort' start
     mkFields = splitFields Just
-    toResult = ExceptT . return . first (mkApiError status400)
     include' = mkFields include
     sort' = mkFields sortFields
 
 -- ^
--- Run an elastic-search action
-runEs
-  :: (MonadReader ApiConfig m, MonadIO m)
-  => (Text -> Text -> Text -> IO (Either EsError b)) -> ExceptT ApiError m b
-runEs action = do
-  conf <- ask
-  let server = esServer conf
-  let index = esIndex conf
-  results <- liftIO $ action server index mappingName
-  ExceptT (return $ first esToApiError results)
-
--- ^
--- Make a 'Search' object from query string parameters
-prepareSearch
-  :: [Text]
-  -> Maybe Text
-  -> [Text]
-  -> RecordStart
-  -> ResultLimit
-  -> Either String Search
-prepareSearch include query sortFields start limit = toSearch <$> expr
-  where
-    expr = sequence $ first ("Invalid query: " ++) . parse <$> query
-    toSearch e = mkSearch e sortFields include start limit
-
--- ^
--- Convert an 'EsError' error into an 'ApiError'
-esToApiError :: EsError -> ApiError
-esToApiError err =
-  ApiError
-    (LBS.pack . T.unpack $ B.errorMessage err)
-    (intToStatus $ B.errorStatus err)
-
--- ^
--- Convert an 'Int' to an HTTP 'Status'
-intToStatus :: Int -> Status
-intToStatus 400 = status400
-intToStatus 403 = status403
-intToStatus 404 = status404
-intToStatus 500 = status500
-intToStatus code = error $ "unknown status code " ++ show code
-
--- ^
--- Extract a 'Record' from a 'SearchResult'
-extractRecord :: SearchResult Record -> Maybe Record
-extractRecord results =
-  case extractRecords [] results of
-    [] -> Nothing
-    x:_ -> Just x
-
--- ^
--- Extract all 'Record's from a 'SearchResult'
-extractRecords :: [Text] -> SearchResult Record -> [Record]
-extractRecords fields input = includeFields fields <$> records
-  where
-    result = B.searchHits input
-    hits = B.hits result
-    getRecord = catMaybes . (: []) . getRecord'
-    getRecord' hit = setValue idLabel (getId $ B.hitDocId hit) <$> B.hitSource hit
-    getId (B.DocId docId) = docId
-    records = concat (getRecord <$> hits)
-
--- ^
 -- Delete a single record
 deleteSingle :: Text -> Api NoContent
-deleteSingle uid = undefined
+deleteSingle uid = verify >> runExceptT delete >>= respond
+  where
+    verify = getSingle mempty uid
+    delete = runEs $ deleteDocument uid
+    respond = either throwApiError (const $ return NoContent)
 
 -- ^
 -- Create one or more records
@@ -222,3 +161,68 @@ optionsSingle _ = undefined
 -- Handle an options request for a multiple record endpoint
 optionsMultiple :: Api (Headers '[Header "Access-Control-Allow-Methods" String] NoContent)
 optionsMultiple = undefined
+
+-- ^
+-- Run an elastic-search action
+runEs
+  :: (MonadReader ApiConfig m, MonadIO m)
+  => (Text -> Text -> Text -> IO (Either EsError b)) -> ExceptT ApiError m b
+runEs action = do
+  conf <- ask
+  let server = esServer conf
+  let index = esIndex conf
+  results <- liftIO $ action server index mappingName
+  ExceptT (return $ first esToApiError results)
+
+-- ^
+-- Make a 'Search' object from query string parameters
+prepareSearch
+  :: [Text]
+  -> Maybe Text
+  -> [Text]
+  -> RecordStart
+  -> ResultLimit
+  -> Either ApiError Search
+prepareSearch include query sortFields start limit = expr >>= toSearch
+  where
+    expr :: Either ApiError (Maybe FilterExpr)
+    expr = sequence $ first toErr . parse <$> query
+    toSearch e = first esToApiError $ mkSearch e sortFields include start limit
+    toErr msg = mkApiError status400 ("Invalid query: " ++ msg)
+
+-- ^
+-- Convert an 'EsError' error into an 'ApiError'
+esToApiError :: EsError -> ApiError
+esToApiError err =
+  ApiError
+    (LBS.pack . T.unpack $ B.errorMessage err)
+    (intToStatus $ B.errorStatus err)
+
+-- ^
+-- Convert an 'Int' to an HTTP 'Status'
+intToStatus :: Int -> Status
+intToStatus 400 = status400
+intToStatus 403 = status403
+intToStatus 404 = status404
+intToStatus 500 = status500
+intToStatus code = error $ "unknown status code " ++ show code
+
+-- ^
+-- Extract a 'Record' from a 'SearchResult'
+extractRecord :: SearchResult Record -> Maybe Record
+extractRecord results =
+  case extractRecords [] results of
+    [] -> Nothing
+    x:_ -> Just x
+
+-- ^
+-- Extract all 'Record's from a 'SearchResult'
+extractRecords :: [Text] -> SearchResult Record -> [Record]
+extractRecords fields input = includeFields fields <$> records
+  where
+    result = B.searchHits input
+    hits = B.hits result
+    getRecord = catMaybes . (: []) . getRecord'
+    getRecord' hit = setValue idLabel (getId $ B.hitDocId hit) <$> B.hitSource hit
+    getId (B.DocId docId) = docId
+    records = concat (getRecord <$> hits)

@@ -21,6 +21,21 @@ GET http://:host/:path?sort=post.link&include=post.link,post.title,title
 GET http://:host/:path?where=(post.title contains 'monad')&per_page=2
 
 #
+# Find by post tags
+#
+GET http://:host/:path?where=(tags in ['haskell','emacs'])&per_page=20&include=tags,post.title,title
+
+#
+# Find with invalid query 1
+#
+GET http://:host/:path?where=(tags eq ['haskell','emacs'])
+
+#
+# Find with invalid query 1
+#
+GET http://:host/:path?where=(tags in 123)
+
+#
 # Find all unread
 #
 GET http://:host/:path?where=(read eq false)&per_page=5&page=1&include=title,post.title,post.guid,createdAt&sort=-createdAt
@@ -40,3 +55,7 @@ GET http://:host/:path?where=(post.title contains 'monad')&include=post.title
 #
 GET http://:host/:path/1
 
+#
+# Delete a single post
+#
+DELETE http://:host/:path/57f422da966d70b95f5e5228-56d7e0c2c788cb1d6eb93217

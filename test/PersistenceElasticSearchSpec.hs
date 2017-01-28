@@ -2,9 +2,7 @@
 
 -- ^
 -- Tests for Persistence.ElasticSearch
-module Main
-  ( main
-  ) where
+module Main (main) where
 
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.Text as T
@@ -23,7 +21,7 @@ runCase c = it (T.unpack $ fst c) (verifySearch c)
 
 verifySearch :: (T.Text, Search) -> Expectation
 verifySearch (filter, exp) =
-  mkSearch (Just $ fromRight $ parse filter) [] [] 3 12 `shouldBe` exp
+  mkSearch (Just $ fromRight $ parse filter) [] [] 3 12 `shouldBe` Right exp
 
 fromRight :: Either a b -> b
 fromRight (Right x) = x

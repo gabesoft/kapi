@@ -19,6 +19,8 @@ module Persistence.ElasticSearch
   , searchDocuments
   ) where
 
+import Control.Applicative
+import Control.Monad (join)
 import Data.Aeson (ToJSON)
 import qualified Data.Aeson as A
 import Data.Bifunctor
@@ -86,7 +88,7 @@ putMappingFromFile file server index mappingName = do
     Just o -> putMapping o server index mappingName
     Nothing ->
       return $
-      Left (EsError 400 $ T.pack $ "File " ++ file ++ " contains invalid json")
+      Left (mkEsError 400 $ "File " ++ file ++ " contains invalid json")
 
 -- ^
 -- Index a document
@@ -151,8 +153,13 @@ searchDocuments search server index mappingName = do
     withBH server $ B.searchByType (IndexName index) (MappingName mappingName) search
   return $ body >>= toResult
   where
-    toErr msg = EsError 500 (T.pack $ "Failed to decode search results " ++ msg)
+    toErr msg = mkEsError 500 ("Failed to decode search results " ++ msg)
     toResult body = first toErr (A.eitherDecode $ textToBytes body)
+
+-- ^
+-- Create an 'EsError' with the given HTTP code and message
+mkEsError :: Int -> String -> EsError
+mkEsError code = EsError code . T.pack
 
 -- ^
 -- Create a search object for finding records by id
@@ -163,11 +170,13 @@ mkIdsSearch mappingName ids = B.mkSearch (Just query) Nothing
 
 -- ^
 -- Create a search object
-mkSearch :: Maybe FilterExpr -> [Text] -> [Text] -> RecordStart -> ResultLimit -> Search
-mkSearch expr sort fields' = mkSearch' query Nothing sort' (FieldName <$> fields')
+mkSearch :: Maybe FilterExpr -> [Text] -> [Text] -> RecordStart -> ResultLimit -> Either EsError Search
+mkSearch expr sort fields' start limit = first mkError $ liftA search query
   where
-    query = exprToQuery =<< expr
+    query = join <$> sequence (exprToQuery <$> expr)
     sort' = mToMaybe $ exprToSort <$> catMaybes (mkSortExpr <$> sort)
+    search q = mkSearch' q Nothing sort' (FieldName <$> fields') start limit
+    mkError = mkEsError 400
 
 mkSearch' :: Maybe Query -> Maybe Filter -> Maybe Sort -> [FieldName] -> Int -> Int -> Search
 mkSearch' query filter' sort fields' start limit =
@@ -184,7 +193,7 @@ mkSearch' query filter' sort fields' start limit =
     (mToMaybe fields')
     Nothing
 
-exprToQuery :: FilterExpr -> Maybe Query
+exprToQuery :: FilterExpr -> Either String (Maybe Query)
 exprToQuery = toQuery
   where
     toQuery (FilterRelOp Equal col val) = mkEqQuery col val
@@ -204,41 +213,45 @@ exprToQuery = toQuery
     mkBoost 1 = Nothing
     mkBoost n = Just $ Boost n
     mkBoost' n = fromMaybe (Boost 1) (mkBoost n)
-    mkNotQuery q = QueryBoolQuery $ B.mkBoolQuery [] [q] []
+    mkNotQuery = liftA (\q -> QueryBoolQuery $ B.mkBoolQuery [] [q] [])
     mkCompositeQuery mkQuery (Just q1) (Just q2) =
       Just . QueryBoolQuery $ mkQuery q1 q2
     mkCompositeQuery _ (Just q1) _ = Just q1
     mkCompositeQuery _ _ (Just q2) = Just q2
     mkCompositeQuery _ _ _ = Nothing
-    mkAndQuery = mkCompositeQuery (\q1 q2 -> B.mkBoolQuery [q1, q2] [] [])
-    mkOrQuery = mkCompositeQuery (\q1 q2 -> B.mkBoolQuery [] [] [q1, q2])
+    compose = liftA2 . mkCompositeQuery
+    mkAndQuery = compose (\q1 q2 -> B.mkBoolQuery [q1, q2] [] [])
+    mkOrQuery = compose (\q1 q2 -> B.mkBoolQuery [] [] [q1, q2])
     mkMatchQuery' (ColumnName c x) (TermStr v) =
-      Just . QueryMatchQuery $ (mkMatchQuery c v $ hasSpace v) (mkBoost x)
-    mkMatchQuery' _ t = error $ "invalid term for match query" ++ show t
-    mkInQuery _ (TermList []) = Nothing
+      Right . Just . QueryMatchQuery $
+      (mkMatchQuery c v $ hasSpace v) (mkBoost x)
+    mkMatchQuery' _ t = Left $ "Unexpected " ++ show t ++ ". Expected a string."
+    mkInQuery _ (TermList []) = Right Nothing
     mkInQuery (ColumnName c _) (TermList (y:ys)) =
-      Just $ TermsQuery c (termToText <$> y :| ys)
-    mkInQuery _ t = error $ "unexpected non-list term " ++ show t
+      Right . Just $ TermsQuery c (termToText <$> y :| ys)
+    mkInQuery _ t = Left $ "Unexpected " ++ show t ++ ". Expected a list."
     mkEqQuery (ColumnName c x) (TermInt v) =
-      Just $ TermQuery (Term c (anyToText v)) (mkBoost x)
+      Right . Just $ TermQuery (Term c (anyToText v)) (mkBoost x)
     mkEqQuery (ColumnName c x) (TermFloat v) =
-      Just $ TermQuery (Term c (anyToText v)) (mkBoost x)
+      Right . Just $ TermQuery (Term c (anyToText v)) (mkBoost x)
     mkEqQuery (ColumnName c x) (TermBool v) =
-      Just $ TermQuery (Term c (boolToText v)) (mkBoost x)
+      Right . Just $ TermQuery (Term c (boolToText v)) (mkBoost x)
     mkEqQuery (ColumnName c x) (TermStr v) =
-      Just $ TermQuery (Term c v) (mkBoost x)
+      Right . Just $ TermQuery (Term c v) (mkBoost x)
     mkEqQuery (ColumnName c x) (TermDate v) =
-      Just $ TermQuery (Term c (anyToText v)) (mkBoost x)
-    mkEqQuery _ TermNull = error "null query not supported"
-    mkEqQuery _ t = error $ "invalid term for equal " ++ show t
-    mkRangeQuery' col val op = Just . QueryRangeQuery $ mkRangeQuery col val op
+      Right . Just $ TermQuery (Term c (anyToText v)) (mkBoost x)
+    mkEqQuery _ TermNull = Left "Null query not yet supported."
+    mkEqQuery _ t = Left $ "Unexpected " ++ show t ++ ". Expected a single term."
+    mkRangeQuery' col val op = Just . QueryRangeQuery <$> mkRangeQuery col val op
     mkRangeQuery (ColumnName c x) (TermInt v) op =
+      Right $
       RangeQuery (FieldName c) (mkRangeDouble op (fromIntegral v)) (mkBoost' x)
     mkRangeQuery (ColumnName c x) (TermFloat v) op =
-      RangeQuery (FieldName c) (mkRangeDouble op v) (mkBoost' x)
+      Right $ RangeQuery (FieldName c) (mkRangeDouble op v) (mkBoost' x)
     mkRangeQuery (ColumnName c x) (TermDate v) op =
-      RangeQuery (FieldName c) (mkRangeDate op v) (mkBoost' x)
-    mkRangeQuery _ t _ = error $ "invalid term for range " ++ show t
+      Right $ RangeQuery (FieldName c) (mkRangeDate op v) (mkBoost' x)
+    mkRangeQuery _ t _ =
+      Left $ "Unexpected " ++ show t ++ ". Expected a number or date."
     hasSpace = isJust . T.find isSpace
 
 mkRangeDouble :: FilterRelationalOperator -> Double -> RangeValue
