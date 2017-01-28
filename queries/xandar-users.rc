@@ -40,6 +40,11 @@ GET http://:host/:path?where=(createdAt ge 2017-01-08T07:47:45.928Z)
 GET http://:host/:path?page=4&per_page=5
 
 #
+# Get all users - in query
+#
+GET http://:host/:path?where=(admin in [])
+
+#
 # Get a single user
 #
 GET http://:host/:path/5869ec3e59841810dc000009

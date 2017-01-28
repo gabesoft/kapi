@@ -293,11 +293,20 @@ cases =
         , source = Nothing
         })
   , ( "name in []"
-    , Left
-        (EsError
-         { errorStatus = 400
-         , errorMessage = "Unexpected empty list."
-         }))
+    , Right
+        Search
+        { queryBody = Just (IdsQuery (MappingName "") [])
+        , filterBody = Nothing
+        , sortBody = Nothing
+        , aggBody = Nothing
+        , highlight = Nothing
+        , trackSortScores = False
+        , from = From 3
+        , size = Size 12
+        , searchType = SearchTypeDfsQueryThenFetch
+        , fields = Nothing
+        , source = Nothing
+        })
   , ( "title ~contains 'haskell'"
     , Right
         Search

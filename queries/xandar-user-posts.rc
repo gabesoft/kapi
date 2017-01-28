@@ -26,14 +26,14 @@ GET http://:host/:path?where=(post.title contains 'monad')&per_page=2
 GET http://:host/:path?where=(tags in ['haskell','emacs'])&per_page=20&include=tags,post.title,title
 
 #
-# Find with invalid query 1
+# Find by empty list query
 #
-GET http://:host/:path?where=(tags eq ['haskell','emacs'])
+GET http://:host/:path?where=(tags in [])
 
 #
 # Find with invalid query 1
 #
-GET http://:host/:path?where=(tags in [])
+GET http://:host/:path?where=(tags eq ['haskell','emacs'])
 
 #
 # Find all unread

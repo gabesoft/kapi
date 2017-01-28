@@ -220,7 +220,8 @@ exprToQuery = toQuery
     mkMatchQuery' (ColumnName c x) (TermStr v) =
       Right . QueryMatchQuery $ (mkMatchQuery c v $ hasSpace v) (mkBoost x)
     mkMatchQuery' _ t = Left $ "Unexpected " ++ show t ++ ". Expected a string."
-    mkInQuery _ (TermList []) = Left "Unexpected empty list."
+    mkInQuery (ColumnName c _) (TermList []) =
+      Right $ IdsQuery (MappingName mempty) []
     mkInQuery (ColumnName c _) (TermList (y:ys)) =
       Right $ TermsQuery c (termToText <$> y :| ys)
     mkInQuery _ t = Left $ "Unexpected " ++ show t ++ ". Expected a list."

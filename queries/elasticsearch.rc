@@ -237,3 +237,52 @@ GET http://:host/:index1/_search
   "track_scores": false,
   "fields": [ "title" ]
 }
+
+#
+# Perform a search with terms query
+#
+GET http://:host/:index1/_search
+{
+  "size": 10,
+  "from": 0,
+  "query": {
+    "constant_score": {
+      "filter": {
+        "terms": {
+          "tags": [
+            "haskell",
+            "programming"
+          ]
+        }
+      }
+    }
+  },
+  "track_scores": false,
+  "fields": [
+    "post.title",
+    "post.guid"
+  ]
+}
+
+#
+# Perform a search with terms query (empty)
+#
+GET http://:host/:index1/_search
+{
+  "size": 10,
+  "from": 0,
+  "query": {
+    "constant_score": {
+      "filter": {
+        "terms": {
+          "tags": []
+        }
+      }
+    }
+  },
+  "track_scores": false,
+  "fields": [
+    "post.title",
+    "post.guid"
+  ]
+}
