@@ -33,7 +33,7 @@ GET http://:host/:path?where=(tags eq ['haskell','emacs'])
 #
 # Find with invalid query 1
 #
-GET http://:host/:path?where=(tags in 123)
+GET http://:host/:path?where=(tags in [])
 
 #
 # Find all unread

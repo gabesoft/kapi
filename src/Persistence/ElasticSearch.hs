@@ -173,7 +173,7 @@ mkIdsSearch mappingName ids = B.mkSearch (Just query) Nothing
 mkSearch :: Maybe FilterExpr -> [Text] -> [Text] -> RecordStart -> ResultLimit -> Either EsError Search
 mkSearch expr sort fields' start limit = first mkError $ liftA search query
   where
-    query = join <$> sequence (exprToQuery <$> expr)
+    query = sequence (exprToQuery <$> expr)
     sort' = mToMaybe $ exprToSort <$> catMaybes (mkSortExpr <$> sort)
     search q = mkSearch' q Nothing sort' (FieldName <$> fields') start limit
     mkError = mkEsError 400
@@ -193,18 +193,18 @@ mkSearch' query filter' sort fields' start limit =
     (mToMaybe fields')
     Nothing
 
-exprToQuery :: FilterExpr -> Either String (Maybe Query)
+exprToQuery :: FilterExpr -> Either String Query
 exprToQuery = toQuery
   where
     toQuery (FilterRelOp Equal col val) = mkEqQuery col val
     toQuery (FilterRelOp In col val) = mkInQuery col val
     toQuery (FilterRelOp Contains col val) = mkMatchQuery' col val
     toQuery (FilterRelOp NotEqual col val) =
-      mkNotQuery <$> exprToQuery (FilterRelOp Equal col val)
+      mkNotQuery $ exprToQuery (FilterRelOp Equal col val)
     toQuery (FilterRelOp NotIn col val) =
-      mkNotQuery <$> exprToQuery (FilterRelOp In col val)
+      mkNotQuery $ exprToQuery (FilterRelOp In col val)
     toQuery (FilterRelOp NotContains col val) =
-      mkNotQuery <$> exprToQuery (FilterRelOp Contains col val)
+      mkNotQuery $ exprToQuery (FilterRelOp Contains col val)
     toQuery (FilterRelOp op col val) = mkRangeQuery' col val op
     toQuery (FilterBoolOp Or e1 e2) =
       mkOrQuery (exprToQuery e1) (exprToQuery e2)
@@ -214,35 +214,30 @@ exprToQuery = toQuery
     mkBoost n = Just $ Boost n
     mkBoost' n = fromMaybe (Boost 1) (mkBoost n)
     mkNotQuery = liftA (\q -> QueryBoolQuery $ B.mkBoolQuery [] [q] [])
-    mkCompositeQuery mkQuery (Just q1) (Just q2) =
-      Just . QueryBoolQuery $ mkQuery q1 q2
-    mkCompositeQuery _ (Just q1) _ = Just q1
-    mkCompositeQuery _ _ (Just q2) = Just q2
-    mkCompositeQuery _ _ _ = Nothing
-    compose = liftA2 . mkCompositeQuery
+    mkCompositeQuery mkQuery q1 q2 = QueryBoolQuery $ mkQuery q1 q2
     mkAndQuery = compose (\q1 q2 -> B.mkBoolQuery [q1, q2] [] [])
     mkOrQuery = compose (\q1 q2 -> B.mkBoolQuery [] [] [q1, q2])
     mkMatchQuery' (ColumnName c x) (TermStr v) =
-      Right . Just . QueryMatchQuery $
-      (mkMatchQuery c v $ hasSpace v) (mkBoost x)
+      Right . QueryMatchQuery $ (mkMatchQuery c v $ hasSpace v) (mkBoost x)
     mkMatchQuery' _ t = Left $ "Unexpected " ++ show t ++ ". Expected a string."
-    mkInQuery _ (TermList []) = Right Nothing
+    mkInQuery _ (TermList []) = Left "Unexpected empty list."
     mkInQuery (ColumnName c _) (TermList (y:ys)) =
-      Right . Just $ TermsQuery c (termToText <$> y :| ys)
+      Right $ TermsQuery c (termToText <$> y :| ys)
     mkInQuery _ t = Left $ "Unexpected " ++ show t ++ ". Expected a list."
     mkEqQuery (ColumnName c x) (TermInt v) =
-      Right . Just $ TermQuery (Term c (anyToText v)) (mkBoost x)
+      Right $ TermQuery (Term c (anyToText v)) (mkBoost x)
     mkEqQuery (ColumnName c x) (TermFloat v) =
-      Right . Just $ TermQuery (Term c (anyToText v)) (mkBoost x)
+      Right $ TermQuery (Term c (anyToText v)) (mkBoost x)
     mkEqQuery (ColumnName c x) (TermBool v) =
-      Right . Just $ TermQuery (Term c (boolToText v)) (mkBoost x)
+      Right $ TermQuery (Term c (boolToText v)) (mkBoost x)
     mkEqQuery (ColumnName c x) (TermStr v) =
-      Right . Just $ TermQuery (Term c v) (mkBoost x)
+      Right $ TermQuery (Term c v) (mkBoost x)
     mkEqQuery (ColumnName c x) (TermDate v) =
-      Right . Just $ TermQuery (Term c (anyToText v)) (mkBoost x)
+      Right $ TermQuery (Term c (anyToText v)) (mkBoost x)
     mkEqQuery _ TermNull = Left "Null query not yet supported."
-    mkEqQuery _ t = Left $ "Unexpected " ++ show t ++ ". Expected a single term."
-    mkRangeQuery' col val op = Just . QueryRangeQuery <$> mkRangeQuery col val op
+    mkEqQuery _ t =
+      Left $ "Unexpected " ++ show t ++ ". Expected a single term."
+    mkRangeQuery' col val op = QueryRangeQuery <$> mkRangeQuery col val op
     mkRangeQuery (ColumnName c x) (TermInt v) op =
       Right $
       RangeQuery (FieldName c) (mkRangeDouble op (fromIntegral v)) (mkBoost' x)
@@ -253,6 +248,7 @@ exprToQuery = toQuery
     mkRangeQuery _ t _ =
       Left $ "Unexpected " ++ show t ++ ". Expected a number or date."
     hasSpace = isJust . T.find isSpace
+    compose = liftA2 . mkCompositeQuery
 
 mkRangeDouble :: FilterRelationalOperator -> Double -> RangeValue
 mkRangeDouble GreaterThan = RangeDoubleGt . B.GreaterThan
