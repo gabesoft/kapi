@@ -13,7 +13,7 @@
 #
 # Get all posts
 #
-GET http://:host/:path
+GET http://:host/:path?sort=post.link&include=post.link,post.title,title
 
 #
 # Find by post title
@@ -23,7 +23,7 @@ GET http://:host/:path?where=(post.title contains 'monad')&per_page=2
 #
 # Find all unread
 #
-GET http://:host/:path?where=(read eq false)&per_page=3&page=1&include=title,post.title,post.guid,createdAt&sort=post.title
+GET http://:host/:path?where=(read eq false)&per_page=5&page=1&include=title,post.title,post.guid,createdAt&sort=-createdAt
 
 #
 # Find by feed title
@@ -31,7 +31,7 @@ GET http://:host/:path?where=(read eq false)&per_page=3&page=1&include=title,pos
 GET http://:host/:path?where=(post.title contains 'activity')&per_page=3&page=1
 
 #
-# Find by title partial result (TODO: fix)
+# Find by title partial result
 #
 GET http://:host/:path?where=(post.title contains 'monad')&include=post.title
 

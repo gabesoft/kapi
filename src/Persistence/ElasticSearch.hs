@@ -70,37 +70,28 @@ refreshIndex server index = withBH server (B.refreshIndex $ IndexName index)
 -- Add a new type to an existing index
 putMapping
   :: ToJSON a
-  => Text -> Text -> Text -> a -> IO (Either EsError Text)
-putMapping server index mappingName mapping =
+  => a -> Text -> Text -> Text -> IO (Either EsError Text)
+putMapping mapping server index mappingName =
   withBH
     server
     (B.putMapping (IndexName index) (MappingName mappingName) mapping)
 
 -- ^
 -- Add a new type from a file to an existing index
-putMappingFromFile :: Text
-                   -> Text
-                   -> Text
-                   -> FilePath
-                   -> IO (Either EsError Text)
-putMappingFromFile server index mappingName file = do
+putMappingFromFile :: FilePath -> Text -> Text -> Text -> IO (Either EsError Text)
+putMappingFromFile file server index mappingName = do
   json <- readFile file
   let obj = A.decode (L.pack json) :: Maybe A.Object
   case obj of
-    Just o -> putMapping server index mappingName o
+    Just o -> putMapping o server index mappingName
     Nothing ->
       return $
       Left (EsError 400 $ T.pack $ "File " ++ file ++ " contains invalid json")
 
 -- ^
 -- Index a document
-indexDocument :: Text
-              -> Text
-              -> Text
-              -> Record
-              -> Text
-              -> IO (Either EsError Text)
-indexDocument server index mappingName record recordId =
+indexDocument :: Record -> Text -> Text -> Text -> Text -> IO (Either EsError Text)
+indexDocument record recordId server index mappingName =
   withBH server $
   B.indexDocument
     (IndexName index)
@@ -111,12 +102,8 @@ indexDocument server index mappingName record recordId =
 
 -- ^
 -- Index multiple documents
-indexDocuments :: Text
-               -> Text
-               -> Text
-               -> [(Record, Text)]
-               -> IO (Either EsError Text)
-indexDocuments server index mappingName items = withBH server (B.bulk stream)
+indexDocuments :: [(Record, Text)] -> Text -> Text -> Text -> IO (Either EsError Text)
+indexDocuments items server index mappingName = withBH server (B.bulk stream)
   where
     op (record, recordId) =
       BulkIndex
@@ -129,14 +116,14 @@ indexDocuments server index mappingName items = withBH server (B.bulk stream)
 -- ^
 -- Delete a document
 deleteDocument :: Text -> Text -> Text -> Text -> IO (Either EsError Text)
-deleteDocument server index mappingName recordId =
+deleteDocument recordId server index mappingName =
   withBH server $
   B.deleteDocument (IndexName index) (MappingName mappingName) (DocId recordId)
 
 -- ^
 -- Delete multiple documents
-deleteDocuments :: Text -> Text -> Text -> [Text] -> IO (Either EsError Text)
-deleteDocuments server index mappingName recordIds =
+deleteDocuments :: [Text] -> Text -> Text -> Text -> IO (Either EsError Text)
+deleteDocuments recordIds server index mappingName =
   withBH server (B.bulk stream)
   where
     op recordId =
@@ -145,34 +132,21 @@ deleteDocuments server index mappingName recordIds =
 
 -- ^
 -- Get documents by id
-getByIds :: Text
-         -> Text
-         -> Text
-         -> [Text]
-         -> IO (Either EsError (SearchResult Record))
-getByIds server index mappingName ids =
-  searchDocuments server index mappingName (mkIdsSearch mappingName ids)
+getByIds :: [Text] -> Text -> Text -> Text -> IO (Either EsError (SearchResult Record))
+getByIds ids server index mappingName =
+  searchDocuments (mkIdsSearch mappingName ids) server index mappingName
 
 -- ^
 -- Return the number of documents matching a query
-countDocuments :: Text -> Text -> Text -> Search -> IO Int
-countDocuments server index mappingName search = do
-  res <- searchDocuments server index mappingName search'
-  return $ either (const 0) (B.hitsTotal . searchHits) res
-  where
-    search' =
-      search
-      { size = Size 0
-      }
+countDocuments :: Search -> Text -> Text -> Text -> IO (Either EsError Int)
+countDocuments search server index mappingName = do
+  res <- searchDocuments (search { size = Size 0 }) server index mappingName
+  return $ B.hitsTotal . searchHits <$> res
 
 -- ^
 -- Search documents given a 'Search' object
-searchDocuments :: Text
-                -> Text
-                -> Text
-                -> Search
-                -> IO (Either EsError (SearchResult Record))
-searchDocuments server index mappingName search = do
+searchDocuments :: Search -> Text -> Text -> Text -> IO (Either EsError (SearchResult Record))
+searchDocuments search server index mappingName = do
   body <-
     withBH server $ B.searchByType (IndexName index) (MappingName mappingName) search
   return $ body >>= toResult

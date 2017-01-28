@@ -28,10 +28,7 @@ import Servant.Utils.Enter (Enter)
 import Types.Common
 
 -- ^
--- Create an application for providing CRUD functionality for a type of record
--- app
---   :: (HasServer a '[])
---   => Proxy a -> (ServerT a Api) -> ApiConfig -> Application
+-- Create an application that provides CRUD functionality for a record type
 app'
   :: (Enter a (Api :~> Handler) (ServerT api Handler), HasServer api '[])
   => Proxy api -> a -> ApiConfig -> Application
@@ -49,35 +46,19 @@ server' handlers config = enter (toHandler config) handlers
 -- Get multiple records
 getMultiple :: ApiGetMultipleLink -> RecordDefinition -> ServerT GetMultiple Api
 getMultiple getLink def include query sort page perPage = do
-  conf <- ask
-  pipe <- dbPipe conf
-  count <- dbCount (dbName conf) def pipe
-  let pagination = paginate (fromMaybe 1 page) (fromMaybe 50 perPage) count
+  count <- runDb (dbCount def)
+  let pagination = mkPagination page perPage count
   let start = paginationStart pagination
   let limit = paginationLimit pagination
   case queryToDoc (fromMaybe "" query) of
-    Left err -> throwApiError $ ApiError (LBS.pack err) status400
+    Left err -> throwApiError $ mkApiError status400 err
     Right filter' -> do
-      records <-
-        dbFind (dbName conf) def filter' sort' include' start limit pipe
-      return $
-        addHeader (show $ paginationPage pagination) $
-        addHeader (show $ paginationTotal pagination) $
-        addHeader (show $ paginationLast pagination) $
-        addHeader (show $ paginationSize pagination) $
-        addHeader (intercalate "," $ mkPaginationLinks pagination) records
+      records <- runDb $ dbFind def filter' sort' include' start limit
+      return $ mkGetMultipleResult records pagination mkUrl
   where
-    mkFields f input = catMaybes $ f <$> concat (T.splitOn "," <$> input)
-    sort' = mkFields mkSortField sort
-    include' = mkFields mkIncludeField include
+    sort' = splitFields mkSortField sort
+    include' = splitFields mkIncludeField include
     mkUrl page' = getLink include query sort (Just page') perPage
-    mkPaginationLinks pagination =
-      uncurry mkRelLink . second mkUrl <$>
-      [ ("next", paginationNext pagination)
-      , ("last", paginationLast pagination)
-      , ("first", paginationFirst pagination)
-      , ("prev", paginationPrev pagination)
-      ]
 
 -- ^
 -- Get a single record by id
@@ -96,11 +77,8 @@ getSingle def etag uid = do
 -- ^
 -- Delete a single record
 deleteSingle :: RecordDefinition -> Text -> Api NoContent
-deleteSingle def uid = do
-  _ <- getSingle' def uid
-  conf <- ask
-  pipe <- dbPipe conf
-  dbDeleteById (dbName conf) def uid pipe >> return NoContent
+deleteSingle def uid =
+  getSingle' def uid >> runDb (dbDeleteById def uid) >> return NoContent
 
 -- ^
 -- Create one or more records
@@ -167,11 +145,7 @@ headSingle def uid = do
 -- ^
 -- Handle a head request for a multiple records endpoint
 headMultiple :: RecordDefinition -> Api (Headers '[Header "X-Total-Count" String] NoContent)
-headMultiple def = do
-  conf <- ask
-  pipe <- dbPipe conf
-  count <- dbCount (dbName conf) def pipe
-  return $ addHeader (show count) NoContent
+headMultiple def = flip addHeader NoContent . show <$> runDb (dbCount def) 
 
 -- ^
 -- Handle an options request for a single record endpoint
@@ -224,37 +198,43 @@ updateSingle' def replace uid updated = do
 -- ^
 -- Insert or update a valid @record@ record according to @action@
 insertOrUpdateSingle
-  :: RecordDefinition -> (Database -> RecordDefinition -> Record -> Pipe -> Api (Either Failure RecordId))
+  :: RecordDefinition -> (RecordDefinition -> Record -> Database -> Pipe -> Api (Either Failure RecordId))
   -> Record
   -> Api ApiResult
 insertOrUpdateSingle def action record = do
-  conf <- ask
-  pipe <- dbPipe conf
-  result <- action (dbName conf) def (populateDefaults def record) pipe
+  result <- runDb $ action def (populateDefaults def record)
   case result of
     Left err -> return $ Fail (failedToApiError err)
-    Right uid -> Succ . fromJust <$> dbGetById (dbName conf) def uid pipe
+    Right uid -> Succ . fromJust <$> runDb (dbGetById def uid)
 
 -- ^
 -- Get a record by id
 getSingle' :: RecordDefinition -> Text -> Api Record
 getSingle' def uid = do
-  conf <- ask
-  pipe <- dbPipe conf
-  record <- dbGetById (dbName conf) def uid pipe
+  record <- runDb (dbGetById def uid)
   maybe (throwError err404) return record
-
--- ^
--- Get the configured database name for this app
-dbName :: ApiConfig -> Database
-dbName = confGetDb appName
 
 -- ^
 -- Add database indices
 addDbIndices :: [Index] -> ApiConfig -> IO ()
 addDbIndices indices conf = do
   pipe <- dbPipe conf
-  mapM_ (flip (dbAddIndex $ dbName conf) pipe) indices
+  mapM_ (\idx -> dbAddIndex idx (dbName conf) pipe) indices
+
+-- ^
+-- Run a database action
+runDb ::
+  (MonadReader ApiConfig m, MonadIO m) =>
+  (Database -> Pipe -> m b) -> m b
+runDb action = do
+  conf <- ask
+  pipe <- dbPipe conf
+  action (dbName conf) pipe
+
+-- ^
+-- Get the configured database name for this app
+dbName :: ApiConfig -> Database
+dbName = confGetDb appName
 
 -- ^
 -- Create a MongoDB connection pipe
@@ -268,7 +248,7 @@ dbPipe conf = liftIO $ mkPipe (mongoHost conf) (mongoPort conf)
 -- TODO parse the MongoDB error object (the error is in BSON format)
 --      https://docs.mongodb.com/manual/reference/command/getLastError/
 failedToApiError :: Failure -> ApiError
-failedToApiError (WriteFailure _ msg) = ApiError (LBS.pack msg) status400
+failedToApiError (WriteFailure _ msg) = mkApiError status400 msg
 failedToApiError err = ApiError (LBS.pack (show err)) status500
 
 -- ^
@@ -282,9 +262,12 @@ throwApiError err
   | otherwise = throwError (mkErr err500 err)
   where
     mkErr sErr aErr =
-      sErr
-      { errBody = encode (Fail aErr :: ApiItem ApiError ())
-      }
+      sErr {errBody = encode (Fail aErr :: ApiItem ApiError ())}
+
+-- ^
+-- Create an 'ApiError'
+mkApiError :: Status -> String -> ApiError
+mkApiError status msg = ApiError (LBS.pack msg) status
 
 -- ^
 -- Chain two API results
@@ -292,6 +275,47 @@ chainResult
   :: Monad m
   => (Record -> m ApiResult) -> ApiResult -> m ApiResult
 chainResult = apiItem (return . Fail)
+
+-- ^
+-- Create a result for the 'getMultiple' endpoint
+mkGetMultipleResult
+  :: (AddHeader h4 String a orig3
+     ,AddHeader h3 String orig3 orig2
+     ,AddHeader h2 String orig2 orig1
+     ,AddHeader h1 String orig1 orig
+     ,AddHeader h String orig b)
+  => a -> Pagination -> (Int -> String) -> b
+mkGetMultipleResult records pagination mkUrl =
+  header paginationPage $
+  header paginationTotal $
+  header paginationLast $
+  header paginationSize $ mkLinkHeader pagination mkUrl records
+  where
+    header f = addHeader (show $ f pagination)
+
+-- ^
+-- Create a 'Pagination' object
+mkPagination :: Maybe Int -> Maybe Int -> Int -> Pagination
+mkPagination page perPage = paginate (fromMaybe 1 page) (fromMaybe perPageDefault perPage)
+
+-- ^
+-- Create a set of pagination links to be returned in the 'Link' header
+mkPaginationLinks :: Pagination -> (Int -> String) -> [String]
+mkPaginationLinks pagination mkUrl =
+  uncurry mkRelLink . second mkUrl <$>
+  [ ("next", paginationNext pagination)
+  , ("last", paginationLast pagination)
+  , ("first", paginationFirst pagination)
+  , ("prev", paginationPrev pagination)
+  ]
+
+-- ^
+-- Create a 'Link' header containing pagination links
+mkLinkHeader ::
+  AddHeader h String a b =>
+  Pagination -> (Int -> String) -> a -> b
+mkLinkHeader pagination mkUrl =
+  addHeader (intercalate "," $ mkPaginationLinks pagination mkUrl)
 
 -- ^
 -- Create a link element
@@ -307,6 +331,13 @@ mkRelLink rel link = mkLink link ++ "; rel=\"" ++ rel ++ "\""
 -- Create a link to be returned during record creation
 getCreateLink :: (Text -> String) -> Record -> String
 getCreateLink getLink = getLink . fromJust . getIdValue
+
+-- ^
+-- Split a list of comma separated fields, apply a function to each one
+-- and return the results that have a value
+splitFields ::
+  (Foldable t, Functor t) => (Text -> Maybe a) -> t Text -> [a]
+splitFields f input = catMaybes $ f <$> concat (T.splitOn "," <$> input)
 
 -- ^
 -- Validate a record given a definition

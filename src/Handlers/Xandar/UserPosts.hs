@@ -11,131 +11,142 @@ module Handlers.Xandar.UserPosts where
 import Api.Xandar
 import Control.Monad.Except
 import Control.Monad.Reader
-import Data.Aeson (encode)
 import Data.Bifunctor
 import qualified Data.ByteString.Lazy.Char8 as LBS
-import Data.Either
-import Data.List (intercalate)
 import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as T
-import Database.Bloodhound (SearchResult(..))
+import Database.Bloodhound (SearchResult(..), EsError, Search)
 import qualified Database.Bloodhound as B
+import Handlers.Xandar.Common
+       (throwApiError, mkApiError, mkPagination, splitFields,
+        mkLinkHeader, mkGetMultipleResult)
 import Network.HTTP.Types.Status
 import Parsers.Filter (parse)
 import Persistence.Common
 import Persistence.ElasticSearch
 import Servant
-import Servant.Utils.Enter (Enter)
 import Types.Common
 
+-- ^
+-- Elastic-search mapping name
 mappingName :: Text
 mappingName = "post"
 
+-- ^
+-- Elastic-search index
 esIndex :: ApiConfig -> Text
 esIndex = confGetEsIndex appName
-
--- ^
--- Get multiple records
-getMultiple :: ServerT GetMultiple Api
-getMultiple include query sort page perPage = do
-  conf <- ask
-  let server = esServer conf
-  let index = esIndex conf
-  case prepareSearch query sort' include 0 0 of
-    Left err -> throwApiError $ ApiError (LBS.pack err) status400
-    Right countSearch -> do
-      count <- liftIO $ countDocuments server index mappingName countSearch
-      let pagination =
-            paginate (fromMaybe 1 page) (fromMaybe perPageDefault perPage) count
-      let start = paginationStart pagination
-      let limit = paginationLimit pagination
-      let search = fromRight $ prepareSearch query sort' [] start limit
-      results <- liftIO $ searchDocuments server index mappingName search
-      case results of
-        Left err -> throwEsError err
-        Right res -> do
-          let (records, total) = extractRecords include' res
-          return $
-            addHeader (show $ paginationPage pagination) $
-            addHeader (show $ paginationTotal pagination) $
-            addHeader (show $ paginationLast pagination) $
-            addHeader (show $ paginationSize pagination) $
-            addHeader (intercalate "," $ mkPaginationLinks pagination) records
-  where
-    mkFields input = concat (T.splitOn "," <$> input)
-    include' = mkFields include
-    sort' = mkFields sort
-    getLink = mkUserPostGetMultipleLink
-    mkUrl page' = getLink include query sort' (Just page') perPage
-    mkPaginationLinks pagination =
-      uncurry mkRelLink . second mkUrl <$>
-      [ ("next", paginationNext pagination)
-      , ("last", paginationLast pagination)
-      , ("first", paginationFirst pagination)
-      , ("prev", paginationPrev pagination)
-      ]
-
--- TODO use the es error status below
-throwEsError :: MonadError ServantErr m => B.EsError -> m a
-throwEsError err =
-  throwApiError $ ApiError (LBS.pack . T.unpack $ B.errorMessage err) status500
-
--- ^
--- Create a link element
-mkLink :: String -> String
-mkLink link = "<" ++ link ++ ">"
-
--- ^
--- Create a relative link element
--- TODO consolidate with mkRelLink from Handlers.Common
---      also mkPaginationLinks, mkLink, and mkUrl
-mkRelLink :: String -> String -> String
-mkRelLink rel link = mkLink link ++ "; rel=\"" ++ rel ++ "\""
-
-fromRight (Right x) = x
-fromRight (Left _) = error "right expected"
-
--- prepareSearch :: Maybe Text
-prepareSearch query sort fields start limit = toSearch <$> expr
-  where
-    expr = sequence $ first ("Invalid query: " ++) . parse <$> query
-    toSearch expr = mkSearch expr sort fields start limit
-
--- ^
--- Convert an 'ApiError' into a 'ServantErr' and throw
--- TODO consolidate
-throwApiError
-  :: MonadError ServantErr m
-  => ApiError -> m a
-throwApiError err
-  | apiErrorStatus err == status400 = throwError (mkErr err400 err)
-  | apiErrorStatus err == status404 = throwError (mkErr err404 err)
-  | otherwise = throwError (mkErr err500 err)
-  where
-    mkErr sErr aErr =
-      sErr
-      { errBody = encode (Fail aErr :: ApiItem ApiError ())
-      }
 
 -- ^
 -- Get a single record by id
 getSingle :: Maybe Text -> Text -> Api (Headers '[Header "ETag" String] Record)
 getSingle etag uid = do
+  records <- runExceptT (runEs $ getByIds [uid])
+  either throwApiError respond records
+  where
+    respond res = maybe (throwError err404) success (extractRecord res)
+    checkEtag sha res tag
+      | tag == T.pack sha = throwError err304
+      | otherwise = return res
+    success record =
+      let sha = recToSha record
+          res = addHeader sha record
+      in maybe (return res) (checkEtag sha res) etag
+
+-- ^
+-- Get multiple records
+getMultiple :: ServerT GetMultiple Api
+getMultiple include query sortFields page perPage = do
+  result <- runExceptT $ getMultiple' include query sortFields page perPage
+  case result of
+    Left err -> throwApiError err
+    Right (records, pagination) ->
+      return $ mkGetMultipleResult records pagination mkUrl
+  where
+    getLink = mkUserPostGetMultipleLink
+    mkUrl page' = getLink include query sortFields (Just page') perPage
+
+
+-- ^
+-- Helper for `getMultiple`
+getMultiple'
+  :: (MonadReader ApiConfig m, MonadIO m)
+  => [Text]
+  -> Maybe Text
+  -> [Text]
+  -> Maybe Int
+  -> Maybe Int
+  -> ExceptT ApiError m ([Record], Pagination)
+getMultiple' include query sortFields page perPage = do
+  count <- runEs . countDocuments =<< getCountSearch
+  let pagination = mkPagination page perPage count
+  search <- getSearch (paginationStart pagination) (paginationLimit pagination)
+  results <- runEs . searchDocuments $ search
+  return (extractRecords include' results, pagination)
+  where
+    getCountSearch = toResult $ prepareSearch include' query sort' 0 0
+    getSearch start = toResult . prepareSearch [] query sort' start
+    mkFields = splitFields Just
+    toResult = ExceptT . return . first (mkApiError status400)
+    include' = mkFields include
+    sort' = mkFields sortFields
+
+-- ^
+-- Run an elastic-search action
+runEs
+  :: (MonadReader ApiConfig m, MonadIO m)
+  => (Text -> Text -> Text -> IO (Either EsError b)) -> ExceptT ApiError m b
+runEs action = do
   conf <- ask
   let server = esServer conf
   let index = esIndex conf
-  record <- liftIO $ getByIds server index mappingName [uid]
-  case record of
-    Left err -> throwError err500
-    Right res ->
-      case extractRecords [] res of
-        ([], _) -> throwError err404
-        (r:_, _) -> return $ addHeader (recToSha r) r
+  results <- liftIO $ action server index mappingName
+  ExceptT (return $ first esToApiError results)
 
-extractRecords :: [Text] -> SearchResult Record -> ([Record], Int)
-extractRecords fields input =
-  (includeFields fields <$> records, B.hitsTotal result)
+-- ^
+-- Make a 'Search' object from query string parameters
+prepareSearch
+  :: [Text]
+  -> Maybe Text
+  -> [Text]
+  -> RecordStart
+  -> ResultLimit
+  -> Either String Search
+prepareSearch include query sortFields start limit = toSearch <$> expr
+  where
+    expr = sequence $ first ("Invalid query: " ++) . parse <$> query
+    toSearch e = mkSearch e sortFields include start limit
+
+-- ^
+-- Convert an 'EsError' error into an 'ApiError'
+esToApiError :: EsError -> ApiError
+esToApiError err =
+  ApiError
+    (LBS.pack . T.unpack $ B.errorMessage err)
+    (intToStatus $ B.errorStatus err)
+
+-- ^
+-- Convert an 'Int' to an HTTP 'Status'
+intToStatus :: Int -> Status
+intToStatus 400 = status400
+intToStatus 403 = status403
+intToStatus 404 = status404
+intToStatus 500 = status500
+intToStatus code = error $ "unknown status code " ++ show code
+
+-- ^
+-- Extract a 'Record' from a 'SearchResult'
+extractRecord :: SearchResult Record -> Maybe Record
+extractRecord results =
+  case extractRecords [] results of
+    [] -> Nothing
+    x:_ -> Just x
+
+-- ^
+-- Extract all 'Record's from a 'SearchResult'
+extractRecords :: [Text] -> SearchResult Record -> [Record]
+extractRecords fields input = includeFields fields <$> records
   where
     result = B.searchHits input
     hits = B.hits result

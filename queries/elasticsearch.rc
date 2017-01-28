@@ -108,6 +108,25 @@ GET http://:host/:index2/_search
 }
 
 #
+# Get sorted
+#
+GET http://:host/:index2/_search
+{
+  "size": 20,
+  "from": 0,
+  "query": {
+    "match_all": {}
+  },
+  "track_scores": false,
+  "fields": ["post.title"],
+  "sort": {
+    "post.title": {
+      "order": "asc"
+    }
+  }
+}
+
+#
 # Perform a search 1
 #
 GET http://:host/:index2/_search
