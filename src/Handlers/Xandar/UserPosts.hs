@@ -19,8 +19,9 @@ import qualified Data.Text as T
 import Database.Bloodhound (SearchResult(..), EsError, Search)
 import qualified Database.Bloodhound as B
 import Handlers.Xandar.Common
-       (throwApiError, mkApiError, mkPagination, splitFields,
-        mkLinkHeader, mkGetMultipleResult, checkEtag)
+       (throwApiError, mkApiError, mkApiError400, mkPagination,
+        splitFields, mkLinkHeader, mkGetMultipleResult, checkEtag,
+        mkApiResponse, mkApiResult)
 import Network.HTTP.Types.Status
 import Parsers.Filter (parse)
 import Persistence.Common
@@ -41,9 +42,7 @@ esIndex = confGetEsIndex appName
 -- ^
 -- Get a single record by id
 getSingle :: Maybe Text -> Text -> Api (Headers '[Header "ETag" String] Record)
-getSingle etag uid = do
-  record <- runExceptT (runEs $ getByIds [uid])
-  either throwApiError respond record
+getSingle etag uid = mkApiResponse respond (runEs $ getByIds [uid])
   where
     respond res = maybe (throwError err404) success (extractRecord res)
     success record =
@@ -54,13 +53,11 @@ getSingle etag uid = do
 -- ^
 -- Get multiple records
 getMultiple :: ServerT GetMultiple Api
-getMultiple include query sortFields page perPage = do
-  result <- runExceptT $ getMultiple' include query sortFields page perPage
-  case result of
-    Left err -> throwApiError err
-    Right (records, pagination) ->
-      return $ mkGetMultipleResult mkUrl records pagination
+getMultiple include query sortFields page perPage =
+  mkApiResponse (return . respond) getRecords
   where
+    getRecords = getMultiple' include query sortFields page perPage
+    respond (records, pagination) = mkGetMultipleResult mkUrl records pagination
     getLink = mkUserPostGetMultipleLink
     mkUrl page' = getLink include query sortFields (Just page') perPage
 
@@ -77,7 +74,9 @@ getMultiple'
 getMultiple' include query sortFields page perPage = do
   count <- runEs . countDocuments =<< getCountSearch
   let pagination = mkPagination page perPage count
-  search <- getSearch (paginationStart pagination) (paginationLimit pagination)
+  let start = paginationStart pagination
+  let limit = paginationLimit pagination
+  search <- getSearch start limit
   results <- runEs . searchDocuments $ search
   return (extractRecords include' results, pagination)
   where
@@ -90,11 +89,10 @@ getMultiple' include query sortFields page perPage = do
 -- ^
 -- Delete a single record
 deleteSingle :: Text -> Api NoContent
-deleteSingle uid = verify >> runExceptT delete >>= respond
+deleteSingle uid = verify >> mkApiResponse (const $ return NoContent) delete
   where
     verify = getSingle mempty uid
     delete = runEs $ deleteDocument uid
-    respond = either throwApiError (const $ return NoContent)
 
 -- ^
 -- Create one or more records
@@ -175,24 +173,21 @@ prepareSearch include query sortFields start limit = expr >>= toSearch
     expr :: Either ApiError (Maybe FilterExpr)
     expr = sequence $ first toErr . parse <$> query
     toSearch e = first esToApiError $ mkSearch e sortFields include start limit
-    toErr msg = mkApiError status400 ("Invalid query: " ++ msg)
+    toErr msg = mkApiError400 ("Invalid query: " ++ msg)
 
 -- ^
 -- Convert an 'EsError' error into an 'ApiError'
 esToApiError :: EsError -> ApiError
 esToApiError err =
   ApiError
-    (LBS.pack . T.unpack $ B.errorMessage err)
     (intToStatus $ B.errorStatus err)
-
--- ^
--- Convert an 'Int' to an HTTP 'Status'
-intToStatus :: Int -> Status
-intToStatus 400 = status400
-intToStatus 403 = status403
-intToStatus 404 = status404
-intToStatus 500 = status500
-intToStatus code = error $ "unknown status code " ++ show code
+    (LBS.pack . T.unpack $ B.errorMessage err)
+  where
+    intToStatus 400 = status400
+    intToStatus 403 = status403
+    intToStatus 404 = status404
+    intToStatus 500 = status500
+    intToStatus code = error $ "unknown status code " ++ show code
 
 -- ^
 -- Extract a 'Record' from a 'SearchResult'

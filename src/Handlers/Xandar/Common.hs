@@ -14,6 +14,7 @@ import Control.Monad.Reader
 import Control.Monad.Trans.Control
 import Data.Aeson (encode)
 import Data.Bifunctor
+import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import Data.List (intercalate)
 import Data.Maybe
@@ -44,10 +45,24 @@ server' handlers config = enter (toHandler config) handlers
     toHandler conf = Nat (`runReaderT` conf)
 
 -- ^
+-- Get a single record by id
+getSingle
+  :: RecordDefinition
+  -> Maybe Text
+  -> Text
+  -> Api (Headers '[Header "ETag" String] Record)
+getSingle def etag uid = mkApiResponse respond (getExisting def uid)
+  where
+    respond record =
+      let sha = recToSha record
+          res = addHeader sha record
+      in maybe (return res) (checkEtag sha res) etag
+
+-- ^
 -- Get multiple records
 getMultiple :: ApiGetMultipleLink -> RecordDefinition -> ServerT GetMultiple Api
 getMultiple getLink def include query sort page perPage =
-  runApiAction (return . respond) getRecords
+  mkApiResponse (return . respond) getRecords
   where
     getRecords = getMultiple' def include query sort page perPage
     mkUrl page' = getLink include query sort (Just page') perPage
@@ -84,25 +99,11 @@ getMultiple' def include query sort page perPage = do
     getQuery = first mkApiError400 (queryToDoc $ fromMaybe mempty query)
 
 -- ^
--- Get a single record by id
-getSingle
-  :: RecordDefinition
-  -> Maybe Text
-  -> Text
-  -> Api (Headers '[Header "ETag" String] Record)
-getSingle def etag uid = runApiAction respond (getExisting def uid)
-  where
-    respond record =
-      let sha = recToSha record
-          res = addHeader sha record
-      in maybe (return res) (checkEtag sha res) etag
-
--- ^
 -- Delete a single record
 deleteSingle :: RecordDefinition -> Text -> Api NoContent
-deleteSingle def uid = verify >> runApiAction (const $ return NoContent) delete
+deleteSingle def uid = verify >> mkApiResponse (const $ return NoContent) delete
   where
-    verify = runApiAction return (getExisting def uid)
+    verify = getSingle def mempty uid
     delete = runDb $ dbDeleteById def uid
 
 -- ^
@@ -123,7 +124,7 @@ createSingle
   -> Record
   -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData ApiResult))
 createSingle def getLink input =
-  runApiAction (return . respond) (insertSingle def input)
+  mkApiResponse (return . respond) (insertSingle def input)
   where
     respond r = addHeader (getCreateLink getLink r) $ noHeader (Single $ Succ r)
 
@@ -174,7 +175,7 @@ optionsMultiple = return $ addHeader "GET, POST, PATCH, PUT" NoContent
 -- Modify or replace a single record
 updateSingle :: RecordDefinition -> Bool -> Text -> Record -> Api Record
 updateSingle def replace uid record =
-  runApiAction return (updateSingle' def replace uid record)
+  mkApiResponse return (updateSingle' def replace uid record)
 
 -- ^
 -- Modify or replace multiple records
@@ -230,7 +231,7 @@ getExisting
   => RecordDefinition -> Text -> ExceptT ApiError m Record
 getExisting def uid = do
   record <- runDb (dbGetById def uid)
-  ExceptT . return $ maybe (Left $ mkApiError status404 mempty) Right record
+  ExceptT . return $ maybe (Left mkApiError404) Right record
 
 -- ^
 -- Add database indices
@@ -249,6 +250,27 @@ runDb action = do
   pipe <- dbPipe conf
   results <- lift $ action (dbName conf) pipe
   ExceptT . return $ first dbToApiError results
+
+-- ^
+-- Prepare an API response
+mkApiResponse
+  :: MonadError ServantErr m
+  => (a -> m b) -> ExceptT ApiError m a -> m b
+mkApiResponse f action = do
+  result <- runExceptT action
+  either throwApiError f result
+
+-- ^
+-- Create an 'ApiResult' from the result of a computation
+mkApiResult
+  :: MonadIO m
+  => ExceptT ApiError m Record -> m ApiResult
+mkApiResult input = do
+  result <- runExceptT input
+  return $
+    case result of
+      Left err -> Fail err
+      Right record -> Succ record
 
 -- ^
 -- Get the configured database name for this app
@@ -271,28 +293,46 @@ dbToApiError err = mkApiError status500 (show err)
 
 -- ^
 -- Convert an 'ApiError' into a 'ServantErr' and throw
-throwApiError
-  :: MonadError ServantErr m
-  => ApiError -> m a
-throwApiError err
-  | apiErrorStatus err == status400 = throwError (mkErr err400 err)
-  | apiErrorStatus err == status404 = throwError err404
-  | otherwise = throwError (mkErr err500 err)
+throwApiError :: MonadError ServantErr m => ApiError -> m a
+throwApiError err = throwError (mkServantErr err)
+
+-- ^
+-- Convert an 'ApiError' into a 'ServantErr'
+mkServantErr :: ApiError -> ServantErr
+mkServantErr err =
+  ServantErr
+  { errHTTPCode = statusCode status
+  , errReasonPhrase = BS.unpack (statusMessage status)
+  , errBody = body
+  , errHeaders = []
+  }
   where
-    mkErr sErr aErr =
-      sErr
-      { errBody = encode (Fail aErr :: ApiItem ApiError ())
-      }
+    status = apiErrorStatus err
+    msg = apiErrorMessage err
+    body
+      | LBS.null msg = mempty
+      | otherwise = encode (Fail err :: ApiItem ApiError ())
 
 -- ^
 -- Create an 'ApiError'
 mkApiError :: Status -> String -> ApiError
-mkApiError status msg = ApiError (LBS.pack msg) status
+mkApiError status msg = ApiError status (LBS.pack msg)
 
 -- ^
 -- Create an 'ApiError' with an HTTP status of 400
 mkApiError400 :: String -> ApiError
 mkApiError400 = mkApiError status400
+
+-- ^
+-- Create an 'ApiError' with an HTTP status of 404
+mkApiError404 :: ApiError
+mkApiError404 = mkApiError status404 mempty
+
+-- ^
+-- Convert the result of a validation to 'Either'
+vToEither :: (a, ValidationResult) -> Either ApiError a
+vToEither (a, ValidationErrors []) = Right a
+vToEither (_, err) = Left (ApiError status400 (encode err))
 
 -- ^
 -- Create a result for the 'getMultiple' endpoint
@@ -310,27 +350,6 @@ mkGetMultipleResult mkUrl records pagination =
   header paginationSize $ mkLinkHeader pagination mkUrl records
   where
     header f = addHeader (show $ f pagination)
-
--- ^
--- Run an action that could result in an 'ApiError'
-runApiAction
-  :: MonadError ServantErr m
-  => (a -> m b) -> ExceptT ApiError m a -> m b
-runApiAction f action = do
-  result <- runExceptT action
-  either throwApiError f result
-
--- ^
--- Create an 'ApiResult' from the result of a computation
-mkApiResult
-  :: MonadIO m
-  => ExceptT ApiError m Record -> m ApiResult
-mkApiResult input = do
-  result <- runExceptT input
-  return $
-    case result of
-      Left err -> Fail err
-      Right record -> Succ record
 
 -- ^
 -- Check an ETag against a SHA and throw a 304 error or return the output
@@ -393,9 +412,3 @@ validate'
   :: Monad m
   => RecordDefinition -> Record -> ExceptT ApiError m Record
 validate' def record = ExceptT $ return (vToEither $ validate def record)
-
--- ^
--- Convert the result of a validation to 'Either'
-vToEither :: (a, ValidationResult) -> Either ApiError a
-vToEither (a, ValidationErrors []) = Right a
-vToEither (_, err) = Left (ApiError (encode err) status400)

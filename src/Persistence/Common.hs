@@ -80,7 +80,7 @@ mkOptDef name = mkFieldDef name False False
 -- Convert the result of a validation to an @Either@ value
 vResultToApiItem :: (a, ValidationResult) -> ApiItem ApiError a
 vResultToApiItem (a, ValidationErrors []) = Succ a
-vResultToApiItem (_, err) = Fail (ApiError (encode err) status400)
+vResultToApiItem (_, err) = Fail (ApiError status400 (encode err))
 
 -- ^
 -- Get the MongoDB database name for an app name
@@ -314,12 +314,12 @@ excludeFields labels (Record d) =
 -- Include only the specified fields and the id in a record
 includeFields :: [Label] -> Record -> Record
 includeFields [] record = record
-includeFields labels record = excludeFields (getLabels' record \\ include) record
+includeFields labels record = excludeFields (getLabels' record \\ include') record
   where
     sep = "."
     split = filter (not . null) . inits . T.splitOn sep
     addPrefixes xs acc = acc ++ (T.intercalate sep <$> split xs)
-    include = [idLabel] ++ foldr addPrefixes [] labels
+    include' = [idLabel] ++ foldr addPrefixes [] labels
 
 -- ^
 -- Extract the field names from a record

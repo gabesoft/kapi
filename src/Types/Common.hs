@@ -84,8 +84,8 @@ instance Monoid (RecordData Field) where
 -- ^
 -- Representation for an API error
 data ApiError = ApiError
-  { apiErrorMessage :: LBS.ByteString
-  , apiErrorStatus :: Status
+  { apiErrorStatus :: Status
+  , apiErrorMessage :: LBS.ByteString
   } deriving (Eq, Show, Generic)
 
 instance ToJSON ApiError where
