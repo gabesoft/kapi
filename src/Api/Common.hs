@@ -47,9 +47,6 @@ type GenericApi =
   -- update (modify)
   :<|> Capture "id" Text :> ReqBody '[JSON] Record :> Patch '[JSON] Record
   :<|> ReqBody '[JSON] [Record] :> Patch '[JSON] [ApiItem ApiError Record]
-  -- head
-  :<|> Capture "id" Text :>  HeadNoContent '[JSON] (Headers '[Header "ETag" String] NoContent)
-  :<|> HeadNoContent '[JSON] (Headers '[Header "X-Total-Count" String] NoContent)
   -- options
   :<|> Capture "id" Text :> OptionsNoContent '[JSON] (Headers '[Header "Access-Control-Allow-Methods" String] NoContent)
   :<|> OptionsNoContent '[JSON] (Headers '[Header "Access-Control-Allow-Methods" String] NoContent)

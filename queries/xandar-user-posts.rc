@@ -16,6 +16,11 @@
 GET http://:host/:path?sort=post.link&include=post.link,post.title,title
 
 #
+# Run a HEAD request against the user-posts collection
+#
+HEAD http://:host/:path?where=(post.title contains 'vim')
+
+#
 # Find by post title
 #
 GET http://:host/:path?where=(post.title contains 'monad')&per_page=2
@@ -54,6 +59,11 @@ GET http://:host/:path?where=(post.title contains 'monad')&include=post.title
 # Get a single post
 #
 GET http://:host/:path/1
+
+#
+# Run a HEAD request against a single post
+#
+HEAD http://:host/:path/1
 
 #
 # Delete a single post

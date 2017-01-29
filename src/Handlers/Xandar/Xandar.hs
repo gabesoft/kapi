@@ -45,8 +45,6 @@ app =
       replaceMultiple def :<|>
       modifySingle def :<|>
       modifyMultiple def :<|>
-      headSingle def :<|>
-      headMultiple def :<|>
       optionsSingle :<|>
       optionsMultiple
     userPostHandlers =
@@ -58,8 +56,6 @@ app =
       UP.replaceMultiple :<|>
       UP.modifySingle :<|>
       UP.modifyMultiple :<|>
-      UP.headSingle :<|>
-      UP.headMultiple :<|>
       UP.optionsSingle :<|>
       UP.optionsMultiple
 

@@ -20,7 +20,7 @@ import Database.Bloodhound (SearchResult(..), EsError, Search)
 import qualified Database.Bloodhound as B
 import Handlers.Xandar.Common
        (throwApiError, mkApiError, mkPagination, splitFields,
-        mkLinkHeader, mkGetMultipleResult)
+        mkLinkHeader, mkGetMultipleResult, checkEtag)
 import Network.HTTP.Types.Status
 import Parsers.Filter (parse)
 import Persistence.Common
@@ -42,13 +42,10 @@ esIndex = confGetEsIndex appName
 -- Get a single record by id
 getSingle :: Maybe Text -> Text -> Api (Headers '[Header "ETag" String] Record)
 getSingle etag uid = do
-  records <- runExceptT (runEs $ getByIds [uid])
-  either throwApiError respond records
+  record <- runExceptT (runEs $ getByIds [uid])
+  either throwApiError respond record
   where
     respond res = maybe (throwError err404) success (extractRecord res)
-    checkEtag sha res tag
-      | tag == T.pack sha = throwError err304
-      | otherwise = return res
     success record =
       let sha = recToSha record
           res = addHeader sha record
@@ -62,7 +59,7 @@ getMultiple include query sortFields page perPage = do
   case result of
     Left err -> throwApiError err
     Right (records, pagination) ->
-      return $ mkGetMultipleResult records pagination mkUrl
+      return $ mkGetMultipleResult mkUrl records pagination
   where
     getLink = mkUserPostGetMultipleLink
     mkUrl page' = getLink include query sortFields (Just page') perPage
@@ -140,16 +137,6 @@ replaceMultiple = undefined
 -- Update (modify) multiple records
 modifyMultiple :: [Record] -> Api [ApiResult]
 modifyMultiple = undefined
-
--- ^
--- Handle a head request for a single record endpoint
-headSingle :: Text -> Api (Headers '[Header "ETag" String] NoContent)
-headSingle uid = undefined
-
--- ^
--- Handle a head request for a multiple records endpoint
-headMultiple :: Api (Headers '[Header "X-Total-Count" String] NoContent)
-headMultiple = undefined
 
 -- ^
 -- Handle an options request for a single record endpoint

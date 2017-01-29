@@ -15,6 +15,16 @@
 GET http://:host/:path
 
 #
+# Run a HEAD request on the users collection
+#
+HEAD http://:host/:path
+
+#
+# Run a OPTIONS request on the users collection
+#
+OPTIONS http://:host/:path
+
+#
 # Get all users - sort & partial response
 #
 GET http://:host/:path?sort=email&include=email,admin
@@ -50,10 +60,25 @@ GET http://:host/:path?where=(admin in [])
 GET http://:host/:path/5869ec3e59841810dc000009
 
 #
+# Run a HEAD request on a single user
+#
+HEAD http://:host/:path/5869ec3e59841810dc000009
+
+#
+# Run an OPTIONS request on a single user
+#
+OPTIONS http://:host/:path/5869ec3e59841810dc000009
+
+#
+# Get a single non-existent user 
+#
+GET http://:host/:path/non-existent
+
+#
 # Get a single user using ETag
 #
 GET http://:host/:path/5869ec3e59841810dc000009
-If-None-Match: ef19b2e0ce2baa83fa90abfa82a5141d4f18842d
+If-None-Match: 76d932c295d6a8d637ab7b36b43fc1d6f7e8a377
 
 #
 # Delete a non-existent user

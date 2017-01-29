@@ -11,6 +11,7 @@ module Handlers.Xandar.Common where
 import Api.Xandar
 import Control.Monad.Except
 import Control.Monad.Reader
+import Control.Monad.Trans.Control
 import Data.Aeson (encode)
 import Data.Bifunctor
 import qualified Data.ByteString.Lazy.Char8 as LBS
@@ -45,45 +46,71 @@ server' handlers config = enter (toHandler config) handlers
 -- ^
 -- Get multiple records
 getMultiple :: ApiGetMultipleLink -> RecordDefinition -> ServerT GetMultiple Api
-getMultiple getLink def include query sort page perPage = do
+getMultiple getLink def include query sort page perPage =
+  runApiAction (return . respond) getRecords
+  where
+    getRecords = getMultiple' def include query sort page perPage
+    mkUrl page' = getLink include query sort (Just page') perPage
+    respond = uncurry (mkGetMultipleResult mkUrl)
+
+-- ^
+-- Helper for 'getMultiple'
+getMultiple'
+  :: (MonadBaseControl IO m
+     ,MonadReader ApiConfig m
+     ,MonadIO m
+     ,Foldable a
+     ,Foldable b
+     ,Functor a
+     ,Functor b)
+  => RecordDefinition
+  -> b Text
+  -> Maybe Text
+  -> a Text
+  -> Maybe Int
+  -> Maybe Int
+  -> ExceptT ApiError m ([Record], Pagination)
+getMultiple' def include query sort page perPage = do
   count <- runDb (dbCount def)
   let pagination = mkPagination page perPage count
   let start = paginationStart pagination
   let limit = paginationLimit pagination
-  case queryToDoc (fromMaybe "" query) of
-    Left err -> throwApiError $ mkApiError status400 err
-    Right filter' -> do
-      records <- runDb $ dbFind def filter' sort' include' start limit
-      return $ mkGetMultipleResult records pagination mkUrl
+  query' <- ExceptT (return getQuery)
+  records <- runDb $ dbFind def query' sort' include' start limit
+  return (records, pagination)
   where
     sort' = splitFields mkSortField sort
     include' = splitFields mkIncludeField include
-    mkUrl page' = getLink include query sort (Just page') perPage
+    getQuery = first mkApiError400 (queryToDoc $ fromMaybe mempty query)
 
 -- ^
 -- Get a single record by id
-getSingle :: RecordDefinition -> Maybe Text -> Text -> Api (Headers '[Header "ETag" String] Record)
-getSingle def etag uid = do
-  record <- getSingle' def uid
-  let sha = recToSha record
-  let res = addHeader sha record
-  case etag of
-    Nothing -> return res
-    Just tag ->
-      if tag == T.pack sha
-        then throwError err304
-        else return res
+getSingle
+  :: RecordDefinition
+  -> Maybe Text
+  -> Text
+  -> Api (Headers '[Header "ETag" String] Record)
+getSingle def etag uid = runApiAction respond (getExisting def uid)
+  where
+    respond record =
+      let sha = recToSha record
+          res = addHeader sha record
+      in maybe (return res) (checkEtag sha res) etag
 
 -- ^
 -- Delete a single record
 deleteSingle :: RecordDefinition -> Text -> Api NoContent
-deleteSingle def uid =
-  getSingle' def uid >> runDb (dbDeleteById def uid) >> return NoContent
+deleteSingle def uid = verify >> runApiAction (const $ return NoContent) delete
+  where
+    verify = runApiAction return (getExisting def uid)
+    delete = runDb $ dbDeleteById def uid
 
 -- ^
 -- Create one or more records
 createSingleOrMultiple
-  :: RecordDefinition -> (Text -> String) -> ApiData Record
+  :: RecordDefinition
+  -> (Text -> String)
+  -> ApiData Record
   -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData ApiResult))
 createSingleOrMultiple def getLink (Single r) = createSingle def getLink r
 createSingleOrMultiple def getLink (Multiple rs) = createMultiple def getLink rs
@@ -95,11 +122,10 @@ createSingle
   -> (Text -> String)
   -> Record
   -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData ApiResult))
-createSingle def getLink input = do
-  record <- insertSingle def input
-  apiItem throwApiError (return . mkResult) record
+createSingle def getLink input =
+  runApiAction (return . respond) (insertSingle def input)
   where
-    mkResult r = addHeader (getCreateLink getLink r) $ noHeader (Single $ Succ r)
+    respond r = addHeader (getCreateLink getLink r) $ noHeader (Single $ Succ r)
 
 -- ^
 -- Create multiple records
@@ -107,9 +133,9 @@ createMultiple
   :: RecordDefinition
   -> (Text -> String)
   -> [Record]
-  -> Api (Headers '[ Header "Location" String, Header "Link" String] (ApiData ApiResult))
+  -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData ApiResult))
 createMultiple def getLink inputs = do
-  records <- mapM (insertSingle def) inputs
+  records <- mapM (mkApiResult . insertSingle def) inputs
   let links = apiItem (const "<>") (mkLink . getCreateLink getLink) <$> records
   return . noHeader $ addHeader (intercalate ", " links) (Multiple records)
 
@@ -134,20 +160,6 @@ modifyMultiple :: RecordDefinition -> [Record] -> Api [ApiResult]
 modifyMultiple def = updateMultiple def False
 
 -- ^
--- Handle a head request for a single record endpoint
-headSingle
-  :: RecordDefinition -> Text
-  -> Api (Headers '[Header "ETag" String] NoContent)
-headSingle def uid = do
-  record <- getSingle' def uid
-  return $ addHeader (recToSha record) NoContent
-
--- ^
--- Handle a head request for a multiple records endpoint
-headMultiple :: RecordDefinition -> Api (Headers '[Header "X-Total-Count" String] NoContent)
-headMultiple def = flip addHeader NoContent . show <$> runDb (dbCount def) 
-
--- ^
 -- Handle an options request for a single record endpoint
 optionsSingle :: Text
               -> Api (Headers '[Header "Access-Control-Allow-Methods" String] NoContent)
@@ -159,36 +171,29 @@ optionsMultiple :: Api (Headers '[Header "Access-Control-Allow-Methods" String] 
 optionsMultiple = return $ addHeader "GET, POST, PATCH, PUT" NoContent
 
 -- ^
--- Insert a single valid record
--- populating any missing fields with default values
-insertSingle :: RecordDefinition -> Record -> Api ApiResult
-insertSingle def =
-  chainResult (insertOrUpdateSingle def dbInsert) . validateRecord def
-
--- ^
 -- Modify or replace a single record
 updateSingle :: RecordDefinition -> Bool -> Text -> Record -> Api Record
 updateSingle def replace uid record =
-  updateSingle' def replace uid record >>= apiItem throwApiError return
+  runApiAction return (updateSingle' def replace uid record)
 
 -- ^
 -- Modify or replace multiple records
 updateMultiple :: RecordDefinition -> Bool -> [Record] -> Api [ApiResult]
-updateMultiple def replace = mapM modify
+updateMultiple def replace = mapM (mkApiResult . update)
   where
-    modify u =
-      chainResult
-        (updateSingle' def replace $ fromJust (getIdValue u))
-        (vResultToApiItem $ validateHasId u)
+    update u = do
+      valid <- ExceptT . return $ vToEither (validateHasId u)
+      updateSingle' def replace (fromJust $ getIdValue u) valid
 
 -- ^
 -- Modify or replace a single record
-updateSingle' :: RecordDefinition -> Bool -> Text -> Record -> Api ApiResult
+updateSingle'
+  :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
+  => RecordDefinition -> Bool -> Text -> Record -> ExceptT ApiError m Record
 updateSingle' def replace uid updated = do
-  existing <- getSingle' def uid
-  chainResult
-    (insertOrUpdateSingle def dbUpdate)
-    (validateRecord def $ merge existing updated)
+  existing <- getExisting def uid
+  valid <- validate' def (merge existing updated)
+  insertOrUpdateSingle def dbUpdate valid
   where
     merge =
       if replace
@@ -196,23 +201,36 @@ updateSingle' def replace uid updated = do
         else mergeRecords
 
 -- ^
--- Insert or update a valid @record@ record according to @action@
-insertOrUpdateSingle
-  :: RecordDefinition -> (RecordDefinition -> Record -> Database -> Pipe -> Api (Either Failure RecordId))
-  -> Record
-  -> Api ApiResult
-insertOrUpdateSingle def action record = do
-  result <- runDb $ action def (populateDefaults def record)
-  case result of
-    Left err -> return $ Fail (failedToApiError err)
-    Right uid -> Succ . fromJust <$> runDb (dbGetById def uid)
+-- Insert a single valid record
+-- populating any missing fields with default values
+insertSingle
+  :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
+  => RecordDefinition -> Record -> ExceptT ApiError m Record
+insertSingle def input = do
+  valid <- validate' def input
+  insertOrUpdateSingle def dbInsert valid
 
 -- ^
--- Get a record by id
-getSingle' :: RecordDefinition -> Text -> Api Record
-getSingle' def uid = do
+-- Insert or update a valid 'record' record according to 'action'
+insertOrUpdateSingle
+  :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
+  => RecordDefinition
+  -> (RecordDefinition -> Record -> Database -> Pipe -> m (Either Failure RecordId))
+  -> Record
+  -> ExceptT ApiError m Record
+insertOrUpdateSingle def action input = do
+  uid <- runDb $ action def (populateDefaults def input)
+  record <- runDb $ dbGetById def uid
+  return (fromJust record)
+
+-- ^
+-- Get an existing record by id
+getExisting
+  :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
+  => RecordDefinition -> Text -> ExceptT ApiError m Record
+getExisting def uid = do
   record <- runDb (dbGetById def uid)
-  maybe (throwError err404) return record
+  ExceptT . return $ maybe (Left $ mkApiError status404 mempty) Right record
 
 -- ^
 -- Add database indices
@@ -223,13 +241,14 @@ addDbIndices indices conf = do
 
 -- ^
 -- Run a database action
-runDb ::
-  (MonadReader ApiConfig m, MonadIO m) =>
-  (Database -> Pipe -> m b) -> m b
+runDb
+  :: (MonadReader ApiConfig m, MonadIO m)
+  => (Database -> Pipe -> m (Either Failure a)) -> ExceptT ApiError m a
 runDb action = do
   conf <- ask
   pipe <- dbPipe conf
-  action (dbName conf) pipe
+  results <- lift $ action (dbName conf) pipe
+  ExceptT . return $ first dbToApiError results
 
 -- ^
 -- Get the configured database name for this app
@@ -244,12 +263,11 @@ dbPipe
 dbPipe conf = liftIO $ mkPipe (mongoHost conf) (mongoPort conf)
 
 -- ^
--- Convert a MongoDB @Failure@ into an @ApiError@
--- TODO parse the MongoDB error object (the error is in BSON format)
---      https://docs.mongodb.com/manual/reference/command/getLastError/
-failedToApiError :: Failure -> ApiError
-failedToApiError (WriteFailure _ msg) = mkApiError status400 msg
-failedToApiError err = ApiError (LBS.pack (show err)) status500
+-- Convert a MongoDB 'Failure' into an 'ApiError'
+dbToApiError :: Failure -> ApiError
+dbToApiError (WriteFailure _ msg) = mkApiError status400 msg
+dbToApiError (QueryFailure _ msg) = mkApiError status400 msg
+dbToApiError err = mkApiError status500 (show err)
 
 -- ^
 -- Convert an 'ApiError' into a 'ServantErr' and throw
@@ -258,11 +276,13 @@ throwApiError
   => ApiError -> m a
 throwApiError err
   | apiErrorStatus err == status400 = throwError (mkErr err400 err)
-  | apiErrorStatus err == status404 = throwError (mkErr err404 err)
+  | apiErrorStatus err == status404 = throwError err404
   | otherwise = throwError (mkErr err500 err)
   where
     mkErr sErr aErr =
-      sErr {errBody = encode (Fail aErr :: ApiItem ApiError ())}
+      sErr
+      { errBody = encode (Fail aErr :: ApiItem ApiError ())
+      }
 
 -- ^
 -- Create an 'ApiError'
@@ -270,11 +290,9 @@ mkApiError :: Status -> String -> ApiError
 mkApiError status msg = ApiError (LBS.pack msg) status
 
 -- ^
--- Chain two API results
-chainResult
-  :: Monad m
-  => (Record -> m ApiResult) -> ApiResult -> m ApiResult
-chainResult = apiItem (return . Fail)
+-- Create an 'ApiError' with an HTTP status of 400
+mkApiError400 :: String -> ApiError
+mkApiError400 = mkApiError status400
 
 -- ^
 -- Create a result for the 'getMultiple' endpoint
@@ -284,8 +302,8 @@ mkGetMultipleResult
      ,AddHeader h2 String orig2 orig1
      ,AddHeader h1 String orig1 orig
      ,AddHeader h String orig b)
-  => a -> Pagination -> (Int -> String) -> b
-mkGetMultipleResult records pagination mkUrl =
+  => (Int -> String) -> a -> Pagination -> b
+mkGetMultipleResult mkUrl records pagination =
   header paginationPage $
   header paginationTotal $
   header paginationLast $
@@ -294,9 +312,38 @@ mkGetMultipleResult records pagination mkUrl =
     header f = addHeader (show $ f pagination)
 
 -- ^
+-- Run an action that could result in an 'ApiError'
+runApiAction
+  :: MonadError ServantErr m
+  => (a -> m b) -> ExceptT ApiError m a -> m b
+runApiAction f action = do
+  result <- runExceptT action
+  either throwApiError f result
+
+-- ^
+-- Create an 'ApiResult' from the result of a computation
+mkApiResult
+  :: MonadIO m
+  => ExceptT ApiError m Record -> m ApiResult
+mkApiResult input = do
+  result <- runExceptT input
+  return $
+    case result of
+      Left err -> Fail err
+      Right record -> Succ record
+
+-- ^
+-- Check an ETag against a SHA and throw a 304 error or return the output
+checkEtag :: MonadError ServantErr m => String -> a -> Text -> m a
+checkEtag sha output etag
+  | etag == T.pack sha = throwError err304
+  | otherwise = return output
+
+-- ^
 -- Create a 'Pagination' object
 mkPagination :: Maybe Int -> Maybe Int -> Int -> Pagination
-mkPagination page perPage = paginate (fromMaybe 1 page) (fromMaybe perPageDefault perPage)
+mkPagination page perPage =
+  paginate (fromMaybe 1 page) (fromMaybe perPageDefault perPage)
 
 -- ^
 -- Create a set of pagination links to be returned in the 'Link' header
@@ -311,9 +358,9 @@ mkPaginationLinks pagination mkUrl =
 
 -- ^
 -- Create a 'Link' header containing pagination links
-mkLinkHeader ::
-  AddHeader h String a b =>
-  Pagination -> (Int -> String) -> a -> b
+mkLinkHeader
+  :: AddHeader h String a b
+  => Pagination -> (Int -> String) -> a -> b
 mkLinkHeader pagination mkUrl =
   addHeader (intercalate "," $ mkPaginationLinks pagination mkUrl)
 
@@ -335,11 +382,20 @@ getCreateLink getLink = getLink . fromJust . getIdValue
 -- ^
 -- Split a list of comma separated fields, apply a function to each one
 -- and return the results that have a value
-splitFields ::
-  (Foldable t, Functor t) => (Text -> Maybe a) -> t Text -> [a]
+splitFields
+  :: (Foldable t, Functor t)
+  => (Text -> Maybe a) -> t Text -> [a]
 splitFields f input = catMaybes $ f <$> concat (T.splitOn "," <$> input)
 
 -- ^
--- Validate a record given a definition
-validateRecord :: RecordDefinition -> Record -> ApiResult
-validateRecord def = vResultToApiItem . validate def
+-- Validate a record
+validate'
+  :: Monad m
+  => RecordDefinition -> Record -> ExceptT ApiError m Record
+validate' def record = ExceptT $ return (vToEither $ validate def record)
+
+-- ^
+-- Convert the result of a validation to 'Either'
+vToEither :: (a, ValidationResult) -> Either ApiError a
+vToEither (a, ValidationErrors []) = Right a
+vToEither (_, err) = Left (ApiError (encode err) status400)
