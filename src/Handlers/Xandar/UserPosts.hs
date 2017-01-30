@@ -152,7 +152,7 @@ optionsMultiple = undefined
 -- Run an elastic-search action
 runEs
   :: (MonadReader ApiConfig m, MonadIO m)
-  => (Text -> Text -> Text -> IO (Either EsError b)) -> ExceptT ApiError m b
+  => (Text -> Text -> Text -> IO (Either EsError d)) -> ExceptT ApiError m d
 runEs action = do
   conf <- ask
   let server = esServer conf

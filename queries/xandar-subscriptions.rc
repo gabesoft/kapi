@@ -12,7 +12,7 @@
 #
 # Get all subscriptions
 #
-GET http://:host/:path
+GET http://:host/:path?per_page=3
 
 #
 # Get all subscriptions - sort & partial response

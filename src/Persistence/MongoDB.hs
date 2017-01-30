@@ -80,7 +80,13 @@ dbInsert def record dbName pipe =
 -- ^
 -- Save an existing record into the database
 -- The input record is assumed to have the id field populated
-dbUpdate :: (MonadIO m, MonadBaseControl IO m) => RecordDefinition -> Record -> Database -> Pipe -> m (Either Failure RecordId)
+dbUpdate
+  :: (MonadIO m, MonadBaseControl IO m)
+  => RecordDefinition
+  -> Record
+  -> Database
+  -> Pipe
+  -> m (Either Failure RecordId)
 dbUpdate def input dbName pipe =
   dbAction $
   do doc <- mkInDocument def False input
@@ -93,7 +99,15 @@ dbUpdate def input dbName pipe =
 -- Select multiple records
 dbFind
   :: (MonadBaseControl IO m, MonadIO m)
-  => RecordDefinition -> [Field] -> [Field] -> [Field] -> Int -> Int -> Database -> Pipe -> m (Either Failure [Record])
+  => RecordDefinition
+  -> [Field]
+  -> [Field]
+  -> [Field]
+  -> Int
+  -> Int
+  -> Database
+  -> Pipe
+  -> m (Either Failure [Record])
 dbFind def filter' sort' fields skip' limit' dbName pipe =
   dbAction $
   do docs <- dbAccess action dbName pipe

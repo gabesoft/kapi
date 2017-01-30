@@ -183,7 +183,7 @@ updateMultiple :: RecordDefinition -> Bool -> [Record] -> Api [ApiResult]
 updateMultiple def replace = mapM (mkApiResult . update)
   where
     update u = do
-      valid <- ExceptT . return $ vToEither (validateHasId u)
+      valid <- ExceptT . return $ vResultToEither (validateHasId u)
       updateSingle' def replace (fromJust $ getIdValue u) valid
 
 -- ^
@@ -383,4 +383,4 @@ splitFields f input = catMaybes $ f <$> concat (T.splitOn "," <$> input)
 validate'
   :: Monad m
   => RecordDefinition -> Record -> ExceptT ApiError m Record
-validate' def record = ExceptT $ return (vToEither $ validate def record)
+validate' def record = ExceptT $ return (vResultToEither $ validate def record)

@@ -11,6 +11,7 @@ import Control.Monad.Trans.Control
 import Data.Bifunctor
 import Data.Bson
 import qualified Data.Map.Strict as Map
+import Data.Maybe
 import Data.Monoid ((<>))
 import Data.String
 import Data.Text (Text)
@@ -40,6 +41,45 @@ userPostDefinition =
     ]
 
 -- ^
+-- Insert new user posts
+insertUserPosts :: [Record]
+                -> Database
+                -> Pipe
+                -> Text
+                -> Text
+                -> ExceptT ApiError IO b
+insertUserPosts input dbName pipe server index = do
+  valid <- mapM validate' input
+  let subIds = vals "subscriptionId" valid
+  let postIds = vals "postId" valid
+  subs <- runDb (getSubsById subIds) dbName pipe
+  posts <- runDb (getPostsById postIds) dbName pipe
+  let items = mkUserPosts subs posts valid
+  _ <- runEs (E.indexDocuments items) server index mapping
+  let recIds = snd <$> items
+  created <- runEs (E.getByIds recIds) server index mapping
+  return $ extractRecords created
+  where
+    vals label = catMaybes . fmap (getValue label)
+    mapping = recordCollection userPostDefinition
+
+-- ^
+-- Update existing user posts
+updateUserPosts input = undefined
+
+-- ^
+-- Construct user post documents
+mkUserPosts :: [Record] -> [Record] -> [Record] -> [(Record, Text)]
+mkUserPosts subs posts records = undefined
+  where
+    subMap = mkMap subs
+    postMap = mkMap posts
+    addId r = (fromJust $ getIdValue r, r)
+    mkMap xs = Map.fromList (addId <$> xs)
+
+extractRecords search = undefined
+
+-- ^
 -- Generate an id for a user post
 mkUserPostId
   :: (Val a, Monoid a, IsString a)
@@ -51,17 +91,18 @@ mkUserPostId record =
 -- Get multiple posts by id
 getPostsById
   :: (MonadBaseControl IO m, MonadIO m)
-  => [Text] -> Database -> Pipe -> m (Either Failure [Record])
-getPostsById ids = M.dbFind postDefinition query [] [] 0 0
-  where
-    query = ["_id" =: ("$in" =: ids)]
+  => [RecordId] -> Database -> Pipe -> m (Either Failure [Record])
+getPostsById ids = M.dbFind postDefinition (idsQuery ids) [] [] 0 0
 
 -- ^
--- Get a subscription by id
-getSubscription
+-- Get multiple subscriptions by id
+getSubsById
   :: (MonadBaseControl IO m, MonadIO m)
-  => RecordId -> Database -> Pipe -> m (Either Failure (Maybe Record))
-getSubscription = M.dbGetById feedSubscriptionDefinition
+  => [RecordId] -> Database -> Pipe -> m (Either Failure [Record])
+getSubsById ids =
+  M.dbFind feedSubscriptionDefinition (idsQuery ids) [] [] 0 0
+
+idsQuery ids = ["_id" =: ("$in" =: ids)]
 
 runDb
   :: (MonadBaseControl IO m, MonadIO m)
@@ -83,3 +124,9 @@ runEs
 runEs action server index mappingName = do
   results <- lift $ action server index mappingName
   ExceptT (return $ first E.esToApiError results)
+
+validate'
+  :: Monad m
+  => Record -> ExceptT ApiError m Record
+validate' record =
+  ExceptT . return $ vResultToEither (validate userPostDefinition record)

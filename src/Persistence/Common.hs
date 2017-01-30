@@ -79,9 +79,9 @@ mkOptDef name = mkFieldDef name False False
 
 -- ^
 -- Convert the result of a validation to 'Either'
-vToEither :: (a, ValidationResult) -> Either ApiError a
-vToEither (a, ValidationErrors []) = Right a
-vToEither (_, err) = Left (ApiError status400 (encode err))
+vResultToEither :: (a, ValidationResult) -> Either ApiError a
+vResultToEither (a, ValidationErrors []) = Right a
+vResultToEither (_, err) = Left (ApiError status400 (encode err))
 
 -- ^
 -- Get the MongoDB database name for an app name
