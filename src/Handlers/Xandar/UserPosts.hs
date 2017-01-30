@@ -19,9 +19,8 @@ import qualified Data.Text as T
 import Database.Bloodhound (SearchResult(..), EsError, Search)
 import qualified Database.Bloodhound as B
 import Handlers.Xandar.Common
-       (throwApiError, mkApiError, mkApiError400, mkPagination,
-        splitFields, mkLinkHeader, mkGetMultipleResult, checkEtag,
-        mkApiResponse, mkApiResult)
+       (throwApiError, mkPagination, splitFields, mkLinkHeader,
+        mkGetMultipleResult, checkEtag, mkApiResponse, mkApiResult)
 import Network.HTTP.Types.Status
 import Parsers.Filter (parse)
 import Persistence.Common
@@ -99,8 +98,8 @@ deleteSingle uid = verify >> mkApiResponse (const $ return NoContent) delete
 createSingleOrMultiple
   :: ApiData Record
   -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData ApiResult))
-createSingleOrMultiple (Single r) = undefined
-createSingleOrMultiple (Multiple rs) = undefined
+createSingleOrMultiple (Single r) = createSingle r
+createSingleOrMultiple (Multiple rs) = createMultiple rs
 
 -- ^
 -- Create a single record
@@ -115,6 +114,8 @@ createMultiple
   :: [Record]
   -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData ApiResult))
 createMultiple inputs = undefined
+
+createMultiple' inputs = undefined
 
 -- ^
 -- Update (replace) a single record
@@ -174,20 +175,6 @@ prepareSearch include query sortFields start limit = expr >>= toSearch
     expr = sequence $ first toErr . parse <$> query
     toSearch e = first esToApiError $ mkSearch e sortFields include start limit
     toErr msg = mkApiError400 ("Invalid query: " ++ msg)
-
--- ^
--- Convert an 'EsError' error into an 'ApiError'
-esToApiError :: EsError -> ApiError
-esToApiError err =
-  ApiError
-    (intToStatus $ B.errorStatus err)
-    (LBS.pack . T.unpack $ B.errorMessage err)
-  where
-    intToStatus 400 = status400
-    intToStatus 403 = status403
-    intToStatus 404 = status404
-    intToStatus 500 = status500
-    intToStatus code = error $ "unknown status code " ++ show code
 
 -- ^
 -- Extract a 'Record' from a 'SearchResult'

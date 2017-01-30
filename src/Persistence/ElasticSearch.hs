@@ -8,6 +8,7 @@ module Persistence.ElasticSearch
   , deleteDocument
   , deleteDocuments
   , deleteIndex
+  , esToApiError
   , getByIds
   , indexDocument
   , indexDocuments
@@ -25,6 +26,7 @@ import Data.Aeson (ToJSON)
 import qualified Data.Aeson as A
 import Data.Bifunctor
 import qualified Data.ByteString.Lazy.Char8 as L
+import qualified Data.ByteString.Lazy.Char8 as LBS
 import Data.Char (isSpace)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe
@@ -325,3 +327,17 @@ mToMaybe :: (Eq a, Monoid a) => a -> Maybe a
 mToMaybe a
   | a == mempty = Nothing
   | otherwise = Just a
+
+-- ^
+-- Convert an 'EsError' error into an 'ApiError'
+esToApiError :: EsError -> ApiError
+esToApiError err =
+  ApiError
+    (intToStatus $ B.errorStatus err)
+    (LBS.pack . T.unpack $ B.errorMessage err)
+  where
+    intToStatus 400 = status400
+    intToStatus 403 = status403
+    intToStatus 404 = status404
+    intToStatus 500 = status500
+    intToStatus code = error $ "unknown status code " ++ show code

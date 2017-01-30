@@ -61,17 +61,15 @@ DELETE http://:host/:path/587ad5bd5984186b15000001
 POST http://:host/:path
 Content-Type: :json
 {
-  "createdAt": "2016-03-03T06:49:30.234Z",
+  "createdAt": "2016-03-03T06:47:35.463Z",
   "disabled": false,
-  "__v": 1,
-  "userId": "56d7cc3fccee17506699e735",
-  "feedId": "56d7de7ac788cb1d6eb91d90",
-  "updatedAt": "2016-03-03T21:36:14.046Z",
-  "title": "Emacs Ninja",
+  "feedId": "56d7de07c788cb1d6eb91a6d",
   "tags": [
-    "editor",
-    "emacs"
-  ]
+    "programming"
+  ],
+  "title": "All Confirmation Bias, All The Time - Aria Stewart",
+  "updatedAt": "2016-03-03T07:05:56.533Z",
+  "userId": "56d7cc3fccee17506699e735"
 }
 
 #
@@ -81,32 +79,60 @@ POST http://:host/:path
 Content-Type: :json
 [
   {
-    "_id": "56d7de26c788cb1d6eb91bdc",
-    "createdAt": "2016-03-03T06:48:06.989Z",
-    "disabled": true,
-    "__v": 0,
-    "userId": "56d7cc3fccee17506699e735",
-    "feedId": "56d7de26c788cb1d6eb91bcc",
-    "updatedAt": "2016-03-03T06:50:20.017Z",
-    "title": "Nodejitsu",
-    "tags": []
+    "createdAt": "2016-03-03T06:47:15.372Z",
+    "disabled": false,
+    "feedId": "56d7ddf3c788cb1d6eb919b2",
+    "tags": [],
+    "title": "Aaron Franks",
+    "updatedAt": "2016-03-03T06:47:15.373Z",
+    "userId": "56d7cc3fccee17506699e735"
   },
   {
-    "_id": "56d7de2cc788cb1d6eb91c08",
-    "createdAt": "2016-03-03T06:48:12.405Z",
+    "createdAt": "2016-03-03T06:47:17.288Z",
     "disabled": false,
-    "__v": 1,
-    "userId": "56d7cc3fccee17506699e735",
-    "feedId": "56d7de2cc788cb1d6eb91bf3",
-    "updatedAt": "2016-03-13T18:42:38.415Z",
-    "title": "The npm Blog",
+    "feedId": "56d7ddf5c788cb1d6eb919c2",
     "tags": [
-      "software",
-      "javascript",
-      "nodejs",
-      "programming",
-      "node"
-    ]
+      "web-dev",
+      "web-design",
+      "ajax",
+      "tech",
+      "javascript"
+    ],
+    "title": "Ajaxian » Front Page",
+    "updatedAt": "2016-03-13T18:23:47.055Z",
+    "userId": "56d7cc3fccee17506699e735"
+  },
+  {
+    "createdAt": "2016-03-03T06:47:20.652Z",
+    "disabled": false,
+    "feedId": "56d7ddf8c788cb1d6eb919d8",
+    "tags": [],
+    "title": "Allison Kaptur",
+    "updatedAt": "2016-03-03T06:47:20.652Z",
+    "userId": "56d7cc3fccee17506699e735"
+  },
+  {
+    "createdAt": "2016-03-03T06:47:23.382Z",
+    "disabled": false,
+    "feedId": "56d7ddfbc788cb1d6eb919f1",
+    "tags": [
+      "front-end"
+    ],
+    "title": "An Innovative Web",
+    "updatedAt": "2016-03-03T07:04:21.208Z",
+    "userId": "56d7cc3fccee17506699e735"
+  },
+  {
+    "createdAt": "2016-03-03T06:47:32.531Z",
+    "disabled": false,
+    "feedId": "56d7de03c788cb1d6eb91a07",
+    "tags": [
+      "database"
+    ],
+    "title": "Antirez",
+    "unreadCount": 1,
+    "updatedAt": "2016-03-03T07:01:10.950Z",
+    "userId": "56d7cc3fccee17506699e735"
   }
 ]
 

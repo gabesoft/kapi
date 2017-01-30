@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
--- |
+-- ^
 -- User model schema and indices
 module Persistence.Xandar.Users where
 

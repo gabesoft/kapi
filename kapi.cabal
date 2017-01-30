@@ -30,6 +30,7 @@ library
                      , Persistence.Xandar.Feeds
                      , Persistence.Xandar.FeedSubscriptions
                      , Persistence.Xandar.Posts
+                     , Persistence.Xandar.UserPosts
                      , Types.Common
   build-depends:       base >= 4.7 && < 5
                      , base-compat >= 0.9

@@ -285,13 +285,6 @@ dbPipe
 dbPipe conf = liftIO $ mkPipe (mongoHost conf) (mongoPort conf)
 
 -- ^
--- Convert a MongoDB 'Failure' into an 'ApiError'
-dbToApiError :: Failure -> ApiError
-dbToApiError (WriteFailure _ msg) = mkApiError status400 msg
-dbToApiError (QueryFailure _ msg) = mkApiError status400 msg
-dbToApiError err = mkApiError status500 (show err)
-
--- ^
 -- Convert an 'ApiError' into a 'ServantErr' and throw
 throwApiError :: MonadError ServantErr m => ApiError -> m a
 throwApiError err = throwError (mkServantErr err)
@@ -312,27 +305,6 @@ mkServantErr err =
     body
       | LBS.null msg = mempty
       | otherwise = encode (Fail err :: ApiItem ApiError ())
-
--- ^
--- Create an 'ApiError'
-mkApiError :: Status -> String -> ApiError
-mkApiError status msg = ApiError status (LBS.pack msg)
-
--- ^
--- Create an 'ApiError' with an HTTP status of 400
-mkApiError400 :: String -> ApiError
-mkApiError400 = mkApiError status400
-
--- ^
--- Create an 'ApiError' with an HTTP status of 404
-mkApiError404 :: ApiError
-mkApiError404 = mkApiError status404 mempty
-
--- ^
--- Convert the result of a validation to 'Either'
-vToEither :: (a, ValidationResult) -> Either ApiError a
-vToEither (a, ValidationErrors []) = Right a
-vToEither (_, err) = Left (ApiError status400 (encode err))
 
 -- ^
 -- Create a result for the 'getMultiple' endpoint

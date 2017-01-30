@@ -32,4 +32,5 @@ feedSubscriptionDefinition =
     , mkOptDef' "notes"
     , mkOptDef "tags" (Just [] :: Maybe [String])
     , mkReqDef "disabled" (Just False :: Maybe Bool)
+    , mkOptDef "unreadCount" (Just 0 :: Maybe Int)
     ]

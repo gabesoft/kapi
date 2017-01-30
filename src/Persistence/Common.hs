@@ -8,6 +8,7 @@ import Control.Monad (join)
 import Control.Monad.IO.Class
 import Data.Aeson as AESON
 import Data.Bson as BSON
+import qualified Data.ByteString.Lazy.Char8 as LBS
 import Data.Digest.Pure.SHA
 import Data.List (find, findIndex, foldl, inits, nub, (\\))
 import qualified Data.Map.Strict as Map
@@ -77,10 +78,10 @@ mkOptDef
 mkOptDef name = mkFieldDef name False False
 
 -- ^
--- Convert the result of a validation to an @Either@ value
-vResultToApiItem :: (a, ValidationResult) -> ApiItem ApiError a
-vResultToApiItem (a, ValidationErrors []) = Succ a
-vResultToApiItem (_, err) = Fail (ApiError status400 (encode err))
+-- Convert the result of a validation to 'Either'
+vToEither :: (a, ValidationResult) -> Either ApiError a
+vToEither (a, ValidationErrors []) = Right a
+vToEither (_, err) = Left (ApiError status400 (encode err))
 
 -- ^
 -- Get the MongoDB database name for an app name
@@ -443,3 +444,18 @@ mkSortExpr name
     getName xs
       | T.head xs == '+' || T.head xs == '-' = T.tail xs
       | otherwise = xs
+
+-- ^
+-- Create an 'ApiError'
+mkApiError :: Status -> String -> ApiError
+mkApiError status msg = ApiError status (LBS.pack msg)
+
+-- ^
+-- Create an 'ApiError' with an HTTP status of 400
+mkApiError400 :: String -> ApiError
+mkApiError400 = mkApiError status400
+
+-- ^
+-- Create an 'ApiError' with an HTTP status of 404
+mkApiError404 :: ApiError
+mkApiError404 = mkApiError status404 mempty

@@ -4,22 +4,23 @@
 -- ^
 -- Functionality for interacting with MongoDB
 module Persistence.MongoDB
-  ( mkPipe
-  , dbAddIndex
+  ( dbAddIndex
   , dbCount
   , dbDeleteById
   , dbFind
   , dbGetById
   , dbInsert
+  , dbToApiError
   , dbUpdate
-  , mkSortField
-  , mkIncludeField
-  , queryToDoc
-  , validateHasId
-  , mkOutRecord
-  , mkInDocument
-  , recordToDocument
   , documentToRecord
+  , mkInDocument
+  , mkIncludeField
+  , mkOutRecord
+  , mkPipe
+  , mkSortField
+  , queryToDoc
+  , recordToDocument
+  , validateHasId
   ) where
 
 import Control.Exception.Lifted (handleJust)
@@ -32,6 +33,7 @@ import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as T
 import Database.MongoDB
+import Network.HTTP.Types.Status
 import Network.Socket (HostName, PortNumber)
 import Parsers.Filter (parse)
 import Persistence.Common
@@ -282,3 +284,10 @@ termToField Contains (ColumnName col _) (TermStr s) = Right (col =: Regex s "i")
 termToField Contains (ColumnName _ _) _ = Left "contains: expected a string term"
 termToField NotContains (ColumnName col _) (TermStr s) = Right (col =: ("$not" =: Regex s "i"))
 termToField NotContains (ColumnName _ _) _ = Left "~contains: expected a string term"
+
+-- ^
+-- Convert a MongoDB 'Failure' into an 'ApiError'
+dbToApiError :: Failure -> ApiError
+dbToApiError (WriteFailure _ msg) = mkApiError status400 msg
+dbToApiError (QueryFailure _ msg) = mkApiError status400 msg
+dbToApiError err = mkApiError status500 (show err)
