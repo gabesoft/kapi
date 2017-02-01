@@ -36,6 +36,9 @@ mkRecId = mkStrField "_id"
 mkStrField :: Label -> String -> Field
 mkStrField name val = name =: val
 
+mkStrListField :: Label -> [String] -> Field
+mkStrListField name val = name =: val
+
 mkIntField :: Label -> Int -> Field
 mkIntField name val = name =: val
 

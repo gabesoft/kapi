@@ -10,6 +10,7 @@ import Control.Monad.IO.Class
 import Control.Monad.Trans.Control
 import Data.Bifunctor
 import Data.Bson
+import Data.Function ((&))
 import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.Monoid ((<>))
@@ -47,7 +48,7 @@ insertUserPosts :: [Record]
                 -> Pipe
                 -> Text
                 -> Text
-                -> ExceptT ApiError IO b
+                -> ExceptT ApiError IO [Record]
 insertUserPosts input dbName pipe server index = do
   valid <- mapM validate' input
   let subIds = vals "subscriptionId" valid
@@ -58,7 +59,7 @@ insertUserPosts input dbName pipe server index = do
   _ <- runEs (E.indexDocuments items) server index mapping
   let recIds = snd <$> items
   created <- runEs (E.getByIds recIds) server index mapping
-  return $ extractRecords created
+  return $ E.extractRecords [] created
   where
     vals label = catMaybes . fmap (getValue label)
     mapping = recordCollection userPostDefinition
@@ -69,23 +70,34 @@ updateUserPosts input = undefined
 
 -- ^
 -- Construct user post documents
-mkUserPosts :: [Record] -> [Record] -> [Record] -> [(Record, Text)]
-mkUserPosts subs posts records = undefined
+mkUserPosts :: [Record] -> [Record] -> [Record] -> [(Record, RecordId)]
+mkUserPosts subs posts records = build <$> records
   where
-    subMap = mkMap subs
-    postMap = mkMap posts
-    addId r = (fromJust $ getIdValue r, r)
-    mkMap xs = Map.fromList (addId <$> xs)
+    build r = mkUserPost (findSub r) (findPost r) r
+    findSub record = subMap Map.! fromJust (getValue "feedId" record)
+    findPost record = postMap Map.! fromJust (getValue "postId" record)
+    subMap = mkMap "feedId" subs
+    postMap = mkMap "_id" posts
+    addId :: Label -> Record -> (RecordId, Record)
+    addId label r = (fromJust $ getValue label r, r)
+    mkMap label xs = Map.fromList (addId label <$> xs)
 
-extractRecords search = undefined
+mkUserPost :: Record -> Record -> Record -> (Record, RecordId)
+mkUserPost sub post record = (build record, recId)
+  where
+    build = setValue "subscriptionId" subId . flip mergeRecords post' . mergeRecords sub'
+    sub' = includeFields subFields sub & excludeFields ["_id"]
+    post' = Record ["post" =: getDocument (excludeFields postSkipFields post)]
+    subId = fromJust $ getIdValue sub
+    postId = fromJust $ getIdValue post
+    recId = mkUserPostId subId postId
+    subFields = ["userId", "feedId", "title", "notes", "tags"]
+    postSkipFields = ["feedId", "_id", "pubdate", "__v"]
 
 -- ^
 -- Generate an id for a user post
-mkUserPostId
-  :: (Val a, Monoid a, IsString a)
-  => Record -> Maybe a
-mkUserPostId record =
-  getValue "postId" record <> Just "-" <> getValue "subscriptionId" record
+mkUserPostId :: (Monoid m, IsString m) => m -> m -> m
+mkUserPostId subId postId = subId <> "-" <> postId
 
 -- ^
 -- Get multiple posts by id
@@ -105,7 +117,7 @@ getSubsById ids =
 idsQuery ids = ["_id" =: ("$in" =: ids)]
 
 runDb
-  :: (MonadBaseControl IO m, MonadIO m)
+  :: (MonadBaseControl IO m)
   => (Database -> Pipe -> m (Either Failure c))
   -> Database
   -> Pipe

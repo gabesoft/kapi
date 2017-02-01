@@ -183,15 +183,3 @@ extractRecord results =
   case extractRecords [] results of
     [] -> Nothing
     x:_ -> Just x
-
--- ^
--- Extract all 'Record's from a 'SearchResult'
-extractRecords :: [Text] -> SearchResult Record -> [Record]
-extractRecords fields input = includeFields fields <$> records
-  where
-    result = B.searchHits input
-    hits = B.hits result
-    getRecord = catMaybes . (: []) . getRecord'
-    getRecord' hit = setValue idLabel (getId $ B.hitDocId hit) <$> B.hitSource hit
-    getId (B.DocId docId) = docId
-    records = concat (getRecord <$> hits)

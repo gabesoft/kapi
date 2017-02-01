@@ -111,6 +111,27 @@ test-suite persistence-mongodb-test
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   default-language:    Haskell2010
 
+test-suite persistence-xandar-user-posts-test
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      test
+  main-is:             PersistenceXandarUserPostsSpec.hs
+  other-modules:       Mocks.Common
+                     , TestHelper
+  build-depends:       base
+                     , bloodhound >= 0.12
+                     , bson
+                     , containers >= 0.5
+                     , hspec
+                     , hspec-core >= 2.3
+                     , iso8601-time >= 0.1
+                     , kapi
+                     , QuickCheck >= 2.8
+                     , quickcheck-text >= 0.1
+                     , text
+                     , time >= 1.6
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  default-language:    Haskell2010
+
 test-suite persistence-elasticsearch-test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test

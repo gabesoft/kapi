@@ -9,6 +9,7 @@ module Persistence.ElasticSearch
   , deleteDocuments
   , deleteIndex
   , esToApiError
+  , extractRecords
   , getByIds
   , indexDocument
   , indexDocuments
@@ -82,7 +83,11 @@ putMapping mapping server index mappingName =
 
 -- ^
 -- Add a new type from a file to an existing index
-putMappingFromFile :: FilePath -> Text -> Text -> Text -> IO (Either EsError Text)
+putMappingFromFile :: FilePath
+                   -> Text
+                   -> Text
+                   -> Text
+                   -> IO (Either EsError Text)
 putMappingFromFile file server index mappingName = do
   json <- readFile file
   let obj = A.decode (L.pack json) :: Maybe A.Object
@@ -94,7 +99,12 @@ putMappingFromFile file server index mappingName = do
 
 -- ^
 -- Index a document
-indexDocument :: Record -> Text -> Text -> Text -> Text -> IO (Either EsError Text)
+indexDocument :: Record
+              -> Text
+              -> Text
+              -> Text
+              -> Text
+              -> IO (Either EsError Text)
 indexDocument record recordId server index mappingName =
   withBH server $
   B.indexDocument
@@ -106,7 +116,11 @@ indexDocument record recordId server index mappingName =
 
 -- ^
 -- Index multiple documents
-indexDocuments :: [(Record, Text)] -> Text -> Text -> Text -> IO (Either EsError Text)
+indexDocuments :: [(Record, Text)]
+               -> Text
+               -> Text
+               -> Text
+               -> IO (Either EsError Text)
 indexDocuments items server index mappingName = withBH server (B.bulk stream)
   where
     op (record, recordId) =
@@ -136,7 +150,11 @@ deleteDocuments recordIds server index mappingName =
 
 -- ^
 -- Get documents by id
-getByIds :: [Text] -> Text -> Text -> Text -> IO (Either EsError (SearchResult Record))
+getByIds :: [Text]
+         -> Text
+         -> Text
+         -> Text
+         -> IO (Either EsError (SearchResult Record))
 getByIds ids server index mappingName =
   searchDocuments (mkIdsSearch mappingName ids) server index mappingName
 
@@ -144,12 +162,23 @@ getByIds ids server index mappingName =
 -- Return the number of documents matching a query
 countDocuments :: Search -> Text -> Text -> Text -> IO (Either EsError Int)
 countDocuments search server index mappingName = do
-  res <- searchDocuments (search { size = Size 0 }) server index mappingName
+  res <-
+    searchDocuments
+      (search
+       { size = Size 0
+       })
+      server
+      index
+      mappingName
   return $ B.hitsTotal . searchHits <$> res
 
 -- ^
 -- Search documents given a 'Search' object
-searchDocuments :: Search -> Text -> Text -> Text -> IO (Either EsError (SearchResult Record))
+searchDocuments :: Search
+                -> Text
+                -> Text
+                -> Text
+                -> IO (Either EsError (SearchResult Record))
 searchDocuments search server index mappingName = do
   body <-
     withBH server $ B.searchByType (IndexName index) (MappingName mappingName) search
@@ -172,7 +201,13 @@ mkIdsSearch mappingName ids = B.mkSearch (Just query) Nothing
 
 -- ^
 -- Create a search object
-mkSearch :: Maybe FilterExpr -> [Text] -> [Text] -> RecordStart -> ResultLimit -> Either EsError Search
+mkSearch
+  :: Maybe FilterExpr
+  -> [Text]
+  -> [Text]
+  -> RecordStart
+  -> ResultLimit
+  -> Either EsError Search
 mkSearch expr sort fields' start limit = first mkError $ liftA search query
   where
     query = sequence (exprToQuery <$> expr)
@@ -180,7 +215,13 @@ mkSearch expr sort fields' start limit = first mkError $ liftA search query
     search q = mkSearch' q Nothing sort' (FieldName <$> fields') start limit
     mkError = mkEsError 400
 
-mkSearch' :: Maybe Query -> Maybe Filter -> Maybe Sort -> [FieldName] -> Int -> Int -> Search
+mkSearch' :: Maybe Query
+          -> Maybe Filter
+          -> Maybe Sort
+          -> [FieldName]
+          -> Int
+          -> Int
+          -> Search
 mkSearch' query filter' sort fields' start limit =
   Search
     query
@@ -311,7 +352,9 @@ boolToText :: Bool -> Text
 boolToText True = T.pack "true"
 boolToText False = T.pack "false"
 
-anyToText :: Show a => a -> Text
+anyToText
+  :: Show a
+  => a -> Text
 anyToText = T.pack . show
 
 termToText :: FilterTerm -> Text
@@ -323,7 +366,9 @@ termToText (TermDate t) = anyToText t
 termToText TermNull = "null"
 termToText t = error $ "cannot convert term " ++ show t ++ "to text"
 
-mToMaybe :: (Eq a, Monoid a) => a -> Maybe a
+mToMaybe
+  :: (Eq a, Monoid a)
+  => a -> Maybe a
 mToMaybe a
   | a == mempty = Nothing
   | otherwise = Just a
@@ -341,3 +386,15 @@ esToApiError err =
     intToStatus 404 = status404
     intToStatus 500 = status500
     intToStatus code = error $ "unknown status code " ++ show code
+
+-- ^
+-- Extract all 'Record's from a 'SearchResult'
+extractRecords :: [Text] -> SearchResult Record -> [Record]
+extractRecords fields input = includeFields fields <$> records
+  where
+    result = B.searchHits input
+    hits = B.hits result
+    getRecord = catMaybes . (: []) . getRecord'
+    getRecord' hit = setValue idLabel (getId $ B.hitDocId hit) <$> B.hitSource hit
+    getId (DocId docId) = docId
+    records = concat (getRecord <$> hits)
