@@ -201,7 +201,7 @@ getField :: Label -> Record -> Maybe Field
 getField name (Record d) = findField d (splitAtDot name)
   where
     findField _ [] = error "no field specified"
-    findField doc (fname:[]) = find ((fname ==) . label) doc
+    findField doc [fname] = find ((fname ==) . label) doc
     findField doc (fname:ns) = withField fname doc (const Nothing) (process ns)
     process ns (_, y, _) _ = findNested y (head ns)
     findNested f@(k := v) fname
@@ -246,7 +246,7 @@ setValue
 setValue fname fvalue = setField (mkField $ T.split (== '.') fname)
   where
     mkField [] = error "no field name specified"
-    mkField (name:[]) = name =: fvalue
+    mkField [name] = name =: fvalue
     mkField (name:ns) = name =: mkField ns
 
 -- ^
@@ -304,7 +304,7 @@ excludeFields labels (Record d) =
   Record $ foldl remove d (splitAtDot <$> labels)
   where
     remove _ [] = error "no field name specified"
-    remove doc (name:[]) = filter (\(k := _) -> k /= name) doc
+    remove doc [name] = filter (\(k := _) -> k /= name) doc
     remove doc (name:ns) = withField name doc id (process ns)
     process ns (xs, y, ys) _ = xs ++ [removeNested y ns] ++ ys
     removeNested f@(k := v) names
@@ -320,7 +320,15 @@ includeFields labels record = excludeFields (getLabels' record \\ include') reco
     sep = "."
     split = filter (not . null) . inits . T.splitOn sep
     addPrefixes xs acc = acc ++ (T.intercalate sep <$> split xs)
-    include' = [idLabel] ++ foldr addPrefixes [] labels
+    include' = foldr addPrefixes [] labels
+
+-- ^
+-- Prepare the labels of the fields to be included in an object
+-- which will contain the input fields and the id. Empty input fields
+-- will result in all fields being returned.
+mkIncludeLabels :: [Label] -> [Label]
+mkIncludeLabels [] = []
+mkIncludeLabels xs = idLabel : xs
 
 -- ^
 -- Extract the field names from a record

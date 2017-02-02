@@ -28,12 +28,12 @@ main =
      it "can exclude simple fields" $
        verifyExclude rec1 excludeRes1 ["email", "y"]
      it "can exclude nested fields" $
-       verifyExclude rec3 excludeRes2 ["email", "nested.guid", "nested.none"]
+       verifyExclude rec3 excludeRes4 ["email", "nested.guid", "nested.none"]
      -- include
      it "can include simple fields" $ verifyInclude rec1 excludeRes1 ["_id"]
      it "can include nested fields" $ verifyInclude rec3 excludeRes2 ["nested._id", "nested.name"]
      it "includes all if fields are empty" $ verifyInclude rec3 rec3 []
-     it "always includes the id field" $ verifyInclude rec4 includeRes1 [ "nested.guid" ]
+     it "does not include the id if not in the list" $ verifyInclude rec4 includeRes1 [ "nested.guid" ]
      -- get
      it "can get simple fields - existing" $
        verifyGetField rec1 "y" (Just $ mkStrField "y" "2")

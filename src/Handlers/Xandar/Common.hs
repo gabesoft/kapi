@@ -94,8 +94,8 @@ getMultiple' def include query sort page perPage = do
   records <- runDb $ dbFind def query' sort' include' start limit
   return (records, pagination)
   where
-    sort' = splitFields mkSortField sort
-    include' = splitFields mkIncludeField include
+    sort' = mkSortFields (splitLabels sort)
+    include' = mkIncludeFields (splitLabels include)
     getQuery = first mkApiError400 (queryToDoc $ fromMaybe mempty query)
 
 -- ^
@@ -371,12 +371,9 @@ getCreateLink :: (Text -> String) -> Record -> String
 getCreateLink getLink = getLink . fromJust . getIdValue
 
 -- ^
--- Split a list of comma separated fields, apply a function to each one
--- and return the results that have a value
-splitFields
-  :: (Foldable t, Functor t)
-  => (Text -> Maybe a) -> t Text -> [a]
-splitFields f input = catMaybes $ f <$> concat (T.splitOn "," <$> input)
+-- Split a list o comma separated field names and remove all empty entries
+splitLabels :: (Foldable t, Functor t) => t Text -> [Text]
+splitLabels input = filter (not . T.null) $ concat (T.splitOn "," <$> input)
 
 -- ^
 -- Validate a record

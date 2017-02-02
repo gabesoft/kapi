@@ -390,8 +390,9 @@ esToApiError err =
 -- ^
 -- Extract all 'Record's from a 'SearchResult'
 extractRecords :: [Text] -> SearchResult Record -> [Record]
-extractRecords fields input = includeFields fields <$> records
+extractRecords fields input = includeFields fields' <$> records
   where
+    fields' = mkIncludeLabels fields
     result = B.searchHits input
     hits = B.hits result
     getRecord = catMaybes . (: []) . getRecord'

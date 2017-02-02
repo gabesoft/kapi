@@ -19,7 +19,7 @@ import qualified Data.Text as T
 import Database.Bloodhound (SearchResult(..), EsError, Search)
 import qualified Database.Bloodhound as B
 import Handlers.Xandar.Common
-       (throwApiError, mkPagination, splitFields, mkLinkHeader,
+       (throwApiError, mkPagination, splitLabels, mkLinkHeader,
         mkGetMultipleResult, checkEtag, mkApiResponse, mkApiResult)
 import Network.HTTP.Types.Status
 import Parsers.Filter (parse)
@@ -81,9 +81,8 @@ getMultiple' include query sortFields page perPage = do
   where
     getCountSearch = ExceptT . return $ prepareSearch include' query sort' 0 0
     getSearch start = ExceptT . return . prepareSearch [] query sort' start
-    mkFields = splitFields Just
-    include' = mkFields include
-    sort' = mkFields sortFields
+    include' = splitLabels include
+    sort' = splitLabels sortFields
 
 -- ^
 -- Delete a single record

@@ -15,9 +15,11 @@ module Persistence.MongoDB
   , documentToRecord
   , mkInDocument
   , mkIncludeField
+  , mkIncludeFields
   , mkOutRecord
   , mkPipe
   , mkSortField
+  , mkSortFields
   , queryToDoc
   , recordToDocument
   , validateHasId
@@ -257,6 +259,16 @@ mkIncludeField :: Text -> Maybe Field
 mkIncludeField name
   | T.null name = Nothing
   | otherwise = Just (mkIntField name 1)
+
+-- ^
+-- Create a document to be used for filtering a database collection
+mkIncludeFields :: [Label] -> [Field]
+mkIncludeFields = catMaybes . fmap mkIncludeField . mkIncludeLabels
+
+-- ^
+-- Create a document to be used for sorting the result of a query
+mkSortFields :: [Label] -> [Field]
+mkSortFields = catMaybes . fmap mkSortField
 
 mkIntField :: Text -> Int -> Field
 mkIntField = (=:)

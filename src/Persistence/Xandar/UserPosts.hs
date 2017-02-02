@@ -86,7 +86,7 @@ mkUserPost :: Record -> Record -> Record -> (Record, RecordId)
 mkUserPost sub post record = (build record, recId)
   where
     build = setValue "subscriptionId" subId . flip mergeRecords post' . mergeRecords sub'
-    sub' = includeFields subFields sub & excludeFields ["_id"]
+    sub' = includeFields subFields sub
     post' = Record ["post" =: getDocument (excludeFields postSkipFields post)]
     subId = fromJust $ getIdValue sub
     postId = fromJust $ getIdValue post

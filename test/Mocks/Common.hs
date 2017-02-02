@@ -204,6 +204,10 @@ excludeRes1 = Record [mkStrField "_id" "584e58195984185eb8000005"]
 
 excludeRes2 :: Record
 excludeRes2 =
+  Record ["nested" =: [mkStrField "_id" "1234", mkStrField "name" "Alfred"]]
+
+excludeRes4 :: Record
+excludeRes4 =
   Record
     [ mkStrField "_id" "584e58195984185eb8000007"
     , "nested" =: [mkStrField "_id" "1234", mkStrField "name" "Alfred"]
@@ -214,9 +218,7 @@ excludeRes2 =
 includeRes1 :: Record
 includeRes1 =
   Record
-    [ mkStrField "_id" "584e58195984185eb8000008"
-    , "nested" =: [mkStrField "guid" "a01c793c-58d2-49d6-aba9-4012e8d6ace5"]
-    ]
+    ["nested" =: [mkStrField "guid" "a01c793c-58d2-49d6-aba9-4012e8d6ace5"]]
 
 -- ^
 -- Merge records results
