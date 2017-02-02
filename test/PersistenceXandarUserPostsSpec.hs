@@ -23,20 +23,19 @@ main =
   describe "Persistence.Xandar.UserPosts" $
   do it "ensures a user post contains a postId and a subscriptionId" $
        verifyValidation invalid (invalid, invalidErrors)
-     it "overrides the post field" $
+     it "creates a user post" $
        verifyMakeUserPost input1 (userPost1, userPost1Id)
-
--- TESTS for mkUserPost
--- post field overrides input
--- input overrides subscription
--- id value
--- result has all expected fields
+     it "can handle multiple posts" $
+       verifyMakeUserPosts input1 (userPost1, userPost1Id)
 
 verifyValidation input exp =
     validate userPostDefinition input `shouldBe` exp
 
 verifyMakeUserPost input exp =
     mkUserPost subscription post input `shouldBe` exp
+
+verifyMakeUserPosts input exp =
+    mkUserPosts [subscription] [post] [input] `shouldBe` [exp]
 
 invalidErrors =
   ValidationErrors
@@ -57,6 +56,8 @@ input1 =
   Record
     [ mkBoolField "read" True
     , mkStrField "title" "random title"
+    , mkStrField "subscriptionId" "56d7de07c788cb1d6eb91a82"
+    , mkStrField "postId" "56d7d88bc788cb1d6eb919a1"
     , "post" =: [mkStrField "author" "unknown"]
     , mkStrListField "tags" ["haskell", "javascript"]
     ]
@@ -68,6 +69,8 @@ userPost1 =
     , mkStrField "title" "random title"
     , mkStrField "userId" "56d7cc3fccee17506699e735"
     , mkBoolField "read" True
+    , mkStrField "subscriptionId" "56d7de07c788cb1d6eb91a82"
+    , mkStrField "postId" "56d7d88bc788cb1d6eb919a1"
     , "post" =:
       [ mkStrField "author" "Post author"
       , mkStrField "comments" []
@@ -79,7 +82,6 @@ userPost1 =
       , mkStrField "title" "Post title"
       , "image" =: [mkStrField "url" "http://example.com/feeds/1233.rss"]
       ]
-    , mkStrField "subscriptionId" "56d7de07c788cb1d6eb91a82"
     ]
 
 userPost1Id = "56d7de07c788cb1d6eb91a82-56d7d88bc788cb1d6eb919a1"
@@ -102,7 +104,7 @@ post =
     , mkStrField "comments" []
     , mkStrField "date" "2016-03-01T03:45:00.000Z"
     , mkStrField "description" "Post description"
-    , mkStrField "feedId" "56d7d88bc788cb1d6eb9199c"
+    , mkStrField "feedId" "56d7de07c788cb1d6eb91a6d"
     , mkStrField "guid" "8196e7a1-4fdd-417d-b49b-c74640089314"
     , mkStrField "_id" "56d7d88bc788cb1d6eb919a1"
     , mkStrField "link" "http://example.com/feeds/1233.html"

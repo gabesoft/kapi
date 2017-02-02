@@ -5,12 +5,15 @@
 -- Persistence functions for user-posts
 module Persistence.Xandar.UserPosts where
 
+import Control.Applicative (liftA2)
 import Control.Monad.Except
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Control
 import Data.Bifunctor
 import Data.Bson
+import Data.Either
 import Data.Function ((&))
+import Data.List (intercalate)
 import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.Monoid ((<>))
@@ -48,18 +51,20 @@ insertUserPosts :: [Record]
                 -> Pipe
                 -> Text
                 -> Text
-                -> ExceptT ApiError IO [Record]
+                -> ExceptT ApiError IO [ApiResult]
 insertUserPosts input dbName pipe server index = do
   valid <- mapM validate' input
   let subIds = vals "subscriptionId" valid
   let postIds = vals "postId" valid
   subs <- runDb (getSubsById subIds) dbName pipe
   posts <- runDb (getPostsById postIds) dbName pipe
-  let items = mkUserPosts subs posts valid
+  let results = mkUserPosts subs posts valid
+  let failed = lefts results
+  let items = rights results
   _ <- runEs (E.indexDocuments items) server index mapping
   let recIds = snd <$> items
   created <- runEs (E.getByIds recIds) server index mapping
-  return $ E.extractRecords [] created
+  return $ (Succ <$> E.extractRecords [] created) <> (Fail <$> failed)
   where
     vals label = catMaybes . fmap (getValue label)
     mapping = recordCollection userPostDefinition
@@ -70,22 +75,35 @@ updateUserPosts input = undefined
 
 -- ^
 -- Construct user post documents
-mkUserPosts :: [Record] -> [Record] -> [Record] -> [(Record, RecordId)]
-mkUserPosts subs posts records = build <$> records
+mkUserPosts :: [Record] -> [Record] -> [Record] -> [Either ApiError (Record, RecordId)]
+mkUserPosts subs posts records = process <$> records
   where
-    build r = mkUserPost (findSub r) (findPost r) r
-    findSub record = subMap Map.! fromJust (getValue "feedId" record)
-    findPost record = postMap Map.! fromJust (getValue "postId" record)
-    subMap = mkMap "feedId" subs
-    postMap = mkMap "_id" posts
-    addId :: Label -> Record -> (RecordId, Record)
-    addId label r = (fromJust $ getValue label r, r)
-    mkMap label xs = Map.fromList (addId label <$> xs)
+    process r = maybe (Left $ mkErr r) Right (build r)
+    build r = liftA2 (mkUserPost r) (findSub r) (findPost r)
+    mkErr r =
+      mkApiError400 $
+      unwords
+        [ msg "Subscription" (subId r) (findSub r)
+        , msg "Post" (postId r) (findPost r)
+        ]
+    msg m rid = maybe (m ++ T.unpack rid ++ "not found.") mempty
+    findSub record = Map.lookup (subId record) subMap
+    findPost record = Map.lookup (postId record) postMap
+    subId = getId "subscriptionId"
+    postId = getId "postId"
+    subMap = mkMap subs
+    postMap = mkMap posts
+    getId :: Label -> Record -> RecordId
+    getId label = fromJust . getValue label
+    addId r = (fromJust $ getIdValue r, r)
+    mkMap xs = Map.fromList (addId <$> xs)
 
 mkUserPost :: Record -> Record -> Record -> (Record, RecordId)
-mkUserPost sub post record = (build record, recId)
+mkUserPost record sub post = (build record, recId)
   where
-    build = setValue "subscriptionId" subId . flip mergeRecords post' . mergeRecords sub'
+    build =
+      setValue "subscriptionId" subId .
+      setValue "postId" postId . flip mergeRecords post' . mergeRecords sub'
     sub' = includeFields subFields sub
     post' = Record ["post" =: getDocument (excludeFields postSkipFields post)]
     subId = fromJust $ getIdValue sub
