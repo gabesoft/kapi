@@ -1,19 +1,32 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 -- ^
 -- GHCI setup for elastic-search
 module Test.ElasticSearchSetup where
 
+import Control.Applicative
+import Control.Monad.Except
 import qualified Data.Aeson as A
+import Data.Bson
 import qualified Data.ByteString.Lazy.Char8 as LBS
+import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Database.Bloodhound as B
+import Database.MongoDB (Pipe)
+import Handlers.Xandar.Common (dbPipe)
 import Parsers.Filter
+import Persistence.Common
 import Persistence.ElasticSearch
 import Persistence.Xandar.UserPosts
+import TestHelper
 import Types.Common
+
+mongoDbHost = "127.0.0.1"
+mongoDbPort = 27017
+mongoDbName = "kapi-xandar"
 
 eServer :: Text
 eServer = "http://localhost:9200"
@@ -23,6 +36,16 @@ eIndex = "kapi-xandar"
 
 eMapping :: Text
 eMapping = "post"
+
+sampleConf =
+  ApiConfig
+  { apiPort = 8001
+  , mongoHost = mongoDbHost
+  , mongoPort = mongoDbPort
+  , mongoDbs = Map.fromList [("xandar", mongoDbName)]
+  , esServer = eServer
+  , esIndices = Map.fromList [("xandar", eIndex)]
+  }
 
 src :: Text -> RecordStart -> ResultLimit -> B.Search
 src input = src' input [] []
@@ -50,4 +73,30 @@ readItems = do
   return (addId <$> posts)
   where
     addId :: Record -> (Record, Text)
-    addId post = (post, fromJust $ mkUserPostId post)
+    addId post =
+      ( post
+      , fromJust $
+        liftA2
+          mkUserPostId
+          (getValue "subscriptionId" post)
+          (getValue "postId" post))
+
+input1 :: RecordData Field
+input1 =
+  Record
+    [ mkStrField "postId" "56d7d88bc788cb1d6eb9199d"
+    , mkStrField "subscriptionId" "56d7df90c788cb1d6eb92789"
+    , mkStrField "title" "Haskell  Reddit"
+    , mkBoolField "read" True
+    ]
+
+getDbData :: [Record] -> ExceptT ApiError IO ([Record], [Record], [Text], [Text])
+getDbData input = do
+  pipe <- dbPipe sampleConf
+  let subIds = vals "subscriptionId" input
+  let postIds = vals "postId" input
+  subs <- runDb (getSubsById subIds) mongoDbName pipe
+  posts <- runDb (getPostsById postIds) mongoDbName pipe
+  return (subs, posts, subIds, postIds)
+  where
+    vals label = catMaybes . fmap (getValue label)

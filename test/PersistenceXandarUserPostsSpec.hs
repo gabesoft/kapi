@@ -10,6 +10,7 @@ import Data.Bson
 import Data.List (all)
 import qualified Data.Map.Strict as Map
 import Mocks.Common
+import Network.HTTP.Types
 import Persistence.Common
 import Persistence.Xandar.UserPosts
 import Test.Hspec
@@ -26,23 +27,28 @@ main =
      it "creates a user post" $
        verifyMakeUserPost input1 (userPost1, userPost1Id)
      it "can handle multiple posts" $
-       verifyMakeUserPosts input1 (userPost1, userPost1Id)
+       verifyMakeUserPosts [input1] [Right (userPost1, userPost1Id)]
+     it "returns results and errors" $
+       verifyMakeUserPosts [input1, input2] result1
 
-verifyValidation input exp =
-    validate userPostDefinition input `shouldBe` exp
+verifyValidation :: Record -> (Record, ValidationResult) -> Expectation
+verifyValidation input exp = validate userPostDefinition input `shouldBe` exp
 
-verifyMakeUserPost input exp =
-    mkUserPost subscription post input `shouldBe` exp
+verifyMakeUserPost :: Record -> (Record, RecordId) -> Expectation
+verifyMakeUserPost input exp = mkUserPost (subscription, post) input `shouldBe` exp
 
+verifyMakeUserPosts :: [Record] -> [Either ApiError (Record, RecordId)] -> Expectation
 verifyMakeUserPosts input exp =
-    mkUserPosts [subscription] [post] [input] `shouldBe` [exp]
+  mkUserPosts ([subscription], [post]) input `shouldBe` exp
 
+invalidErrors :: ValidationResult
 invalidErrors =
   ValidationErrors
     [ mkStrField "postId" "Field is required"
     , mkStrField "subscriptionId" "Field is required"
     ]
 
+invalid :: RecordData Field
 invalid =
   Record
     [ "post" =:
@@ -52,6 +58,7 @@ invalid =
     , mkStrField "feedId" "57e9f802d5ec56510904c9d9"
     ]
 
+input1 :: RecordData Field
 input1 =
   Record
     [ mkBoolField "read" True
@@ -62,6 +69,18 @@ input1 =
     , mkStrListField "tags" ["haskell", "javascript"]
     ]
 
+input2 :: RecordData Field
+input2 =
+  Record
+    [ mkBoolField "read" True
+    , mkStrField "title" "random title"
+    , mkStrField "subscriptionId" "56d7de07c788cb1d6eb9ba82"
+    , mkStrField "postId" "56d7d88bc788cb1d6eb919c1"
+    , "post" =: [mkStrField "author" "unknown"]
+    , mkStrListField "tags" ["haskell", "javascript"]
+    ]
+
+userPost1 :: RecordData Field
 userPost1 =
   Record
     [ mkStrField "feedId" "56d7de07c788cb1d6eb91a6d"
@@ -84,8 +103,25 @@ userPost1 =
       ]
     ]
 
+result1 :: [Either ApiError (RecordData Field, RecordId)]
+result1 =
+  [ Right (userPost1, userPost1Id)
+  , Left
+      ApiError
+      { apiErrorStatus =
+        Status
+        { statusCode = 400
+        , statusMessage = "Bad Request"
+        }
+      , apiErrorMessage =
+        "Subscription 56d7de07c788cb1d6eb9ba82 not found. Post 56d7d88bc788cb1d6eb919c1 not found."
+      }
+  ]
+
+userPost1Id :: RecordId
 userPost1Id = "56d7de07c788cb1d6eb91a82-56d7d88bc788cb1d6eb919a1"
 
+subscription :: RecordData Field
 subscription =
   Record
     [ mkStrField "createdAt" "2016-03-03T06:47:35.463Z"
@@ -98,6 +134,7 @@ subscription =
     , mkStrField "userId" "56d7cc3fccee17506699e735"
     ]
 
+post :: RecordData Field
 post =
   Record
     [ mkStrField "author" "Post author"

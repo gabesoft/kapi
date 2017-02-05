@@ -20,11 +20,14 @@ import Database.Bloodhound (SearchResult(..), EsError, Search)
 import qualified Database.Bloodhound as B
 import Handlers.Xandar.Common
        (throwApiError, mkPagination, splitLabels, mkLinkHeader,
-        mkGetMultipleResult, checkEtag, mkApiResponse, mkApiResult)
+        mkGetMultipleResult, checkEtag, mkApiResponse, mkApiResult, dbName,
+        dbPipe, getCreateLink)
 import Network.HTTP.Types.Status
 import Parsers.Filter (parse)
 import Persistence.Common
 import Persistence.ElasticSearch
+import Persistence.Xandar.UserPosts
+       (insertUserPosts, updateUserPosts)
 import Servant
 import Types.Common
 
@@ -105,7 +108,30 @@ createSingleOrMultiple (Multiple rs) = createMultiple rs
 createSingle
   :: Record
   -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData ApiResult))
-createSingle input = undefined
+createSingle input = mkApiResponse respond (createSingle' input)
+  where
+    respond r =
+      case r of
+        Fail e -> throwApiError e
+        Succ r ->
+          return $
+          addHeader (getCreateLink mkUserPostGetSingleLink r) $
+          noHeader (Single $ Succ r)
+    mkResult f input = do
+      result <- runExceptT input
+      either throwApiError f result
+
+createSingle'
+  :: (MonadReader ApiConfig m, MonadIO m)
+  => Record -> ExceptT ApiError m ApiResult
+createSingle' input = do
+  conf <- ask
+  pipe <- dbPipe conf
+  posts <-
+    liftIO $
+    runExceptT $
+    insertUserPosts [input] (dbName conf, pipe) (esServer conf, esIndex conf)
+  ExceptT $ return (head <$> posts)
 
 -- ^
 -- Create multiple records

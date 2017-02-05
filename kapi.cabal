@@ -123,6 +123,7 @@ test-suite persistence-xandar-user-posts-test
                      , containers >= 0.5
                      , hspec
                      , hspec-core >= 2.3
+                     , http-types >= 0.9
                      , iso8601-time >= 0.1
                      , kapi
                      , QuickCheck >= 2.8

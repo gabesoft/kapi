@@ -20,6 +20,14 @@ GET http://:host
 GET http://:host/_cluster/health?pretty
 
 #
+# Change the root logger level (TRACE,DEBUG,INFO,WARN)
+#
+PUT http://:host/_cluster/settings
+{
+  "transient": {"logger._root": "TRACE"}
+}
+
+#
 # Display all shards
 #
 GET http://:host/_cat/shards
@@ -60,7 +68,7 @@ GET http://:host/:index2/_search?q=title:haskell
 #
 # Index a document
 #
-PUT http://:host/:index2/:coll/1
+PUT http://:host/:index2/:coll/2
 {
   "post": {
     "summary": null,
@@ -93,6 +101,11 @@ PUT http://:host/:index2/:coll/1
 # Get a document by id
 #
 GET http://:host/:index2/:coll/2
+
+#
+# Get a document by id 2
+#
+GET http://:host/:index2/:coll/56d7df90c788cb1d6eb92789-56d7d88bc788cb1d6eb9199d
 
 #
 # Get a document by _uid

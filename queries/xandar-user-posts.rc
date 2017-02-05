@@ -69,3 +69,26 @@ HEAD http://:host/:path/1
 # Delete a single post
 #
 DELETE http://:host/:path/57f422da966d70b95f5e5228-56d7e0c2c788cb1d6eb93217
+
+#
+# Get post by id (existing)
+#
+GET http://:host/:path/581a32d909a64c359672ec0b-5814f2d909a64c359672dded
+
+#
+# Get post by id (new)
+#
+GET http://:host/:path/56d7df90c788cb1d6eb92789-56d7d88bc788cb1d6eb9199d
+
+#
+# Create a single post (valid)
+#
+POST http://:host/:path
+Content-Type: :json
+{           
+  "postId": "56d7d88bc788cb1d6eb9199d",
+  "subscriptionId": "56d7df90c788cb1d6eb92789",
+  "title": "Sample user post title",
+  "read": true,
+  "tags": ["technology", "programming", "javascript"]
+}

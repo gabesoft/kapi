@@ -32,7 +32,7 @@ import Types.Common
 
 userPostDefinition :: RecordDefinition
 userPostDefinition =
-  RecordDefinition "posts" $
+  RecordDefinition "post" $
   Map.fromList
     [ mkReqDef' "subscriptionId"
     , mkReqDef' "postId"
@@ -46,22 +46,25 @@ userPostDefinition =
 
 -- ^
 -- Insert new user posts
+-- TODO: set createdAt and updatedAt
+--       ensure user id matches with the subscription user
+--       feedId should be overwritten
 insertUserPosts :: [Record]
-                -> Database
-                -> Pipe
-                -> Text
-                -> Text
+                -> (Database, Pipe)
+                -> (Text, Text)
                 -> ExceptT ApiError IO [ApiResult]
-insertUserPosts input dbName pipe server index = do
+insertUserPosts input (dbName, pipe) (server, index) = do
   valid <- mapM validate' input
   let subIds = vals "subscriptionId" valid
   let postIds = vals "postId" valid
   subs <- runDb (getSubsById subIds) dbName pipe
   posts <- runDb (getPostsById postIds) dbName pipe
-  let results = mkUserPosts subs posts valid
+  let results = mkUserPosts (subs, posts) valid
   let failed = lefts results
   let items = rights results
-  _ <- runEs (E.indexDocuments items) server index mapping
+  ir <- runEs (E.indexDocuments items) server index mapping
+  liftIO $ print ir
+  rr <- runEs (\s i _ -> E.refreshIndex s i) server index mapping
   let recIds = snd <$> items
   created <- runEs (E.getByIds recIds) server index mapping
   return $ (Succ <$> E.extractRecords [] created) <> (Fail <$> failed)
@@ -75,18 +78,18 @@ updateUserPosts input = undefined
 
 -- ^
 -- Construct user post documents
-mkUserPosts :: [Record] -> [Record] -> [Record] -> [Either ApiError (Record, RecordId)]
-mkUserPosts subs posts records = process <$> records
+mkUserPosts :: ([Record], [Record]) -> [Record] -> [Either ApiError (Record, RecordId)]
+mkUserPosts (subs, posts) records = process <$> records
   where
     process r = maybe (Left $ mkErr r) Right (build r)
-    build r = liftA2 (mkUserPost r) (findSub r) (findPost r)
+    build r = liftA2 (curry $ flip mkUserPost r) (findSub r) (findPost r)
     mkErr r =
       mkApiError400 $
       unwords
         [ msg "Subscription" (subId r) (findSub r)
         , msg "Post" (postId r) (findPost r)
         ]
-    msg m rid = maybe (m ++ T.unpack rid ++ "not found.") mempty
+    msg m rid = maybe (m ++ " " ++ T.unpack rid ++ " not found.") mempty
     findSub record = Map.lookup (subId record) subMap
     findPost record = Map.lookup (postId record) postMap
     subId = getId "subscriptionId"
@@ -98,8 +101,8 @@ mkUserPosts subs posts records = process <$> records
     addId r = (fromJust $ getIdValue r, r)
     mkMap xs = Map.fromList (addId <$> xs)
 
-mkUserPost :: Record -> Record -> Record -> (Record, RecordId)
-mkUserPost record sub post = (build record, recId)
+mkUserPost :: (Record, Record) -> Record -> (Record, RecordId)
+mkUserPost (sub, post) record = (build record, recId)
   where
     build =
       setValue "subscriptionId" subId .
@@ -122,7 +125,7 @@ mkUserPostId subId postId = subId <> "-" <> postId
 getPostsById
   :: (MonadBaseControl IO m, MonadIO m)
   => [RecordId] -> Database -> Pipe -> m (Either Failure [Record])
-getPostsById ids = M.dbFind postDefinition (idsQuery ids) [] [] 0 0
+getPostsById ids = M.dbFind postDefinition (M.idsQuery ids) [] [] 0 0
 
 -- ^
 -- Get multiple subscriptions by id
@@ -130,9 +133,7 @@ getSubsById
   :: (MonadBaseControl IO m, MonadIO m)
   => [RecordId] -> Database -> Pipe -> m (Either Failure [Record])
 getSubsById ids =
-  M.dbFind feedSubscriptionDefinition (idsQuery ids) [] [] 0 0
-
-idsQuery ids = ["_id" =: ("$in" =: ids)]
+  M.dbFind feedSubscriptionDefinition (M.idsQuery ids) [] [] 0 0
 
 runDb
   :: (MonadBaseControl IO m)

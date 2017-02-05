@@ -13,6 +13,8 @@ module Persistence.MongoDB
   , dbToApiError
   , dbUpdate
   , documentToRecord
+  , idQuery
+  , idsQuery
   , mkInDocument
   , mkIncludeField
   , mkIncludeFields
@@ -139,7 +141,7 @@ dbGetById def recId dbName pipe =
      return $ Right (mkOutRecord def <$> record)
   where
     collName = recordCollection def
-    action = findOne $ idQuery collName recId
+    action = findOne $ select (idQuery recId) collName
 
 -- ^
 -- Delete a record by id
@@ -151,7 +153,7 @@ dbDeleteById def recId dbName pipe =
   do dbAccess action dbName pipe
      return $ Right ()
   where
-    action = delete $ idQuery (recordCollection def) recId
+    action = delete $ select (idQuery recId) (recordCollection def)
 
 -- ^
 -- Count the number of records in a collection
@@ -203,11 +205,14 @@ setTimestamp' isNew =
     else setUpdatedAt
 
 -- ^
--- Get an selection for querying one record by id
-idQuery
-  :: Select a
-  => Collection -> RecordId -> a
-idQuery collName recId = select [idLabel =: recIdToObjId recId] collName
+-- Get a query for finding one record by id
+idQuery :: RecordId -> [Field]
+idQuery recId = [idLabel =: recIdToObjId recId]
+
+-- ^
+-- Get a query for finding multiple records by id
+idsQuery :: [RecordId] -> [Field]
+idsQuery recIds = [idLabel =: ("$in" =: recIdToObjId <$> recIds)]
 
 -- ^
 -- Convert a record id to an object id value

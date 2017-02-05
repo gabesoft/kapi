@@ -17,7 +17,7 @@ GET http://:host/:path?per_page=3
 #
 # Get all subscriptions - sort & partial response
 #
-GET http://:host/:path?sort=title&include=title,uri,userId&page=4&per_page=10
+GET http://:host/:path?sort=title&include=title,uri,userId,feedId&page=4&per_page=10
 
 #
 # Get subscriptions filtered by status
