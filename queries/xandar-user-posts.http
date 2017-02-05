@@ -160,5 +160,16 @@ Content-Type: :json
     "subscriptionId": "56d7de0dc788cb1d6eb91ac6",
     "feedId": "56d7de0dc788cb1d6eb91abb",
     "tags": [ "javascript", "programming" ]
+  },
+  {
+    "postId": "56d7de0dc788cb1d6eb91ac5",
+    "subscriptionId": "56k7de0dc788cb1d6eb91ac6",
+    "feedId": "56d7de0dc788cb1d6eb91abb",
+    "tags": [ "javascript", "programming" ]
+  },
+  {
+    "postId": "56d7de0dc788cb1d6eb91ac5",
+    "feedId": "56d7de0dc788cb1d6eb91abb",
+    "tags": [ "javascript", "programming" ]
   }
 ]

@@ -54,7 +54,9 @@ insertUserPosts :: [Record]
                 -> (Text, Text)
                 -> ExceptT ApiError IO [ApiResult]
 insertUserPosts input (dbName, pipe) (server, index) = do
-  valid <- mapM validate' input
+  let vResults = validate' <$> input
+  let valid = rights vResults
+  let invalid = lefts vResults
   let subIds = vals "subscriptionId" valid
   let postIds = vals "postId" valid
   subs <- runDb (getSubsById subIds) dbName pipe
@@ -62,7 +64,7 @@ insertUserPosts input (dbName, pipe) (server, index) = do
   let results = mkUserPosts (subs, posts) valid
   let failed = lefts results
   created <- indexDocuments (rights results) server index mapping
-  return $ (Succ <$> created) <> (Fail <$> failed)
+  return $ (Succ <$> created) <> (Fail <$> failed) <> (Fail <$> invalid)
   where
     vals label = catMaybes . fmap (getValue label)
     mapping = recordCollection userPostDefinition
@@ -90,7 +92,6 @@ indexDocuments input server index mapping = do
 
 -- ^
 -- Merge an existing with a new user post
--- TODO: merge tags
 mergeUserPosts :: MonadIO m => Map.Map RecordId Record -> (Record, RecordId) -> m (Record, RecordId)
 mergeUserPosts recMap (new, recId) = mergeDates existingDate
   where
@@ -213,8 +214,5 @@ runEs action server index mappingName = do
   results <- lift $ action server index mappingName
   ExceptT (return $ first E.esToApiError results)
 
-validate'
-  :: Monad m
-  => Record -> ExceptT ApiError m Record
-validate' record =
-  ExceptT . return $ vResultToEither (validate userPostDefinition record)
+validate' :: Record -> Either ApiError Record
+validate' record = vResultToEither (validate userPostDefinition record)

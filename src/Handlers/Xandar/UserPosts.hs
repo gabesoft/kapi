@@ -13,6 +13,7 @@ import Control.Monad.Except
 import Control.Monad.Reader
 import Data.Bifunctor
 import qualified Data.ByteString.Lazy.Char8 as LBS
+import Data.List (intercalate)
 import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -21,7 +22,7 @@ import qualified Database.Bloodhound as B
 import Handlers.Xandar.Common
        (throwApiError, mkPagination, splitLabels, mkLinkHeader,
         mkGetMultipleResult, checkEtag, mkApiResponse, mkApiResult, dbName,
-        dbPipe, getCreateLink)
+        dbPipe, getCreateLink, mkLink)
 import Network.HTTP.Types.Status
 import Parsers.Filter (parse)
 import Persistence.Common
@@ -117,10 +118,9 @@ createSingle input = mkApiResponse respond (createSingle' input)
           return $
           addHeader (getCreateLink mkUserPostGetSingleLink r) $
           noHeader (Single $ Succ r)
-    mkResult f input = do
-      result <- runExceptT input
-      either throwApiError f result
 
+-- ^
+-- Helper for 'createSingle'
 createSingle'
   :: (MonadReader ApiConfig m, MonadIO m)
   => Record -> ExceptT ApiError m ApiResult
@@ -138,9 +138,27 @@ createSingle' input = do
 createMultiple
   :: [Record]
   -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData ApiResult))
-createMultiple inputs = undefined
+createMultiple inputs = mkApiResponse respond (createMultiple' inputs)
+  where
+    respond records =
+      return . noHeader $
+      addHeader (intercalate ", " $ links records) (Multiple records)
+    getLink = mkUserPostGetSingleLink
+    links = fmap $ apiItem (const "<>") (mkLink . getCreateLink getLink)
 
-createMultiple' inputs = undefined
+-- ^
+-- Helper for 'createMultiple'
+createMultiple'
+  :: (MonadReader ApiConfig m, MonadIO m)
+  => [Record] -> ExceptT ApiError m [ApiResult]
+createMultiple' inputs = do
+  conf <- ask
+  pipe <- dbPipe conf
+  posts <-
+    liftIO $
+    runExceptT $
+    insertUserPosts inputs (dbName conf, pipe) (esServer conf, esIndex conf)
+  ExceptT $ return posts
 
 -- ^
 -- Update (replace) a single record
