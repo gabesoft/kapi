@@ -274,8 +274,8 @@ exprToQuery = toQuery
       Right $ TermQuery (Term c (anyToText v)) (mkBoost x)
     mkEqQuery (ColumnName c x) (TermBool v) =
       Right $ TermQuery (Term c (boolToText v)) (mkBoost x)
-    mkEqQuery (ColumnName c x) (TermStr v) =
-      Right $ TermQuery (Term c v) (mkBoost x)
+    mkEqQuery (ColumnName c x) (TermStr v) = Right $ TermQuery (Term c v) (mkBoost x)
+    mkEqQuery (ColumnName c x) (TermId v) = Right $ TermQuery (Term c v) (mkBoost x)
     mkEqQuery (ColumnName c x) (TermDate v) =
       Right $ TermQuery (Term c (anyToText v)) (mkBoost x)
     mkEqQuery _ TermNull = Left "Null query not yet supported."
@@ -361,6 +361,7 @@ termToText :: FilterTerm -> Text
 termToText (TermInt t) = anyToText t
 termToText (TermFloat t) = anyToText t
 termToText (TermStr t) = t
+termToText (TermId t) = t
 termToText (TermBool t) = anyToText t
 termToText (TermDate t) = anyToText t
 termToText TermNull = "null"

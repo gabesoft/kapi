@@ -13,6 +13,7 @@ import Data.Bifunctor
 import Data.Bson as BSON
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import qualified Data.Map.Strict as Map
+import Data.Maybe
 import Data.Monoid
 import Data.String
 import Data.Text (Text)
@@ -23,6 +24,7 @@ import GHC.Generics
 import Network.HTTP.Types.Status
 import Network.Socket (HostName, PortNumber)
 import Servant
+import Text.Read (readMaybe)
 
 -- ^ Api type
 type Api = ReaderT ApiConfig Handler
@@ -241,6 +243,7 @@ data FilterTerm
   | TermFloat Double
   | TermBool Bool
   | TermStr Text
+  | TermId Text
   | TermDate UTCTime
   | TermNull
   | TermList [FilterTerm]
@@ -251,12 +254,14 @@ instance Val FilterTerm where
   val (TermFloat x) = val x
   val (TermBool x) = val x
   val (TermStr x) = val x
+  val (TermId x) = val (ObjId (fromJust . readMaybe $ T.unpack x))
   val (TermDate x) = val x
   val TermNull = BSON.Null
   val (TermList xs) = valList xs
   cast' x@(Int32 _) = TermInt <$> cast' x
   cast' x@(Int64 _) = TermInt <$> cast' x
   cast' x@(Float _) = TermFloat <$> cast' x
+  cast' x@(ObjId y) = TermId <$> Just (T.pack $ show y)
   cast' x@(BSON.Bool _) = TermBool <$> cast' x
   cast' x@(BSON.String _) = TermStr <$> cast' x
   cast' x@(BSON.UTC _) = TermDate <$> cast' x

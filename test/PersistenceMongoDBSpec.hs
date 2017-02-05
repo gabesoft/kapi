@@ -57,6 +57,10 @@ main =
        verifyQueryToDoc
          "foreignKey in ['586763745984183aef000002','586763745984183aef000003']"
          queryRes1
+     it "converts a query to a document - id field multiple 2" $
+       verifyQueryToDoc
+         "foreignKey in ['586763745984183aef000002', 586763745984183aef000003]"
+         queryRes1
      it "converts a query to a document - id field multiple negated" $
        verifyQueryToDoc
          "foreignKey ~in ['586763745984183aef000002','586763745984183aef000003']"

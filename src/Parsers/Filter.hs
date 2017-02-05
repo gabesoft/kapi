@@ -13,6 +13,7 @@ import qualified Data.Attoparsec.Text as A
 import Data.Char (isSpace, chr, isHexDigit)
 import Data.List (find)
 import Data.Maybe
+import Data.Monoid ((<>))
 import Data.Scientific (floatingOrInteger, Scientific)
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -65,7 +66,7 @@ term :: Parser FilterTerm
 term = termSingle <|> termList <?> "term"
 
 termSingle :: Parser FilterTerm
-termSingle = jsDate <|> bool <|> null' <|> str <|> num <?> "term single"
+termSingle = jsDate <|> bool <|> null' <|> str <|> idTerm <|> num <?> "term single"
 
 termList :: Parser FilterTerm
 termList = TermList <$> braces (sepByComma item) <?> "list"
@@ -113,6 +114,20 @@ jsDate = TermDate <$> (takeWhile1 (inClass included) >>= getDate) <?> "iso8601 d
       case parseISO8601 (T.unpack s) of
         Just d -> return d
         Nothing -> fail "expected an ISO8601 date"
+
+idTerm :: Parser FilterTerm
+idTerm = (TermId <$> postId) <|> (TermId <$> objId)
+
+objId :: Parser Text
+objId = do
+  oid <- replicateM 24 (satisfy isHexDigit)
+  return (T.pack oid)
+
+postId :: Parser Text
+postId = do
+  p1 <- objId <* char '-'
+  p2 <- objId
+  return $ p1 <> "-" <> p2
 
 str :: Parser FilterTerm
 str = TermStr <$> (str' '"' <|> str' '\'') <?> "string"

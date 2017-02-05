@@ -12,7 +12,7 @@
 #
 # Get all posts
 #
-GET http://:host/:path
+GET http://:host/:path?per_page=2
 
 #
 # Get all posts - sort & partial response
@@ -20,9 +20,14 @@ GET http://:host/:path
 GET http://:host/:path?sort=image.url&include=title,link,image
 
 #
-# Get all posts for feed
+# Get all posts for feed 1
 #
 GET http://:host/:path?where=(feedId eq '56d7de0dc788cb1d6eb91abb')&include=title,feedId,link
+
+#
+# Get all posts for feed 2
+#
+GET http://:host/:path?where=(feedId eq 56d7de0dc788cb1d6eb91abb)&include=title,feedId,link
 
 #
 # Get multiple posts by id
