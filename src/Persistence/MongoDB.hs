@@ -31,6 +31,7 @@ import Control.Exception.Lifted (handleJust)
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Control
 import Data.Bifunctor
+import Data.Bson
 import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.Text (Text)
@@ -126,6 +127,16 @@ dbFind def filter' sort' fields skip' limit' dbName pipe =
         { limit = fromIntegral limit'} >>= rest
 
 -- ^
+-- Count the number of records in a collection
+dbCount
+  :: (MonadBaseControl IO m, MonadIO m)
+  => RecordDefinition -> [Field] -> Database -> Pipe -> m (Either Failure Int)
+dbCount def filter' dbName pipe = dbAction $ Right <$> dbAccess action dbName pipe
+  where
+    collName = recordCollection def
+    action = count (select filter' collName)
+
+-- ^
 -- Get a record by id
 dbGetById
   :: (MonadBaseControl IO m, MonadIO m)
@@ -155,15 +166,6 @@ dbDeleteById def recId dbName pipe =
     action = delete $ select (idQuery recId) (recordCollection def)
 
 -- ^
--- Count the number of records in a collection
-dbCount
-  :: (MonadBaseControl IO m, MonadIO m)
-  => RecordDefinition -> Database -> Pipe -> m (Either Failure Int)
-dbCount def dbName pipe = dbAction $ Right <$> dbAccess action dbName pipe
-  where
-    action = count (select [] $ recordCollection def)
-
--- ^
 -- Perform a database action that could result in a 'Failure'
 dbAction :: (MonadIO m, MonadBaseControl IO m) => m (Either Failure a) -> m (Either Failure a)
 dbAction = handleJust Just (return . Left)
@@ -189,11 +191,6 @@ documentToRecord def document =
 recordToDocument :: RecordDefinition -> Record -> Document
 recordToDocument def record =
   getDocument (foldr mapIdToObjId record $ idLabel : getIdLabels def)
-
--- ^
--- Convert all id fields to ObjectId
-convertIds :: RecordDefinition -> Record -> Record
-convertIds def record = foldr mapIdToObjId record $ getIdLabels def
 
 -- ^
 -- Get the labels of all fields of type 'ObjectId' in a 'RecordDefinition'
@@ -281,7 +278,7 @@ mkIntField = (=:)
 queryToDoc :: RecordDefinition -> Text -> Either String Document
 queryToDoc def xs = do
   q <- queryToDoc' xs
-  return (getDocument $ convertIds def $ Record q)
+  return (convertIds def q)
 
 -- ^
 -- Convert a filter query to a 'Document'
@@ -289,6 +286,19 @@ queryToDoc' :: Text -> Either String Document
 queryToDoc' xs
   | T.null xs = Right []
   | otherwise = first ("Invalid query: " ++) $ parse xs >>= filterToDoc
+
+-- ^
+-- Convert all id values to ObjectId
+convertIds :: RecordDefinition -> Document -> Document
+convertIds def doc = foldr mapId doc (idLabel : getIdLabels def)
+  where
+    mapId label acc = maybe acc (processField acc) (getField label $ Record doc)
+    processField d f = getDocument $ setField (process f) (Record d)
+    process (k := v) = k := mapValue v
+    mapValue (String t) = fromMaybe (String t) (recIdToObjId t)
+    mapValue (Array xs) = Array (mapValue <$> xs)
+    mapValue (Doc d) = Doc (process <$> d)
+    mapValue v = v
 
 -- ^
 -- Convert a 'FilterExpr' into a 'Document' that can be used to filter

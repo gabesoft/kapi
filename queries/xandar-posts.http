@@ -25,6 +25,16 @@ GET http://:host/:path?sort=image.url&include=title,link,image
 GET http://:host/:path?where=(feedId eq '56d7de0dc788cb1d6eb91abb')&include=title,feedId,link
 
 #
+# Get multiple posts by id
+#
+GET http://:host/:path?where=(_id in ['56d7de0dc788cb1d6eb91abc', '56d7de0dc788cb1d6eb91abd', '56d7de0dc788cb1d6eb91abe'])&include=title,feedId,link
+
+#
+# Get all posts for feeds
+#
+GET http://:host/:path?where=(feedId in ['56d7defcc788cb1d6eb922c8', '56d7de07c788cb1d6eb91a6d', '56d7ddf8c788cb1d6eb919d8', '56d7e029c788cb1d6eb92c65'])&include=title,feedId,link
+
+#
 # Get posts filtered by status
 #
 GET http://:host/:path?where=(title contains "taking")&include=title,link

@@ -49,6 +49,18 @@ main =
        verifyQueryToDoc
          "foreignKey eq '586763745984183aef000002'"
          ["foreignKey" =: mkId "586763745984183aef000002"]
+     it "converts a query to a document - id field 2" $
+       verifyQueryToDoc
+         "_id eq '586763745984183aef000002'"
+         ["_id" =: mkId "586763745984183aef000002"]
+     it "converts a query to a document - id field multiple" $
+       verifyQueryToDoc
+         "foreignKey in ['586763745984183aef000002','586763745984183aef000003']"
+         queryRes1
+     it "converts a query to a document - id field multiple negated" $
+       verifyQueryToDoc
+         "foreignKey ~in ['586763745984183aef000002','586763745984183aef000003']"
+         queryRes2
      it "converts a document to a record - new" $
        verifyDocumentToRecord recDef sampleNewDoc sampleNewRec
      it "converts a document to a record - old" $
@@ -190,5 +202,21 @@ res6 =
   [ "$or" =:
     [ ["$and" =: [[mkStrField "a" "b"], ["b" =: [mkIntField "$gt" 1]]]]
     , ["c" =: [mkFloatField "$lt" 2.4]]
+    ]
+  ]
+
+queryRes1 :: Document
+queryRes1 =
+  [ "foreignKey" =:
+    [ "$in" =:
+      [mkId "586763745984183aef000002", mkId "586763745984183aef000003"]
+    ]
+  ]
+
+queryRes2 :: Document
+queryRes2 =
+  [ "foreignKey" =:
+    [ "$nin" =:
+      [mkId "586763745984183aef000002", mkId "586763745984183aef000003"]
     ]
   ]

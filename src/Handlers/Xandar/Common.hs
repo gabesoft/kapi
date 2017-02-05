@@ -86,11 +86,11 @@ getMultiple'
   -> Maybe Int
   -> ExceptT ApiError m ([Record], Pagination)
 getMultiple' def include query sort page perPage = do
-  count <- runDb (dbCount def)
+  query' <- ExceptT (return getQuery)
+  count <- runDb (dbCount def query')
   let pagination = mkPagination page perPage count
   let start = paginationStart pagination
   let limit = paginationLimit pagination
-  query' <- ExceptT (return getQuery)
   records <- runDb $ dbFind def query' sort' include' start limit
   return (records, pagination)
   where

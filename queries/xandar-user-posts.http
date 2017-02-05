@@ -86,7 +86,7 @@ GET http://:host/:path/581a32d909a64c359672ec0b-5814f2d909a64c359672dded
 GET http://:host/:path/56d7de0dc788cb1d6eb91ac6-56d7de0dc788cb1d6eb91abc
 
 #
-# Create a single post (valid)
+# Create a single post
 #
 POST http://:host/:path
 Content-Type: :json
@@ -124,3 +124,35 @@ Content-Type: :json
   "read": true,
   "tags": ["technology", "programming"]
 }
+
+#
+# Create multiple posts
+#
+POST http://:host/:path
+Content-Type: :json
+[
+  {
+    "postId": "56d7de0dc788cb1d6eb91ac2",
+    "subscriptionId": "56d7de0dc788cb1d6eb91ac6",
+    "feedId": "56d7de0dc788cb1d6eb91abb",
+    "tags": [ "haskell", "programming" ]
+  },
+  {
+    "postId": "56d7de0dc788cb1d6eb91ac3",
+    "subscriptionId": "56d7de0dc788cb1d6eb91ac6",
+    "feedId": "56d7de0dc788cb1d6eb91abb",
+    "tags": [ "haskell", "programming" ]
+  },
+  {
+    "postId": "56d7de0dc788cb1d6eb91ac4",
+    "subscriptionId": "56d7de0dc788cb1d6eb91ac6",
+    "feedId": "56d7de0dc788cb1d6eb91abb",
+    "tags": [ "javascript", "programming" ]
+  },
+  {
+    "postId": "56d7de0dc788cb1d6eb91ac5",
+    "subscriptionId": "56d7de0dc788cb1d6eb91ac6",
+    "feedId": "56d7de0dc788cb1d6eb91abb",
+    "tags": [ "javascript", "programming" ]
+  }
+]
