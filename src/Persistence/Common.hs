@@ -4,7 +4,7 @@
 -- Common functionality for the persistence layer
 module Persistence.Common where
 
-import Control.Monad (join)
+import Control.Monad (join, (>=>))
 import Control.Monad.IO.Class
 import Data.Aeson as AESON
 import Data.Bson as BSON
@@ -146,10 +146,12 @@ setIdValue = setValue idLabel
 getIdValue :: Record -> Maybe RecordId
 getIdValue = getValue idLabel
 
-setTimestamp
+-- ^
+-- Set the value of a field to the current time
+setTimestamp'
   :: MonadIO m
   => Text -> Record -> m Record
-setTimestamp name r = do
+setTimestamp' name r = do
   time <- liftIO getCurrentTime
   return (setValue name time r)
 
@@ -158,14 +160,24 @@ setTimestamp name r = do
 setUpdatedAt
   :: MonadIO m
   => Record -> m Record
-setUpdatedAt = setTimestamp updatedAtLabel
+setUpdatedAt = setTimestamp' updatedAtLabel
 
 -- ^
 -- Set the value of the createdAt field
 setCreatedAt
   :: MonadIO m
   => Record -> m Record
-setCreatedAt = setTimestamp createdAtLabel
+setCreatedAt = setTimestamp' createdAtLabel
+
+-- ^
+-- Set the updatedAt field. For new records also set a createdAt field.
+setTimestamp
+  :: MonadIO m
+  => Bool -> Record -> m Record
+setTimestamp isNew =
+  if isNew
+    then setUpdatedAt >=> setCreatedAt
+    else setUpdatedAt
 
 -- ^
 -- Modify the value of a field or remove it

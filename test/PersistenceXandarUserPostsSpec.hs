@@ -23,13 +23,13 @@ main =
   hspec $
   describe "Persistence.Xandar.UserPosts" $
   do it "ensures a user post contains a postId and a subscriptionId" $
-       verifyValidation invalid (invalid, invalidErrors)
+       verifyValidation inputInvalid1 (inputInvalid1, invalidErrors)
      it "creates a user post" $
-       verifyMakeUserPost input1 (userPost1, userPost1Id)
+       verifyMakeUserPost inputValid (userPost1, userPost1Id)
      it "can handle multiple posts" $
-       verifyMakeUserPosts [input1] [Right (userPost1, userPost1Id)]
+       verifyMakeUserPosts [inputValid] [Right (userPost1, userPost1Id)]
      it "returns results and errors" $
-       verifyMakeUserPosts [input1, input2] result1
+       verifyMakeUserPosts [inputValid, inputInvalid2] result1
 
 verifyValidation :: Record -> (Record, ValidationResult) -> Expectation
 verifyValidation input exp = validate userPostDefinition input `shouldBe` exp
@@ -48,8 +48,8 @@ invalidErrors =
     , mkStrField "subscriptionId" "Field is required"
     ]
 
-invalid :: RecordData Field
-invalid =
+inputInvalid1 :: RecordData Field
+inputInvalid1 =
   Record
     [ "post" =:
       [ mkIntField "version" 0
@@ -58,24 +58,26 @@ invalid =
     , mkStrField "feedId" "57e9f802d5ec56510904c9d9"
     ]
 
-input1 :: RecordData Field
-input1 =
+inputInvalid2 :: RecordData Field
+inputInvalid2 =
+  Record
+    [ mkBoolField "read" True
+    , mkStrField "title" "random title"
+    , mkStrField "subscriptionId" "56d7de07c788cb1d6eb91a82"
+    , mkStrField "postId" "56d7d88bc788cb1d6eb919c1"
+    , "post" =: [mkStrField "author" "unknown"]
+    , mkStrListField "tags" ["haskell", "javascript"]
+    ]
+
+inputValid :: RecordData Field
+inputValid =
   Record
     [ mkBoolField "read" True
     , mkStrField "title" "random title"
     , mkStrField "subscriptionId" "56d7de07c788cb1d6eb91a82"
     , mkStrField "postId" "56d7d88bc788cb1d6eb919a1"
-    , "post" =: [mkStrField "author" "unknown"]
-    , mkStrListField "tags" ["haskell", "javascript"]
-    ]
-
-input2 :: RecordData Field
-input2 =
-  Record
-    [ mkBoolField "read" True
-    , mkStrField "title" "random title"
-    , mkStrField "subscriptionId" "56d7de07c788cb1d6eb9ba82"
-    , mkStrField "postId" "56d7d88bc788cb1d6eb919c1"
+    , mkStrField "feedId" "to be overwritten"
+    , mkStrField "userId" "to be overwritten"
     , "post" =: [mkStrField "author" "unknown"]
     , mkStrListField "tags" ["haskell", "javascript"]
     ]
@@ -83,13 +85,13 @@ input2 =
 userPost1 :: RecordData Field
 userPost1 =
   Record
-    [ mkStrField "feedId" "56d7de07c788cb1d6eb91a6d"
-    , mkStrListField "tags" ["haskell", "javascript"]
+    [ mkStrListField "tags" ["haskell", "javascript"]
     , mkStrField "title" "random title"
-    , mkStrField "userId" "56d7cc3fccee17506699e735"
     , mkBoolField "read" True
     , mkStrField "subscriptionId" "56d7de07c788cb1d6eb91a82"
     , mkStrField "postId" "56d7d88bc788cb1d6eb919a1"
+    , mkStrField "feedId" "56d7de07c788cb1d6eb91a6d"
+    , mkStrField "userId" "56d7cc3fccee17506699e735"
     , "post" =:
       [ mkStrField "author" "Post author"
       , mkStrField "comments" []
@@ -114,7 +116,7 @@ result1 =
         , statusMessage = "Bad Request"
         }
       , apiErrorMessage =
-        "Subscription 56d7de07c788cb1d6eb9ba82 not found. Post 56d7d88bc788cb1d6eb919c1 not found."
+        "Post 56d7d88bc788cb1d6eb919c1 not found."
       }
   ]
 

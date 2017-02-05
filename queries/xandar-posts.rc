@@ -22,7 +22,7 @@ GET http://:host/:path?sort=image.url&include=title,link,image
 #
 # Get all posts for feed
 #
-GET http://:host/:path?where(feedId eq 56d7cc3fccee17506699e735)
+GET http://:host/:path?where=(feedId eq '56d7de0dc788cb1d6eb91abb')&include=title,feedId,link
 
 #
 # Get posts filtered by status

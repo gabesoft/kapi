@@ -21,40 +21,44 @@ import Types.Common
 main :: IO ()
 main =
   hspec $
-  describe "Persistence.MongoDB" $ do
-    it "validates that a record has a valid id - missing" $
-      verifyValidateId rec1 res1
-    it "validates that a record has a valid id - invalid" $
-      verifyValidateId rec1 res1
-    it "validates that a record has a valid id - valid" $
-      verifyValidateId rec3 (ValidationErrors [])
-    it "creates a document ready to be saved - missing id" =<<
-      runIO (verifyMkInDocument rec4 res5)
-    it "creates a document ready to be saved - invalid id" =<<
-      runIO (verifyMkInDocument rec6 res2)
-    it "creates a document ready to be saved - valid id" =<<
-      runIO (verifyMkInDocument rec7 res4)
-    it "creates a record ready to be returned" $ verifyMkOutDocument rec5 res3
-    it "can make a sort field for ascending sort" $
-      verifyMkSortField "email" (mkIntField "email" 1)
-    it "can make a sort field for descending sort" $
-      verifyMkSortField "-email" (mkIntField "email" (negate 1))
-    it "converts a query to a document" $
-      verifyQueryToDoc "(a eq \"b\") and (b gt 1) or (c:2 lt 2.4)" res6
-    it "converts a query to a document - null" $
-      verifyQueryToDoc "a eq null" ["a" =: Null]
-    it "converts a query to a document - not null" $
-      verifyQueryToDoc "a ~eq null" ["a" =: ["$ne" =: Null]]
-    it "converts a document to a record - new" $
-      verifyDocumentToRecord recDef sampleNewDoc sampleNewRec
-    it "converts a document to a record - old" $
-      verifyDocumentToRecord recDef sampleDoc sampleRec
-    it "converts a record to a document - new" $
-      verifyRecordToDocument recDef sampleNewRec sampleNewDoc
-    it "converts a record to a document - old" $
-      verifyRecordToDocument recDef sampleRec sampleDoc
-    it "converts a record to a document - invalid foreign key" $
-      verifyRecordToDocument recDef sampleRecInvalidFK sampleDocMissingFK
+  describe "Persistence.MongoDB" $
+  do it "validates that a record has a valid id - missing" $
+       verifyValidateId rec1 res1
+     it "validates that a record has a valid id - invalid" $
+       verifyValidateId rec1 res1
+     it "validates that a record has a valid id - valid" $
+       verifyValidateId rec3 (ValidationErrors [])
+     it "creates a document ready to be saved - missing id" =<<
+       runIO (verifyMkInDocument rec4 res5)
+     it "creates a document ready to be saved - invalid id" =<<
+       runIO (verifyMkInDocument rec6 res2)
+     it "creates a document ready to be saved - valid id" =<<
+       runIO (verifyMkInDocument rec7 res4)
+     it "creates a record ready to be returned" $ verifyMkOutDocument rec5 res3
+     it "can make a sort field for ascending sort" $
+       verifyMkSortField "email" (mkIntField "email" 1)
+     it "can make a sort field for descending sort" $
+       verifyMkSortField "-email" (mkIntField "email" (negate 1))
+     it "converts a query to a document" $
+       verifyQueryToDoc "(a eq \"b\") and (b gt 1) or (c:2 lt 2.4)" res6
+     it "converts a query to a document - null" $
+       verifyQueryToDoc "a eq null" ["a" =: Null]
+     it "converts a query to a document - not null" $
+       verifyQueryToDoc "a ~eq null" ["a" =: ["$ne" =: Null]]
+     it "converts a query to a document - id field" $
+       verifyQueryToDoc
+         "foreignKey eq '586763745984183aef000002'"
+         ["foreignKey" =: mkId "586763745984183aef000002"]
+     it "converts a document to a record - new" $
+       verifyDocumentToRecord recDef sampleNewDoc sampleNewRec
+     it "converts a document to a record - old" $
+       verifyDocumentToRecord recDef sampleDoc sampleRec
+     it "converts a record to a document - new" $
+       verifyRecordToDocument recDef sampleNewRec sampleNewDoc
+     it "converts a record to a document - old" $
+       verifyRecordToDocument recDef sampleRec sampleDoc
+     it "converts a record to a document - invalid foreign key" $
+       verifyRecordToDocument recDef sampleRecInvalidFK sampleDocMissingFK
 
 verifyValidateId :: Record -> ValidationResult -> Expectation
 verifyValidateId r exp = snd (validateHasId r) `shouldBe` exp
@@ -75,7 +79,7 @@ verifyMkSortField :: Text -> Field -> Expectation
 verifyMkSortField name exp = mkSortField name `shouldBe` Just exp
 
 verifyQueryToDoc :: Text -> Document -> Expectation
-verifyQueryToDoc query exp = queryToDoc query `shouldBe` Right exp
+verifyQueryToDoc query exp = queryToDoc recDef query `shouldBe` Right exp
 
 verifyRecordToDocument :: RecordDefinition -> Record -> Document -> Expectation
 verifyRecordToDocument def record exp =

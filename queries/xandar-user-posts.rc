@@ -26,6 +26,11 @@ HEAD http://:host/:path?where=(post.title contains 'vim')
 GET http://:host/:path?where=(post.title contains 'monad')&per_page=2
 
 #
+# Find by subscription id
+#
+GET http://:host/:path?where=(subscriptionId eq '56d7df90c788cb1d6eb92789')&include=createdAt,updatedAt,title
+
+#
 # Find by post tags
 #
 GET http://:host/:path?where=(tags in ['haskell','emacs'])&per_page=20&include=tags,post.title,title
@@ -78,7 +83,7 @@ GET http://:host/:path/581a32d909a64c359672ec0b-5814f2d909a64c359672dded
 #
 # Get post by id (new)
 #
-GET http://:host/:path/56d7df90c788cb1d6eb92789-56d7d88bc788cb1d6eb9199d
+GET http://:host/:path/56d7de0dc788cb1d6eb91ac6-56d7de0dc788cb1d6eb91abc
 
 #
 # Create a single post (valid)
@@ -90,5 +95,32 @@ Content-Type: :json
   "subscriptionId": "56d7df90c788cb1d6eb92789",
   "title": "Sample user post title",
   "read": true,
-  "tags": ["technology", "programming", "javascript"]
+  "tags": ["technology", "programming"]
+}
+
+#
+# Create a single post (valid 2)
+#
+POST http://:host/:path
+Content-Type: :json
+{           
+  "postId": "56d7de0dc788cb1d6eb91abf",
+  "feedId": "56d7de0dc788cb1d6eb91abb",
+  "subscriptionId": "56d7de0dc788cb1d6eb91ac6",
+  "read": true,
+  "tags": ["technology", "programming"]
+}
+
+
+#
+# Create a single post (invalid)
+#
+POST http://:host/:path
+Content-Type: :json
+{           
+  "postId": "56d7d88bc788cb1d6eb9199k",
+  "subscriptionId": "56d7df90c788cb1d6eb92789",
+  "title": "Sample user post title",
+  "read": true,
+  "tags": ["technology", "programming"]
 }

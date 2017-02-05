@@ -28,7 +28,6 @@ module Persistence.MongoDB
   ) where
 
 import Control.Exception.Lifted (handleJust)
-import Control.Monad ((>=>))
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Control
 import Data.Bifunctor
@@ -177,7 +176,7 @@ mkOutRecord = documentToRecord
 -- ^
 -- Create a document ready to be saved or updated
 mkInDocument :: MonadIO m => RecordDefinition -> Bool -> Record -> m Document
-mkInDocument def isNew = fmap (recordToDocument def) . setTimestamp' isNew
+mkInDocument def isNew = fmap (recordToDocument def) . setTimestamp isNew
 
 -- ^
 -- Convert a BSON 'Document' to a 'Record'
@@ -192,17 +191,14 @@ recordToDocument def record =
   getDocument (foldr mapIdToObjId record $ idLabel : getIdLabels def)
 
 -- ^
+-- Convert all id fields to ObjectId
+convertIds :: RecordDefinition -> Record -> Record
+convertIds def record = foldr mapIdToObjId record $ getIdLabels def
+
+-- ^
 -- Get the labels of all fields of type 'ObjectId' in a 'RecordDefinition'
 getIdLabels :: RecordDefinition -> [Label]
 getIdLabels = Map.keys . Map.filter isObjectId . recordFields
-
--- ^
--- Set the updatedAt field. For new records also set a createdAt field.
-setTimestamp' :: MonadIO m => Bool -> Record -> m Record
-setTimestamp' isNew =
-  if isNew
-    then setUpdatedAt >=> setCreatedAt
-    else setUpdatedAt
 
 -- ^
 -- Get a query for finding one record by id
@@ -275,13 +271,22 @@ mkIncludeFields = catMaybes . fmap mkIncludeField . mkIncludeLabels
 mkSortFields :: [Label] -> [Field]
 mkSortFields = catMaybes . fmap mkSortField
 
+-- ^
+-- Create an 'Int' field
 mkIntField :: Text -> Int -> Field
 mkIntField = (=:)
 
 -- ^
+-- Convert a filter query to a 'Document' and convert all id fields to ObjectId
+queryToDoc :: RecordDefinition -> Text -> Either String Document
+queryToDoc def xs = do
+  q <- queryToDoc' xs
+  return (getDocument $ convertIds def $ Record q)
+
+-- ^
 -- Convert a filter query to a 'Document'
-queryToDoc :: Text -> Either String Document
-queryToDoc xs
+queryToDoc' :: Text -> Either String Document
+queryToDoc' xs
   | T.null xs = Right []
   | otherwise = first ("Invalid query: " ++) $ parse xs >>= filterToDoc
 

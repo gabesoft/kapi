@@ -9,8 +9,10 @@ import Control.Applicative (liftA2)
 import Control.Monad.Except
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Control
+import qualified Data.Aeson as A
 import Data.Bifunctor
-import Data.Bson
+import Data.Bson hiding (lookup)
+import qualified Data.ByteString.Lazy.Char8 as LBS
 import Data.Either
 import Data.Function ((&))
 import Data.List (intercalate)
@@ -22,6 +24,7 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Bloodhound (EsError(..))
 import Database.MongoDB (Database, Pipe, Failure)
+import Debug.Trace
 import Persistence.Common
 import qualified Persistence.ElasticSearch as E
 import qualified Persistence.MongoDB as M
@@ -46,9 +49,6 @@ userPostDefinition =
 
 -- ^
 -- Insert new user posts
--- TODO: set createdAt and updatedAt
---       ensure user id matches with the subscription user
---       feedId should be overwritten
 insertUserPosts :: [Record]
                 -> (Database, Pipe)
                 -> (Text, Text)
@@ -61,31 +61,67 @@ insertUserPosts input (dbName, pipe) (server, index) = do
   posts <- runDb (getPostsById postIds) dbName pipe
   let results = mkUserPosts (subs, posts) valid
   let failed = lefts results
-  let items = rights results
-  ir <- runEs (E.indexDocuments items) server index mapping
-  liftIO $ print ir
-  rr <- runEs (\s i _ -> E.refreshIndex s i) server index mapping
-  let recIds = snd <$> items
-  created <- runEs (E.getByIds recIds) server index mapping
-  return $ (Succ <$> E.extractRecords [] created) <> (Fail <$> failed)
+  created <- indexDocuments (rights results) server index mapping
+  return $ (Succ <$> created) <> (Fail <$> failed)
   where
     vals label = catMaybes . fmap (getValue label)
     mapping = recordCollection userPostDefinition
 
 -- ^
+-- Index multiple documents and re-query them
+indexDocuments :: [(Record, RecordId)]
+               -> Text
+               -> Text
+               -> Text
+               -> ExceptT ApiError IO [Record]
+indexDocuments [] _ _ _ = return []
+indexDocuments input server index mapping = do
+  existing <- runEs (E.getByIds ids) server index mapping
+  let existingMap = mkRecordMap (E.extractRecords [] existing)
+  items <- liftIO $ mapM (mergeUserPosts existingMap) input
+  runEs (E.indexDocuments items) server index mapping >>= log
+  runEs refreshIndex server index mapping
+  created <- runEs (E.getByIds ids) server index mapping
+  return (E.extractRecords [] created)
+  where
+    ids = snd <$> input
+    refreshIndex s i _ = E.refreshIndex s i
+    log msg = liftIO $ print $ trace "Insert user posts" msg
+
+-- ^
+-- Merge an existing with a new user post
+-- TODO: merge tags
+mergeUserPosts :: MonadIO m => Map.Map RecordId Record -> (Record, RecordId) -> m (Record, RecordId)
+mergeUserPosts recMap (new, recId) = mergeDates existingDate
+  where
+    existing = Map.lookup recId recMap
+    existingDate :: Maybe Text
+    existingDate = existing >>= getValue "createdAt"
+    mergeDates Nothing = do
+      record <- setTimestamp True new
+      return (record, recId)
+    mergeDates (Just createdAt) = do
+      record <- setTimestamp False new
+      return (setValue "createdAt" createdAt record, recId)
+
+-- ^
 -- Update existing user posts
-updateUserPosts input = undefined
+updateUserPosts = insertUserPosts
 
 -- ^
 -- Construct user post documents
-mkUserPosts :: ([Record], [Record]) -> [Record] -> [Either ApiError (Record, RecordId)]
+mkUserPosts :: ([Record], [Record])
+            -> [Record]
+            -> [Either ApiError (Record, RecordId)]
 mkUserPosts (subs, posts) records = process <$> records
   where
     process r = maybe (Left $ mkErr r) Right (build r)
     build r = liftA2 (curry $ flip mkUserPost r) (findSub r) (findPost r)
     mkErr r =
       mkApiError400 $
-      unwords
+      unwords $
+      filter
+        (not . null)
         [ msg "Subscription" (subId r) (findSub r)
         , msg "Post" (postId r) (findPost r)
         ]
@@ -94,30 +130,52 @@ mkUserPosts (subs, posts) records = process <$> records
     findPost record = Map.lookup (postId record) postMap
     subId = getId "subscriptionId"
     postId = getId "postId"
-    subMap = mkMap subs
-    postMap = mkMap posts
+    subMap = mkRecordMap subs
+    postMap = mkRecordMap posts
     getId :: Label -> Record -> RecordId
     getId label = fromJust . getValue label
-    addId r = (fromJust $ getIdValue r, r)
-    mkMap xs = Map.fromList (addId <$> xs)
 
+-- ^
+-- Make a make a map with the ids as keys and records as values
+mkRecordMap xs = Map.fromList (addId <$> xs)
+  where
+    addId r = (fromJust $ getIdValue r, r)
+
+-- ^
+-- Combine a subscription, post, and input record to create a user-post ready to be indexed
 mkUserPost :: (Record, Record) -> Record -> (Record, RecordId)
 mkUserPost (sub, post) record = (build record, recId)
   where
-    build =
-      setValue "subscriptionId" subId .
-      setValue "postId" postId . flip mergeRecords post' . mergeRecords sub'
+    build r = foldr set (flip mergeRecords post' $ mergeRecords sub' r) overwriteIds
+    (recId, overwriteIds) = getIds sub post
+    set (name, val) = setValue name val
     sub' = includeFields subFields sub
     post' = Record ["post" =: getDocument (excludeFields postSkipFields post)]
-    subId = fromJust $ getIdValue sub
-    postId = fromJust $ getIdValue post
-    recId = mkUserPostId subId postId
-    subFields = ["userId", "feedId", "title", "notes", "tags"]
+    subFields = ["title", "notes", "tags"]
     postSkipFields = ["feedId", "_id", "pubdate", "__v"]
 
 -- ^
+-- Get all ids required to create a user-post record
+getIds :: Record -> Record -> (RecordId, [(RecordId, RecordId)])
+getIds sub post = (recId, output)
+  where
+    output = get <$> input
+    input =
+      [ ("feedId", "feedId", sub)
+      , ("userId", "userId", sub)
+      , ("subscriptionId", "_id", sub)
+      , ("postId", "_id", post)
+      ]
+    get (outLabel, label, r) = (outLabel, fromJust $ getValue label r)
+    subId = fromJust $ lookup "subscriptionId" output
+    postId = fromJust $ lookup "postId" output
+    recId = mkUserPostId subId postId
+
+-- ^
 -- Generate an id for a user post
-mkUserPostId :: (Monoid m, IsString m) => m -> m -> m
+mkUserPostId
+  :: (Monoid m, IsString m)
+  => m -> m -> m
 mkUserPostId subId postId = subId <> "-" <> postId
 
 -- ^
@@ -132,8 +190,7 @@ getPostsById ids = M.dbFind postDefinition (M.idsQuery ids) [] [] 0 0
 getSubsById
   :: (MonadBaseControl IO m, MonadIO m)
   => [RecordId] -> Database -> Pipe -> m (Either Failure [Record])
-getSubsById ids =
-  M.dbFind feedSubscriptionDefinition (M.idsQuery ids) [] [] 0 0
+getSubsById ids = M.dbFind feedSubscriptionDefinition (M.idsQuery ids) [] [] 0 0
 
 runDb
   :: (MonadBaseControl IO m)

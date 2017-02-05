@@ -96,7 +96,7 @@ getMultiple' def include query sort page perPage = do
   where
     sort' = mkSortFields (splitLabels sort)
     include' = mkIncludeFields (splitLabels include)
-    getQuery = first mkApiError400 (queryToDoc $ fromMaybe mempty query)
+    getQuery = first mkApiError400 (queryToDoc def $ fromMaybe mempty query)
 
 -- ^
 -- Delete a single record
