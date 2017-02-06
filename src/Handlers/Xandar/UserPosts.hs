@@ -15,6 +15,7 @@ import Data.Bifunctor
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import Data.List (intercalate)
 import Data.Maybe
+import Data.Monoid
 import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Bloodhound (SearchResult(..), EsError, Search)
@@ -23,12 +24,12 @@ import Handlers.Xandar.Common
        (throwApiError, mkPagination, splitLabels, mkLinkHeader,
         mkGetMultipleResult, checkEtag, mkApiResponse, mkApiResult, dbName,
         dbPipe, getCreateLink, mkLink)
+import qualified Handlers.Xandar.Common as C
 import Network.HTTP.Types.Status
 import Parsers.Filter (parse)
 import Persistence.Common
 import Persistence.ElasticSearch
-import Persistence.Xandar.UserPosts
-       (insertUserPosts, updateUserPosts)
+import Persistence.Xandar.UserPosts (insertUserPosts)
 import Servant
 import Types.Common
 
@@ -109,7 +110,7 @@ createSingleOrMultiple (Multiple rs) = createMultiple rs
 createSingle
   :: Record
   -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData ApiResult))
-createSingle input = mkApiResponse respond (createSingle' input)
+createSingle input = mkApiResponse respond (createSingle' True input)
   where
     respond r =
       case r of
@@ -120,25 +121,11 @@ createSingle input = mkApiResponse respond (createSingle' input)
           noHeader (Single $ Succ r)
 
 -- ^
--- Helper for 'createSingle'
-createSingle'
-  :: (MonadReader ApiConfig m, MonadIO m)
-  => Record -> ExceptT ApiError m ApiResult
-createSingle' input = do
-  conf <- ask
-  pipe <- dbPipe conf
-  posts <-
-    liftIO $
-    runExceptT $
-    insertUserPosts [input] (dbName conf, pipe) (esServer conf, esIndex conf)
-  ExceptT $ return (head <$> posts)
-
--- ^
 -- Create multiple records
 createMultiple
   :: [Record]
   -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData ApiResult))
-createMultiple inputs = mkApiResponse respond (createMultiple' inputs)
+createMultiple inputs = mkApiResponse respond (createMultiple' True inputs)
   where
     respond records =
       return . noHeader $
@@ -147,49 +134,91 @@ createMultiple inputs = mkApiResponse respond (createMultiple' inputs)
     links = fmap $ apiItem (const "<>") (mkLink . getCreateLink getLink)
 
 -- ^
--- Helper for 'createMultiple'
-createMultiple'
-  :: (MonadReader ApiConfig m, MonadIO m)
-  => [Record] -> ExceptT ApiError m [ApiResult]
-createMultiple' inputs = do
-  conf <- ask
-  pipe <- dbPipe conf
-  posts <-
-    liftIO $
-    runExceptT $
-    insertUserPosts inputs (dbName conf, pipe) (esServer conf, esIndex conf)
-  ExceptT $ return posts
-
--- ^
 -- Update (replace) a single record
 replaceSingle :: Text -> Record -> Api Record
-replaceSingle = undefined
+replaceSingle uid input = mkApiResponse respond run
+  where
+    respond = apiItem throwApiError return
+    run = updateSingle' True uid input
 
 -- ^
 -- Update (modify) a single record
 modifySingle :: Text -> Record -> Api Record
-modifySingle = undefined
+modifySingle uid input = mkApiResponse respond run
+  where
+    respond = apiItem throwApiError return
+    run = updateSingle' False uid input
 
 -- ^
 -- Update (replace) multiple records
 replaceMultiple :: [Record] -> Api [ApiResult]
-replaceMultiple = undefined
+replaceMultiple inputs = mkApiResponse return (createMultiple' True inputs)
 
 -- ^
 -- Update (modify) multiple records
 modifyMultiple :: [Record] -> Api [ApiResult]
-modifyMultiple = undefined
+modifyMultiple inputs = mkApiResponse return (createMultiple' False inputs)
 
 -- ^
 -- Handle an options request for a single record endpoint
 optionsSingle :: Text
               -> Api (Headers '[Header "Access-Control-Allow-Methods" String] NoContent)
-optionsSingle _ = undefined
+optionsSingle = C.optionsSingle
 
 -- ^
 -- Handle an options request for a multiple record endpoint
 optionsMultiple :: Api (Headers '[Header "Access-Control-Allow-Methods" String] NoContent)
-optionsMultiple = undefined
+optionsMultiple = C.optionsMultiple
+
+-- ^
+-- Helper for create or update single methods
+createSingle'
+  :: (MonadReader ApiConfig m, MonadIO m)
+  => Bool -> Record -> ExceptT ApiError m ApiResult
+createSingle' replace input = do
+  conf <- ask
+  pipe <- dbPipe conf
+  posts <-
+    liftIO $
+    runExceptT $
+    insertUserPosts
+      replace
+      [input]
+      (dbName conf, pipe)
+      (esServer conf, esIndex conf)
+  ExceptT $ return (head <$> posts)
+
+-- ^
+-- Helper for create or update multiple methods
+createMultiple'
+  :: (MonadReader ApiConfig m, MonadIO m)
+  => Bool -> [Record] -> ExceptT ApiError m [ApiResult]
+createMultiple' replace inputs = do
+  conf <- ask
+  pipe <- dbPipe conf
+  posts <-
+    liftIO $
+    runExceptT $
+    insertUserPosts
+      replace
+      inputs
+      (dbName conf, pipe)
+      (esServer conf, esIndex conf)
+  ExceptT $ return posts
+
+-- ^
+-- Helper for update single methods
+updateSingle'
+  :: (MonadReader ApiConfig m, MonadIO m)
+  => Bool -> Text -> Record -> ExceptT ApiError m ApiResult
+updateSingle' replace uid input = do
+  result <- runEs (getByIds [uid])
+  existing <- ExceptT $ return (extract result)
+  createSingle' replace (merge existing input)
+  where
+    merge old new = mergeRecords new (includeFields include old)
+    include = ["postId", "subscriptionId"]
+    extract r = maybe (Left mkApiError404) Right (extractRecord r)
 
 -- ^
 -- Run an elastic-search action

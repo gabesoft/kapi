@@ -117,6 +117,30 @@ Content-Type: :json
   "tags": ["technology", "programming"]
 }
 
+#
+# Replace a single post
+#
+PUT http://:host/:path/56d7de0dc788cb1d6eb91ac6-56d7de0dc788cb1d6eb91abf
+Content-Type: :json
+{           
+  "read": true,
+  "title": "Title updated",
+  "tags": ["technology", "programming"]
+}
+
+#
+# Modify a single post
+#
+PATCH http://:host/:path/56d7de0dc788cb1d6eb91ac6-56d7de0dc788cb1d6eb91abf
+Content-Type: :json
+{
+  "read": true,
+  "tags": [
+    "technology",
+    "programming",
+    "haskell"
+  ]
+}
 
 #
 # Create a single post (invalid)
@@ -135,6 +159,92 @@ Content-Type: :json
 # Create multiple posts
 #
 POST http://:host/:path
+Content-Type: :json
+[
+  {
+    "postId": "56d7de0dc788cb1d6eb91ac2",
+    "subscriptionId": "56d7de0dc788cb1d6eb91ac6",
+    "feedId": "56d7de0dc788cb1d6eb91abb",
+    "tags": [ "haskell", "programming" ]
+  },
+  {
+    "postId": "56d7de0dc788cb1d6eb91ac3",
+    "subscriptionId": "56d7de0dc788cb1d6eb91ac6",
+    "feedId": "56d7de0dc788cb1d6eb91abb",
+    "tags": [ "haskell", "programming" ]
+  },
+  {
+    "postId": "56d7de0dc788cb1d6eb91ac4",
+    "subscriptionId": "56d7de0dc788cb1d6eb91ac6",
+    "feedId": "56d7de0dc788cb1d6eb91abb",
+    "tags": [ "javascript", "programming" ]
+  },
+  {
+    "postId": "56d7de0dc788cb1d6eb91ac5",
+    "subscriptionId": "56d7de0dc788cb1d6eb91ac6",
+    "feedId": "56d7de0dc788cb1d6eb91abb",
+    "tags": [ "javascript", "programming" ]
+  },
+  {
+    "postId": "56d7de0dc788cb1d6eb91ac5",
+    "subscriptionId": "56k7de0dc788cb1d6eb91ac6",
+    "feedId": "56d7de0dc788cb1d6eb91abb",
+    "tags": [ "javascript", "programming" ]
+  },
+  {
+    "postId": "56d7de0dc788cb1d6eb91ac5",
+    "feedId": "56d7de0dc788cb1d6eb91abb",
+    "tags": [ "javascript", "programming" ]
+  }
+]
+
+#
+# Replace multiple posts
+#
+PUT http://:host/:path
+Content-Type: :json
+[
+  {
+    "postId": "56d7de0dc788cb1d6eb91ac2",
+    "subscriptionId": "56d7de0dc788cb1d6eb91ac6",
+    "feedId": "56d7de0dc788cb1d6eb91abb",
+    "tags": [ "haskell", "programming" ]
+  },
+  {
+    "postId": "56d7de0dc788cb1d6eb91ac3",
+    "subscriptionId": "56d7de0dc788cb1d6eb91ac6",
+    "feedId": "56d7de0dc788cb1d6eb91abb",
+    "tags": [ "haskell", "programming" ]
+  },
+  {
+    "postId": "56d7de0dc788cb1d6eb91ac4",
+    "subscriptionId": "56d7de0dc788cb1d6eb91ac6",
+    "feedId": "56d7de0dc788cb1d6eb91abb",
+    "tags": [ "javascript", "programming" ]
+  },
+  {
+    "postId": "56d7de0dc788cb1d6eb91ac5",
+    "subscriptionId": "56d7de0dc788cb1d6eb91ac6",
+    "feedId": "56d7de0dc788cb1d6eb91abb",
+    "tags": [ "javascript", "programming" ]
+  },
+  {
+    "postId": "56d7de0dc788cb1d6eb91ac5",
+    "subscriptionId": "56k7de0dc788cb1d6eb91ac6",
+    "feedId": "56d7de0dc788cb1d6eb91abb",
+    "tags": [ "javascript", "programming" ]
+  },
+  {
+    "postId": "56d7de0dc788cb1d6eb91ac5",
+    "feedId": "56d7de0dc788cb1d6eb91abb",
+    "tags": [ "javascript", "programming" ]
+  }
+]
+
+#
+# Modify multiple posts
+#
+PATCH http://:host/:path
 Content-Type: :json
 [
   {

@@ -48,12 +48,14 @@ userPostDefinition =
     ]
 
 -- ^
--- Insert new user posts
-insertUserPosts :: [Record]
-                -> (Database, Pipe)
-                -> (Text, Text)
-                -> ExceptT ApiError IO [ApiResult]
-insertUserPosts input (dbName, pipe) (server, index) = do
+-- Insert new user posts or replace existing ones
+insertUserPosts
+  :: Bool
+  -> [Record]
+  -> (Database, Pipe)
+  -> (Text, Text)
+  -> ExceptT ApiError IO [ApiResult]
+insertUserPosts replace input (dbName, pipe) (server, index) = do
   let vResults = validate' <$> input
   let valid = rights vResults
   let invalid = lefts vResults
@@ -63,7 +65,7 @@ insertUserPosts input (dbName, pipe) (server, index) = do
   posts <- runDb (getPostsById postIds) dbName pipe
   let results = mkUserPosts (subs, posts) valid
   let failed = lefts results
-  created <- indexDocuments (rights results) server index mapping
+  created <- indexDocuments True (rights results) server index mapping
   return $ (Succ <$> created) <> (Fail <$> failed) <> (Fail <$> invalid)
   where
     vals label = catMaybes . fmap (getValue label)
@@ -71,16 +73,18 @@ insertUserPosts input (dbName, pipe) (server, index) = do
 
 -- ^
 -- Index multiple documents and re-query them
-indexDocuments :: [(Record, RecordId)]
-               -> Text
-               -> Text
-               -> Text
-               -> ExceptT ApiError IO [Record]
-indexDocuments [] _ _ _ = return []
-indexDocuments input server index mapping = do
+indexDocuments
+  :: Bool
+  -> [(Record, RecordId)]
+  -> Text
+  -> Text
+  -> Text
+  -> ExceptT ApiError IO [Record]
+indexDocuments _ [] _ _ _ = return []
+indexDocuments replace input server index mapping = do
   existing <- runEs (E.getByIds ids) server index mapping
   let existingMap = mkRecordMap (E.extractRecords [] existing)
-  items <- liftIO $ mapM (mergeUserPosts existingMap) input
+  items <- liftIO $ mapM (mergeUserPosts replace existingMap) input
   runEs (E.indexDocuments items) server index mapping >>= log
   runEs refreshIndex server index mapping
   created <- runEs (E.getByIds ids) server index mapping
@@ -91,23 +95,29 @@ indexDocuments input server index mapping = do
     log msg = liftIO $ print $ trace "Insert user posts" msg
 
 -- ^
--- Merge an existing with a new user post
-mergeUserPosts :: MonadIO m => Map.Map RecordId Record -> (Record, RecordId) -> m (Record, RecordId)
-mergeUserPosts recMap (new, recId) = mergeDates existingDate
+-- Merge an existing with a new user post.
+-- Do a replace or a partial update according to 'replace'.
+mergeUserPosts
+  :: MonadIO m
+  => Bool
+  -> Map.Map RecordId Record
+  -> (Record, RecordId)
+  -> m (Record, RecordId)
+mergeUserPosts replace recMap (new, recId)
+  | replace = mergeDates new existingDate
+  | otherwise = mergeDates (merge existing new) existingDate
   where
+    merge Nothing r = r
+    merge (Just o) n = mergeRecords o n
     existing = Map.lookup recId recMap
     existingDate :: Maybe Text
     existingDate = existing >>= getValue "createdAt"
-    mergeDates Nothing = do
-      record <- setTimestamp True new
+    mergeDates r Nothing = do
+      record <- setTimestamp True r
       return (record, recId)
-    mergeDates (Just createdAt) = do
-      record <- setTimestamp False new
+    mergeDates r (Just createdAt) = do
+      record <- setTimestamp False r
       return (setValue "createdAt" createdAt record, recId)
-
--- ^
--- Update existing user posts
-updateUserPosts = insertUserPosts
 
 -- ^
 -- Construct user post documents
