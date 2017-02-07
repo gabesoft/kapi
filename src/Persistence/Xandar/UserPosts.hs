@@ -61,31 +61,32 @@ insertUserPosts replace input (dbName, pipe) (server, index) = do
   let invalid = lefts vResults
   let subIds = vals "subscriptionId" valid
   let postIds = vals "postId" valid
+  let ids = mkId <$> valid
+  existingResults <- runEs (E.getByIds ids) server index mapping
   subs <- runDb (getSubsById subIds) dbName pipe
   posts <- runDb (getPostsById postIds) dbName pipe
-  let results = mkUserPosts (subs, posts) valid
+  let existing = E.extractRecords [] existingResults
+  results <- mkUserPosts replace (subs, posts) (existing, valid)
   let failed = lefts results
-  created <- indexDocuments True (rights results) server index mapping
+  created <- indexDocuments (rights results) server index mapping
   return $ (Succ <$> created) <> (Fail <$> failed) <> (Fail <$> invalid)
   where
     vals label = catMaybes . fmap (getValue label)
     mapping = recordCollection userPostDefinition
+    getId label = fromJust . getValue label
+    mkId r = mkUserPostId (getId "subscriptionId" r) (getId "postId" r)
 
 -- ^
 -- Index multiple documents and re-query them
 indexDocuments
-  :: Bool
-  -> [(Record, RecordId)]
+  :: [(Record, RecordId)]
   -> Text
   -> Text
   -> Text
   -> ExceptT ApiError IO [Record]
-indexDocuments _ [] _ _ _ = return []
-indexDocuments replace input server index mapping = do
-  existing <- runEs (E.getByIds ids) server index mapping
-  let existingMap = mkRecordMap (E.extractRecords [] existing)
-  items <- liftIO $ mapM (mergeUserPosts replace existingMap) input
-  runEs (E.indexDocuments items) server index mapping >>= log
+indexDocuments [] _ _ _ = return []
+indexDocuments input server index mapping = do
+  runEs (E.indexDocuments input) server index mapping >>= log
   runEs refreshIndex server index mapping
   created <- runEs (E.getByIds ids) server index mapping
   return (E.extractRecords [] created)
@@ -95,75 +96,76 @@ indexDocuments replace input server index mapping = do
     log msg = liftIO $ print $ trace "Insert user posts" msg
 
 -- ^
--- Merge an existing with a new user post.
--- Do a replace or a partial update according to 'replace'.
-mergeUserPosts
-  :: MonadIO m
-  => Bool
-  -> Map.Map RecordId Record
-  -> (Record, RecordId)
-  -> m (Record, RecordId)
-mergeUserPosts replace recMap (new, recId)
-  | replace = mergeDates new existingDate
-  | otherwise = mergeDates (merge existing new) existingDate
-  where
-    merge Nothing r = r
-    merge (Just o) n = mergeRecords o n
-    existing = Map.lookup recId recMap
-    existingDate :: Maybe Text
-    existingDate = existing >>= getValue "createdAt"
-    mergeDates r Nothing = do
-      record <- setTimestamp True r
-      return (record, recId)
-    mergeDates r (Just createdAt) = do
-      record <- setTimestamp False r
-      return (setValue "createdAt" createdAt record, recId)
-
--- ^
 -- Construct user post documents
-mkUserPosts :: ([Record], [Record])
-            -> [Record]
-            -> [Either ApiError (Record, RecordId)]
-mkUserPosts (subs, posts) records = process <$> records
+mkUserPosts
+  :: (MonadIO m)
+  => Bool
+  -> ([Record], [Record])
+  -> ([Record], [Record])
+  -> m [Either ApiError (Record, RecordId)]
+mkUserPosts replace (subs, posts) (existing, input) = mapM build input
   where
-    process r = maybe (Left $ mkErr r) Right (build r)
-    build r = liftA2 (curry $ flip mkUserPost r) (findSub r) (findPost r)
-    mkErr r =
-      mkApiError400 $
-      unwords $
-      filter
-        (not . null)
-        [ msg "Subscription" (subId r) (findSub r)
-        , msg "Post" (postId r) (findPost r)
-        ]
-    msg m rid = maybe (m ++ " " ++ T.unpack rid ++ " not found.") mempty
+    build r = mkRecord r (findSub r) (findPost r)
+    mkRecord r s p = mkUserPost replace (s, p) (findExisting s p, r)
     findSub record = Map.lookup (subId record) subMap
     findPost record = Map.lookup (postId record) postMap
-    subId = getId "subscriptionId"
-    postId = getId "postId"
+    findExisting s p = liftA2 mkId s p >>= flip Map.lookup existingMap
+    mkId s p = mkUserPostId (getIdValue' s) (getIdValue' p)
+    subId = getValue' "subscriptionId"
+    postId = getValue' "postId"
+    existingMap = mkRecordMap existing
     subMap = mkRecordMap subs
     postMap = mkRecordMap posts
-    getId :: Label -> Record -> RecordId
-    getId label = fromJust . getValue label
-
--- ^
--- Make a make a map with the ids as keys and records as values
-mkRecordMap xs = Map.fromList (addId <$> xs)
-  where
-    addId r = (fromJust $ getIdValue r, r)
 
 -- ^
 -- Combine a subscription, post, and input record to create a user-post ready to be indexed
-mkUserPost :: (Record, Record) -> Record -> (Record, RecordId)
-mkUserPost (sub, post) record = (build record, recId)
+mkUserPost
+  :: (MonadIO m)
+  => Bool
+  -> (Maybe Record, Maybe Record)
+  -> (Maybe Record, Record)
+  -> m (Either ApiError (Record, RecordId))
+mkUserPost _ (Nothing, Nothing) (_, r) =
+  return . Left $ mk400Err "Subscription and post not found." r
+mkUserPost _ (Nothing, _) (_, r) =
+  return . Left $ mk400Err "Subscription not found." r
+mkUserPost _ (_, Nothing) (_, r) = return . Left $ mk400Err "Post not found." r
+mkUserPost replace (Just sub, Just post) (existing, input)
+  | getValue "feedId" sub /= (getValue "feedId" post :: Maybe RecordId) =
+    return . Left $ mk400Err "Post not subscribed to." input
+  | otherwise = do
+    record <- addTimestamp existing mkRecord
+    return $ Right (record, recId)
   where
-    build r = foldr set (flip mergeRecords post' $ mergeRecords sub' r) overwriteIds
+    mkRecord =
+      mergeRecords
+        (baseRecord replace existing)
+        (excludeFields skipFields input)
+    baseRecord _ Nothing = mkBase
+    baseRecord True _ = mkBase
+    baseRecord False (Just e) = e
+    mkBase = foldr set (mergeRecords sub' post') overwriteIds
     (recId, overwriteIds) = getIds sub post
     set (name, val) = setValue name val
     sub' = includeFields subFields sub
     post' = Record ["post" =: getDocument (excludeFields postSkipFields post)]
     subFields = ["title", "notes", "tags"]
     postSkipFields = ["feedId", "_id", "pubdate", "__v"]
+    skipFields = ["post", "userId", "feedId", "createdAt", "updatedAt", "_id"]
+
+-- ^
+-- Add time-stamp dates to a user post record
+addTimestamp
+  :: (MonadIO m)
+  => Maybe Record -> Record -> m Record
+addTimestamp existing new = mergeDates new existingDate
+  where
+    existingDate :: Maybe Text
+    existingDate = existing >>= getValue "createdAt"
+    mergeDates r Nothing = setTimestamp True r
+    mergeDates r (Just createdAt) = do
+      record <- setTimestamp False r
+      return (setValue "createdAt" createdAt record)
 
 -- ^
 -- Get all ids required to create a user-post record
@@ -184,9 +186,7 @@ getIds sub post = (recId, output)
 
 -- ^
 -- Generate an id for a user post
-mkUserPostId
-  :: (Monoid m, IsString m)
-  => m -> m -> m
+mkUserPostId :: RecordId -> RecordId -> RecordId
 mkUserPostId subId postId = subId <> "-" <> postId
 
 -- ^
@@ -226,3 +226,15 @@ runEs action server index mappingName = do
 
 validate' :: Record -> Either ApiError Record
 validate' record = vResultToEither (validate userPostDefinition record)
+
+-- ^
+-- Make a make a map with the ids as keys and records as values
+mkRecordMap xs = Map.fromList (addId <$> xs)
+  where
+    addId r = (fromJust $ getIdValue r, r)
+
+-- ^
+-- Make a 400 error to be returned when attempting to construct an invalid user post
+mk400Err :: String -> Record -> ApiError
+mk400Err msg record =
+  mkApiError400 $ msg <> " Original input: " <> LBS.unpack (A.encode record)

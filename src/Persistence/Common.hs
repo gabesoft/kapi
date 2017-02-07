@@ -147,6 +147,11 @@ getIdValue :: Record -> Maybe RecordId
 getIdValue = getValue idLabel
 
 -- ^
+-- Get the value of the id field
+getIdValue' :: Record -> RecordId
+getIdValue' = fromJust . getValue idLabel
+
+-- ^
 -- Set the value of a field to the current time
 setTimestamp'
   :: MonadIO m
@@ -244,6 +249,11 @@ getValue name r = join $ get <$> getField name r
       :: Val a
       => Field -> Maybe a
     get (_ := v) = cast v
+
+-- ^
+-- Get the value of a field by name. Nested fields are supported.
+getValue' :: Val a => Label -> Record -> a
+getValue' name = fromJust . getValue name
 
 -- ^
 -- Set a field in a record. Overwrite the existing value if any.

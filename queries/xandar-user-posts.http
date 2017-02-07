@@ -124,7 +124,7 @@ PUT http://:host/:path/56d7de0dc788cb1d6eb91ac6-56d7de0dc788cb1d6eb91abf
 Content-Type: :json
 {           
   "read": true,
-  "title": "Title updated",
+  "title": "Title replaced",
   "tags": ["technology", "programming"]
 }
 
