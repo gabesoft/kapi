@@ -78,12 +78,11 @@ insertUserPosts replace input (dbName, pipe) (server, index) = do
 
 -- ^
 -- Index multiple documents and re-query them
-indexDocuments
-  :: [(Record, RecordId)]
-  -> Text
-  -> Text
-  -> Text
-  -> ExceptT ApiError IO [Record]
+indexDocuments :: [(Record, RecordId)]
+               -> Text
+               -> Text
+               -> Text
+               -> ExceptT ApiError IO [Record]
 indexDocuments [] _ _ _ = return []
 indexDocuments input server index mapping = do
   runEs (E.indexDocuments input) server index mapping >>= log
@@ -118,7 +117,8 @@ mkUserPosts replace (subs, posts) (existing, input) = mapM build input
     postMap = mkRecordMap posts
 
 -- ^
--- Combine a subscription, post, and input record to create a user-post ready to be indexed
+-- Given a subscription, post, input data, and possibly an
+-- existing user-post create a user-post ready to be indexed
 mkUserPost
   :: (MonadIO m)
   => Bool
@@ -131,27 +131,36 @@ mkUserPost _ (Nothing, _) (_, r) =
   return . Left $ mk400Err "Subscription not found." r
 mkUserPost _ (_, Nothing) (_, r) = return . Left $ mk400Err "Post not found." r
 mkUserPost replace (Just sub, Just post) (existing, input)
-  | getValue "feedId" sub /= (getValue "feedId" post :: Maybe RecordId) =
-    return . Left $ mk400Err "Post not subscribed to." input
+  | getValue' "feedId" sub /= (getValue' "feedId" post :: RecordId) =
+    return . Left $ mk400Err "Post belongs to a different subscription." input
   | otherwise = do
     record <- addTimestamp existing mkRecord
     return $ Right (record, recId)
   where
-    mkRecord =
-      mergeRecords
-        (baseRecord replace existing)
-        (excludeFields skipFields input)
-    baseRecord _ Nothing = mkBase
-    baseRecord True _ = mkBase
-    baseRecord False (Just e) = e
-    mkBase = foldr set (mergeRecords sub' post') overwriteIds
-    (recId, overwriteIds) = getIds sub post
-    set (name, val) = setValue name val
-    sub' = includeFields subFields sub
-    post' = Record ["post" =: getDocument (excludeFields postSkipFields post)]
-    subFields = ["title", "notes", "tags"]
-    postSkipFields = ["feedId", "_id", "pubdate", "__v"]
-    skipFields = ["post", "userId", "feedId", "createdAt", "updatedAt", "_id"]
+    (recId, ids) = getIds sub post
+    mkRecord = mergeRecords base (clean input)
+    mkBase = foldr (uncurry setValue) (mergeRecords sub' $ mkPost post) ids
+    base = baseUserPost replace existing mkBase
+    sub' = includeFields ["title", "notes", "tags"] sub
+    clean =
+      excludeFields
+        ["post", "userId", "feedId", createdAtLabel, updatedAtLabel, idLabel]
+
+-- ^
+-- Return the base data for a user-post according to the 'replace' flag
+baseUserPost :: Bool -> Maybe Record -> Record -> Record
+baseUserPost _ Nothing base = base
+baseUserPost replace (Just existing) base
+  | replace = base
+  | otherwise = excludeFields [idLabel] existing
+
+-- ^
+-- Return the value of the 'post' field of a user-post
+mkPost :: Record -> Record
+mkPost input = Record ["post" =: getDocument post]
+  where
+    post = excludeFields skipFields input
+    skipFields = ["feedId", idLabel, "pubdate", "__v"]
 
 -- ^
 -- Add time-stamp dates to a user post record
@@ -161,11 +170,11 @@ addTimestamp
 addTimestamp existing new = mergeDates new existingDate
   where
     existingDate :: Maybe Text
-    existingDate = existing >>= getValue "createdAt"
+    existingDate = existing >>= getValue createdAtLabel
     mergeDates r Nothing = setTimestamp True r
     mergeDates r (Just createdAt) = do
       record <- setTimestamp False r
-      return (setValue "createdAt" createdAt record)
+      return (setValue createdAtLabel createdAt record)
 
 -- ^
 -- Get all ids required to create a user-post record
@@ -176,12 +185,12 @@ getIds sub post = (recId, output)
     input =
       [ ("feedId", "feedId", sub)
       , ("userId", "userId", sub)
-      , ("subscriptionId", "_id", sub)
-      , ("postId", "_id", post)
+      , ("subscriptionId", idLabel, sub)
+      , ("postId", idLabel, post)
       ]
     get (outLabel, label, r) = (outLabel, fromJust $ getValue label r)
-    subId = fromJust $ lookup "subscriptionId" output
-    postId = fromJust $ lookup "postId" output
+    subId = lookup' "subscriptionId" output
+    postId = lookup' "postId" output
     recId = mkUserPostId subId postId
 
 -- ^
@@ -238,3 +247,8 @@ mkRecordMap xs = Map.fromList (addId <$> xs)
 mk400Err :: String -> Record -> ApiError
 mk400Err msg record =
   mkApiError400 $ msg <> " Original input: " <> LBS.unpack (A.encode record)
+
+lookup'
+  :: Eq a
+  => a -> [(a, c)] -> c
+lookup' name = fromJust . lookup name

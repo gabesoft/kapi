@@ -25,9 +25,6 @@ verifySearch :: (T.Text, Either EsError Search) -> Expectation
 verifySearch (filter, exp) =
   mkSearch (Just $ fromRight $ parse filter) [] [] 3 12 `shouldBe` exp
 
-fromRight :: Either a b -> b
-fromRight (Right x) = x
-
 cases :: [(T.Text, Either EsError Search)]
 cases =
   [ ( "title eq 'haskell'"

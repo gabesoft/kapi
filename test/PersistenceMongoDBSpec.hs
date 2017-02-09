@@ -85,11 +85,11 @@ verifyMkInDocument
 verifyMkInDocument r exp = do
   doc <- mkInDocument recDef (not $ hasField "_id" r) r
   return $
-    (modDate createdAtLabel . modDate updatedAtLabel) (Record doc) `shouldBe` exp
+    (replaceDate createdAtLabel . replaceDate updatedAtLabel) (Record doc) `shouldBe` exp
 
 verifyMkOutDocument :: Document -> Record -> Expectation
 verifyMkOutDocument doc exp =
-  modDate createdAtLabel (mkOutRecord recDef doc) `shouldBe` exp
+  replaceDate createdAtLabel (mkOutRecord recDef doc) `shouldBe` exp
 
 verifyMkSortField :: Text -> Field -> Expectation
 verifyMkSortField name exp = mkSortField name `shouldBe` Just exp
@@ -116,10 +116,10 @@ recDef =
     , mkIdDef "foreignKey"
     ]
 
-sampleId1 :: String
+sampleId1 :: RecordId
 sampleId1 = "586763745984183aef000002"
 
-sampleId2 :: String
+sampleId2 :: RecordId
 sampleId2 = "586763745984183aef000004"
 
 commonDoc :: Document
@@ -137,7 +137,7 @@ sampleNewDocMissingFK :: Document
 sampleNewDocMissingFK = commonDoc
 
 sampleNewRec :: Record
-sampleNewRec = Record (merge commonDoc [mkStrField "foreignKey" sampleId2])
+sampleNewRec = Record (merge commonDoc [mkTxtField "foreignKey" sampleId2])
 
 sampleNewRecInvalidFK :: Record
 sampleNewRecInvalidFK = Record (merge commonDoc [mkStrField "foreignKey" "123"])

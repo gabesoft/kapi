@@ -5,36 +5,40 @@ module TestHelper where
 
 import Data.Bson
 import Data.Maybe
+import Data.String
 import Data.Text (Text, unpack, pack)
 import Data.Time (UTCTime)
 import Data.Time.ISO8601
 import Persistence.Common
 import Types.Common
 
-modDate :: Label -> Record -> Record
-modDate name = modField name set
+replaceDate :: Label -> Record -> Record
+replaceDate name = modField name set
   where
-    set :: Maybe UTCTime -> Maybe String
+    set :: Maybe UTCTime -> Maybe Text
     set field = const "12345" <$> field
 
-mkId :: String -> Value
-mkId v = ObjId (read v)
+mkId :: RecordId -> Value
+mkId v = ObjId (read $ unpack v)
 
-mkObjId :: String -> Field
+mkObjId :: RecordId -> Field
 mkObjId = mkObjId' "_id"
 
 date = fromJust . parseISO8601 . unpack
 
 dateTerm = TermDate . date
 
-mkObjId' :: Label -> String -> Field
+mkObjId' :: Label -> RecordId -> Field
 mkObjId' name v = name =: mkId v
 
-mkRecId :: String -> Field
-mkRecId = mkStrField "_id"
+mkRecId :: RecordId -> Field
+mkRecId = mkTxtField "_id"
 
 mkStrField :: Label -> String -> Field
 mkStrField name val = name =: val
+
+mkTxtField :: Label -> Text -> Field
+mkTxtField name val = name =: val
 
 mkStrListField :: Label -> [String] -> Field
 mkStrListField name val = name =: val
@@ -47,3 +51,7 @@ mkFloatField name val = name =: val
 
 mkBoolField :: Label -> Bool -> Field
 mkBoolField name val = name =: val
+
+fromRight :: (Show a, Show b) => Either a b -> b
+fromRight (Right x) = x
+fromRight y = error $ "Right value expected. " ++ show y

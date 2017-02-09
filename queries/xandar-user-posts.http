@@ -208,6 +208,7 @@ Content-Type: :json
     "postId": "56d7de0dc788cb1d6eb91ac2",
     "subscriptionId": "56d7de0dc788cb1d6eb91ac6",
     "feedId": "56d7de0dc788cb1d6eb91abb",
+    "title": "Multi replace",
     "tags": [ "haskell", "programming" ]
   },
   {
