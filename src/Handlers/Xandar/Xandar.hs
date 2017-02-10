@@ -48,10 +48,10 @@ app =
       optionsSingle :<|>
       optionsMultiple
     userPostHandlers =
-      UP.getMultiple :<|>
+      UP.getMultiple mkUserPostGetMultipleLink :<|>
       UP.getSingle :<|>
       UP.deleteSingle :<|>
-      UP.createSingleOrMultiple :<|>
+      UP.createSingleOrMultiple mkUserPostGetSingleLink :<|>
       UP.replaceSingle :<|>
       UP.replaceMultiple :<|>
       UP.modifySingle :<|>

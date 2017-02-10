@@ -2,9 +2,7 @@
 
 -- ^
 -- Tests for Persistence.Xandar.UserPosts
-module Main
-  ( main
-  ) where
+module Main (main) where
 
 import Control.Monad.IO.Class
 import Data.Bifunctor

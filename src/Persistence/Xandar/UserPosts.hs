@@ -5,24 +5,18 @@
 -- Persistence functions for user-posts
 module Persistence.Xandar.UserPosts where
 
-import Control.Applicative (liftA2)
 import Control.Monad.Except
-import Control.Monad.IO.Class
 import Control.Monad.Trans.Control
 import qualified Data.Aeson as A
 import Data.Bifunctor
-import Data.Bson hiding (lookup)
+import Data.Bson hiding (lookup, label)
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import Data.Either
-import Data.Function ((&))
-import Data.List (intercalate)
 import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.Monoid ((<>))
-import Data.String
 import Data.Text (Text)
-import qualified Data.Text as T
-import Database.Bloodhound (EsError(..))
+import Database.Bloodhound (EsError(..), SearchResult(..))
 import Database.MongoDB (Database, Pipe, Failure)
 import Debug.Trace
 import Persistence.Common
@@ -56,25 +50,16 @@ insertUserPosts
   -> (Text, Text)
   -> ExceptT ApiError IO [ApiResult]
 insertUserPosts replace input (dbName, pipe) (server, index) = do
-  let vResults = validate' <$> input
-  let valid = rights vResults
-  let invalid = lefts vResults
-  let subIds = vals "subscriptionId" valid
-  let postIds = vals "postId" valid
-  let ids = mkId <$> valid
-  existingResults <- runEs (E.getByIds ids) server index mapping
-  subs <- runDb (getSubsById subIds) dbName pipe
-  posts <- runDb (getPostsById postIds) dbName pipe
-  let existing = E.extractRecords [] existingResults
+  let mapping = recordCollection userPostDefinition
+  let validated = validate' <$> input
+  let valid = rights validated
+  let invalid = lefts validated
+  existing <- runEs' (E.getByIds $ mkUserPostId' <$> valid) server index mapping
+  subs <- runDb (getSubsById $ subId <$> valid) dbName pipe
+  posts <- runDb (getPostsById $ postId <$> valid) dbName pipe
   results <- mkUserPosts replace (subs, posts) (existing, valid)
-  let failed = lefts results
   created <- indexDocuments (rights results) server index mapping
-  return $ (Succ <$> created) <> (Fail <$> failed) <> (Fail <$> invalid)
-  where
-    vals label = catMaybes . fmap (getValue label)
-    mapping = recordCollection userPostDefinition
-    getId label = fromJust . getValue label
-    mkId r = mkUserPostId (getId "subscriptionId" r) (getId "postId" r)
+  return $ (Succ <$> created) <> (Fail <$> lefts results <> invalid)
 
 -- ^
 -- Index multiple documents and re-query them
@@ -85,14 +70,12 @@ indexDocuments :: [(Record, RecordId)]
                -> ExceptT ApiError IO [Record]
 indexDocuments [] _ _ _ = return []
 indexDocuments input server index mapping = do
-  runEs (E.indexDocuments input) server index mapping >>= log
-  runEs refreshIndex server index mapping
-  created <- runEs (E.getByIds ids) server index mapping
-  return (E.extractRecords [] created)
+  _ <- runEs (E.indexDocuments input) server index mapping >>= printLog
+  _ <- runEs refreshIndex server index mapping
+  runEs' (E.getByIds $ snd <$> input) server index mapping
   where
-    ids = snd <$> input
     refreshIndex s i _ = E.refreshIndex s i
-    log msg = liftIO $ print $ trace "Insert user posts" msg
+    printLog msg = liftIO $ print $ trace "Insert user posts" msg
 
 -- ^
 -- Construct user post documents
@@ -102,16 +85,12 @@ mkUserPosts
   -> ([Record], [Record])
   -> ([Record], [Record])
   -> m [Either ApiError (Record, RecordId)]
-mkUserPosts replace (subs, posts) (existing, input) = mapM build input
+mkUserPosts replace (subs, posts) (existing, input) = mapM mkRecord input
   where
-    build r = mkRecord r (findSub r) (findPost r)
-    mkRecord r s p = mkUserPost replace (s, p) (findExisting s p, r)
-    findSub record = Map.lookup (subId record) subMap
-    findPost record = Map.lookup (postId record) postMap
-    findExisting s p = liftA2 mkId s p >>= flip Map.lookup existingMap
-    mkId s p = mkUserPostId (getIdValue' s) (getIdValue' p)
-    subId = getValue' "subscriptionId"
-    postId = getValue' "postId"
+    mkRecord r = mkUserPost replace (getSubPost r) (findExisting r, r)
+    getSubPost r = (get subMap subId r, get postMap postId r)
+    findExisting = get existingMap mkUserPostId'
+    get m fid r = Map.lookup (fid r) m
     existingMap = mkRecordMap existing
     subMap = mkRecordMap subs
     postMap = mkRecordMap posts
@@ -133,26 +112,19 @@ mkUserPost _ (_, Nothing) (_, r) = return . Left $ mk400Err "Post not found." r
 mkUserPost replace (Just sub, Just post) (existing, input)
   | getValue' "feedId" sub /= (getValue' "feedId" post :: RecordId) =
     return . Left $ mk400Err "Post belongs to a different subscription." input
-  | otherwise = do
-    record <- addTimestamp existing mkRecord
-    return $ Right (record, recId)
+  | otherwise = Right . flip (,) recId <$> addTimestamp existing record
   where
     (recId, ids) = getIds sub post
-    mkRecord = mergeRecords base (clean input)
-    mkBase = foldr (uncurry setValue) (mergeRecords sub' $ mkPost post) ids
-    base = baseUserPost replace existing mkBase
+    record = mergeRecords (mkRecord replace existing) input'
     sub' = includeFields ["title", "notes", "tags"] sub
-    clean =
+    base = foldr (uncurry setValue) (mergeRecords sub' $ mkPost post) ids
+    mkRecord _ Nothing = base
+    mkRecord True _ = base
+    mkRecord False (Just existing) = excludeFields [idLabel] existing
+    input' =
       excludeFields
         ["post", "userId", "feedId", createdAtLabel, updatedAtLabel, idLabel]
-
--- ^
--- Return the base data for a user-post according to the 'replace' flag
-baseUserPost :: Bool -> Maybe Record -> Record -> Record
-baseUserPost _ Nothing base = base
-baseUserPost replace (Just existing) base
-  | replace = base
-  | otherwise = excludeFields [idLabel] existing
+        input
 
 -- ^
 -- Return the value of the 'post' field of a user-post
@@ -195,6 +167,12 @@ getIds sub post = (recId, output)
 
 -- ^
 -- Generate an id for a user post
+mkUserPostId' :: Record -> RecordId
+mkUserPostId' record =
+  mkUserPostId (getValue' "subscriptionId" record) (getValue' "postId" record)
+
+-- ^
+-- Generate an id given a subscription id and a post id
 mkUserPostId :: RecordId -> RecordId -> RecordId
 mkUserPostId subId postId = subId <> "-" <> postId
 
@@ -212,6 +190,16 @@ getSubsById
   => [RecordId] -> Database -> Pipe -> m (Either Failure [Record])
 getSubsById ids = M.dbFind feedSubscriptionDefinition (M.idsQuery ids) [] [] 0 0
 
+-- ^
+-- Get the subscription id of a user-post
+subId :: Record -> RecordId
+subId = getValue' "subscriptionId"
+
+-- ^
+-- Get the post id of a user-post
+postId :: Record -> RecordId
+postId = getValue' "postId"
+
 runDb
   :: (MonadBaseControl IO m)
   => (Database -> Pipe -> m (Either Failure c))
@@ -221,6 +209,17 @@ runDb
 runDb action dbName pipe = do
   results <- lift $ action dbName pipe
   ExceptT (return $ first M.dbToApiError results)
+
+runEs'
+  :: Monad m
+  => (a -> b -> c -> m (Either EsError (SearchResult Record)))
+  -> a
+  -> b
+  -> c
+  -> ExceptT ApiError m [Record]
+runEs' action server index mappingName = do
+  results <- runEs action server index mappingName
+  return $ E.extractRecords [] results
 
 runEs
   :: Monad m
@@ -238,6 +237,7 @@ validate' record = vResultToEither (validate userPostDefinition record)
 
 -- ^
 -- Make a make a map with the ids as keys and records as values
+mkRecordMap :: [Record] -> Map.Map RecordId Record
 mkRecordMap xs = Map.fromList (addId <$> xs)
   where
     addId r = (fromJust $ getIdValue r, r)

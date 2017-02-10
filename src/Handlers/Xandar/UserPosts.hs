@@ -12,31 +12,25 @@ import Api.Xandar
 import Control.Monad.Except
 import Control.Monad.Reader
 import Data.Bifunctor
-import qualified Data.ByteString.Lazy.Char8 as LBS
 import Data.List (intercalate)
-import Data.Maybe
-import Data.Monoid
 import Data.Text (Text)
-import qualified Data.Text as T
 import Database.Bloodhound (SearchResult(..), EsError, Search)
-import qualified Database.Bloodhound as B
 import Handlers.Xandar.Common
-       (throwApiError, mkPagination, splitLabels, mkLinkHeader,
-        mkGetMultipleResult, checkEtag, mkApiResponse, mkApiResult, dbName,
-        dbPipe, getCreateLink, mkLink)
+       (throwApiError, mkPagination, splitLabels, 
+        mkGetMultipleResult, mkApiResponse, dbName,
+        dbPipe, getCreateLink, mkLink, mkSingleResult)
 import qualified Handlers.Xandar.Common as C
-import Network.HTTP.Types.Status
 import Parsers.Filter (parse)
 import Persistence.Common
 import Persistence.ElasticSearch
-import Persistence.Xandar.UserPosts (insertUserPosts)
+import Persistence.Xandar.UserPosts (insertUserPosts, userPostDefinition)
 import Servant
 import Types.Common
 
 -- ^
 -- Elastic-search mapping name
 mappingName :: Text
-mappingName = "post"
+mappingName = recordCollection userPostDefinition
 
 -- ^
 -- Elastic-search index
@@ -48,22 +42,17 @@ esIndex = confGetEsIndex appName
 getSingle :: Maybe Text -> Text -> Api (Headers '[Header "ETag" String] Record)
 getSingle etag uid = mkApiResponse respond (runEs $ getByIds [uid])
   where
-    respond res = maybe (throwError err404) success (extractRecord res)
-    success record =
-      let sha = recToSha record
-          res = addHeader sha record
-      in maybe (return res) (checkEtag sha res) etag
+    respond = maybe (throwError err404) (mkSingleResult etag) . extractRecord
 
 -- ^
 -- Get multiple records
-getMultiple :: ServerT GetMultiple Api
-getMultiple include query sortFields page perPage =
+getMultiple :: ApiGetMultipleLink -> ServerT GetMultiple Api
+getMultiple getLink include query sortFields page perPage =
   mkApiResponse (return . respond) getRecords
   where
     getRecords = getMultiple' include query sortFields page perPage
-    respond (records, pagination) = mkGetMultipleResult mkUrl records pagination
-    getLink = mkUserPostGetMultipleLink
     mkUrl page' = getLink include query sortFields (Just page') perPage
+    respond = uncurry (mkGetMultipleResult mkUrl)
 
 -- ^
 -- Helper for `getMultiple`
@@ -100,37 +89,35 @@ deleteSingle uid = verify >> mkApiResponse (const $ return NoContent) delete
 -- ^
 -- Create one or more records
 createSingleOrMultiple
-  :: ApiData Record
+  :: (Text -> String)
+  -> ApiData Record
   -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData ApiResult))
-createSingleOrMultiple (Single r) = createSingle r
-createSingleOrMultiple (Multiple rs) = createMultiple rs
+createSingleOrMultiple getLink (Single r) = createSingle getLink r
+createSingleOrMultiple getLink (Multiple rs) = createMultiple getLink rs
 
 -- ^
 -- Create a single record
 createSingle
-  :: Record
+  :: (Text -> String)
+  -> Record
   -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData ApiResult))
-createSingle input = mkApiResponse respond (createSingle' True input)
+createSingle getLink input = mkApiResponse respond (createSingle' True input)
   where
-    respond r =
-      case r of
-        Fail e -> throwApiError e
-        Succ r ->
-          return $
-          addHeader (getCreateLink mkUserPostGetSingleLink r) $
-          noHeader (Single $ Succ r)
+    success r = addHeader (getCreateLink getLink r) $ noHeader (Single $ Succ r)
+    respond = apiItem throwApiError (return . success)
 
 -- ^
 -- Create multiple records
 createMultiple
-  :: [Record]
+  :: (Text -> String)
+  -> [Record]
   -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData ApiResult))
-createMultiple inputs = mkApiResponse respond (createMultiple' True inputs)
+createMultiple getLink inputs =
+  mkApiResponse respond (createMultiple' True inputs)
   where
     respond records =
       return . noHeader $
       addHeader (intercalate ", " $ links records) (Multiple records)
-    getLink = mkUserPostGetSingleLink
     links = fmap $ apiItem (const "<>") (mkLink . getCreateLink getLink)
 
 -- ^

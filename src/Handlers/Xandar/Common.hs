@@ -35,12 +35,9 @@ app'
   :: (Enter a (Api :~> Handler) (ServerT api Handler), HasServer api '[])
   => Proxy api -> a -> ApiConfig -> Application
 app' proxy handlers = serve proxy . server' handlers
-
-server'
-  :: Enter a (Api :~> Handler) b
-  => a -> ApiConfig -> b
-server' handlers config = enter (toHandler config) handlers
   where
+    server' :: Enter a (Api :~> Handler) b => a -> ApiConfig -> b
+    server' handlers config = enter (toHandler config) handlers
     toHandler :: ApiConfig -> Api :~> Handler
     toHandler conf = Nat (`runReaderT` conf)
 
@@ -51,12 +48,8 @@ getSingle
   -> Maybe Text
   -> Text
   -> Api (Headers '[Header "ETag" String] Record)
-getSingle def etag uid = mkApiResponse respond (getExisting def uid)
-  where
-    respond record =
-      let sha = recToSha record
-          res = addHeader sha record
-      in maybe (return res) (checkEtag sha res) etag
+getSingle def etag uid =
+  mkApiResponse (mkSingleResult etag) (getExisting def uid)
 
 -- ^
 -- Get multiple records
@@ -71,17 +64,11 @@ getMultiple getLink def include query sort page perPage =
 -- ^
 -- Helper for 'getMultiple'
 getMultiple'
-  :: (MonadBaseControl IO m
-     ,MonadReader ApiConfig m
-     ,MonadIO m
-     ,Foldable a
-     ,Foldable b
-     ,Functor a
-     ,Functor b)
+  :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
   => RecordDefinition
-  -> b Text
+  -> [Text]
   -> Maybe Text
-  -> a Text
+  -> [Text]
   -> Maybe Int
   -> Maybe Int
   -> ExceptT ApiError m ([Record], Pagination)
@@ -305,6 +292,16 @@ mkServantErr err =
     body
       | LBS.null msg = mempty
       | otherwise = encode (Fail err :: ApiItem ApiError ())
+
+-- ^
+-- Create a result that can be returned from a 'getSingle' method
+mkSingleResult :: Maybe Text
+               -> Record
+               -> Api (Headers '[Header "ETag" String] Record)
+mkSingleResult etag record = maybe (return res) (checkEtag sha res) etag
+  where
+    sha = recToSha record
+    res = addHeader sha record
 
 -- ^
 -- Create a result for the 'getMultiple' endpoint
