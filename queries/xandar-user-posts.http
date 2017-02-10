@@ -97,7 +97,7 @@ POST http://:host/:path
 Content-Type: :json
 {           
   "postId": "56d7d88bc788cb1d6eb9199d",
-  "subscriptionId": "56d7df90c788cb1d6eb92789",
+  "subscriptionId": "56d7d89dc788cb1d6eb919b1",
   "title": "Sample user post title",
   "read": true,
   "tags": ["technology", "programming"]

@@ -122,10 +122,8 @@ createMultiple
   -> (Text -> String)
   -> [Record]
   -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData ApiResult))
-createMultiple def getLink inputs = do
-  records <- mapM (mkApiResult . insertSingle def) inputs
-  let links = apiItem (const "<>") (mkLink . getCreateLink getLink) <$> records
-  return . noHeader $ addHeader (intercalate ", " links) (Multiple records)
+createMultiple def getLink inputs =
+  mapM (mkApiResult . insertSingle def) inputs >>= mkCreateMultipleResult getLink
 
 -- ^
 -- Update (replace) a single record
@@ -302,6 +300,16 @@ mkSingleResult etag record = maybe (return res) (checkEtag sha res) etag
   where
     sha = recToSha record
     res = addHeader sha record
+
+mkCreateMultipleResult
+  :: (Text -> String)
+  -> [ApiItem ApiError Record]
+  -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData ApiResult))
+mkCreateMultipleResult getLink records =
+  return . noHeader $
+  addHeader (intercalate ", " $ links records) (Multiple records)
+  where
+    links = fmap $ apiItem (const "<>") (mkLink . getCreateLink getLink)
 
 -- ^
 -- Create a result for the 'getMultiple' endpoint

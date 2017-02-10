@@ -16,9 +16,9 @@ import Data.List (intercalate)
 import Data.Text (Text)
 import Database.Bloodhound (SearchResult(..), EsError, Search)
 import Handlers.Xandar.Common
-       (throwApiError, mkPagination, splitLabels, 
-        mkGetMultipleResult, mkApiResponse, dbName,
-        dbPipe, getCreateLink, mkLink, mkSingleResult)
+       (throwApiError, mkPagination, splitLabels, mkGetMultipleResult,
+        mkCreateMultipleResult, mkApiResponse, dbName, dbPipe,
+        getCreateLink, mkLink, mkSingleResult)
 import qualified Handlers.Xandar.Common as C
 import Parsers.Filter (parse)
 import Persistence.Common
@@ -113,38 +113,27 @@ createMultiple
   -> [Record]
   -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData ApiResult))
 createMultiple getLink inputs =
-  mkApiResponse respond (createMultiple' True inputs)
-  where
-    respond records =
-      return . noHeader $
-      addHeader (intercalate ", " $ links records) (Multiple records)
-    links = fmap $ apiItem (const "<>") (mkLink . getCreateLink getLink)
+  mkApiResponse (mkCreateMultipleResult getLink) (createMultiple' True inputs)
 
 -- ^
 -- Update (replace) a single record
 replaceSingle :: Text -> Record -> Api Record
-replaceSingle uid input = mkApiResponse respond run
-  where
-    respond = apiItem throwApiError return
-    run = updateSingle' True uid input
+replaceSingle = updateSingle True
 
 -- ^
 -- Update (modify) a single record
 modifySingle :: Text -> Record -> Api Record
-modifySingle uid input = mkApiResponse respond run
-  where
-    respond = apiItem throwApiError return
-    run = updateSingle' False uid input
+modifySingle = updateSingle False
 
 -- ^
 -- Update (replace) multiple records
 replaceMultiple :: [Record] -> Api [ApiResult]
-replaceMultiple inputs = mkApiResponse return (createMultiple' True inputs)
+replaceMultiple = updateMultiple True
 
 -- ^
 -- Update (modify) multiple records
 modifyMultiple :: [Record] -> Api [ApiResult]
-modifyMultiple inputs = mkApiResponse return (createMultiple' False inputs)
+modifyMultiple = updateMultiple False
 
 -- ^
 -- Handle an options request for a single record endpoint
@@ -162,18 +151,7 @@ optionsMultiple = C.optionsMultiple
 createSingle'
   :: (MonadReader ApiConfig m, MonadIO m)
   => Bool -> Record -> ExceptT ApiError m ApiResult
-createSingle' replace input = do
-  conf <- ask
-  pipe <- dbPipe conf
-  posts <-
-    liftIO $
-    runExceptT $
-    insertUserPosts
-      replace
-      [input]
-      (dbName conf, pipe)
-      (esServer conf, esIndex conf)
-  ExceptT $ return (head <$> posts)
+createSingle' replace input = head <$> createMultiple' replace [input]
 
 -- ^
 -- Helper for create or update multiple methods
@@ -183,7 +161,7 @@ createMultiple'
 createMultiple' replace inputs = do
   conf <- ask
   pipe <- dbPipe conf
-  posts <-
+  ExceptT $
     liftIO $
     runExceptT $
     insertUserPosts
@@ -191,7 +169,19 @@ createMultiple' replace inputs = do
       inputs
       (dbName conf, pipe)
       (esServer conf, esIndex conf)
-  ExceptT $ return posts
+
+-- ^
+-- Update multiple records
+updateMultiple :: Bool -> [Record] -> Api [ApiResult]
+updateMultiple replace inputs = mkApiResponse return (createMultiple' replace inputs)
+
+-- ^
+-- Update a single record
+updateSingle :: Bool -> Text -> Record -> Api Record
+updateSingle replace uid input = mkApiResponse respond run
+  where
+    respond = apiItem throwApiError return
+    run = updateSingle' replace uid input
 
 -- ^
 -- Helper for update single methods
