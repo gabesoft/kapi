@@ -12,7 +12,7 @@
 #
 # Get all subscriptions
 #
-GET http://:host/:path?per_page=3
+GET http://:host/:path?per_page=10
 
 #
 # Get a subscription by feed id
@@ -23,11 +23,6 @@ GET http://:host/:path?where=(feedId eq 56d7d88bc788cb1d6eb9199c)
 # Get all subscriptions - sort & partial response
 #
 GET http://:host/:path?sort=title&include=title,uri,userId,feedId&page=4&per_page=10
-
-#
-# Get subscriptions filtered by status
-#
-GET http://:host/:path?where=(lastReadStatus.readStatus eq "success")&include=title,lastReadStatus,uri
 
 #
 # Get subscriptions created afte a date

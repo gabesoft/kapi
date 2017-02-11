@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 -- ^
--- Persistence functions for user-posts
+-- Persistence functionality for user-posts
 module Persistence.Xandar.UserPosts where
 
 import Control.Monad.Except
@@ -22,23 +22,8 @@ import Debug.Trace
 import Persistence.Common
 import qualified Persistence.ElasticSearch as E
 import qualified Persistence.MongoDB as M
-import Persistence.Xandar.Posts (postDefinition)
-import Persistence.Xandar.Subscriptions (subscriptionDefinition)
+import Persistence.Xandar.Common
 import Types.Common
-
-userPostDefinition :: RecordDefinition
-userPostDefinition =
-  RecordDefinition "post" $
-  Map.fromList
-    [ mkReqDef' "subscriptionId"
-    , mkReqDef' "postId"
-    , mkOptDef' "feedId"
-    , mkOptDef "read" (Just False)
-    , mkOptDef' "userId"
-    , mkOptDef' "post"
-    , mkOptDef' "title"
-    , mkOptDef' "tags"
-    ]
 
 -- ^
 -- Insert new user posts or replace existing ones
@@ -199,55 +184,5 @@ subId = getValue' "subscriptionId"
 postId :: Record -> RecordId
 postId = getValue' "postId"
 
-runDb
-  :: (MonadBaseControl IO m)
-  => (Database -> Pipe -> m (Either Failure c))
-  -> Database
-  -> Pipe
-  -> ExceptT ApiError m c
-runDb action dbName pipe = do
-  results <- lift $ action dbName pipe
-  ExceptT (return $ first M.dbToApiError results)
-
-runEs'
-  :: Monad m
-  => (a -> b -> c -> m (Either EsError (SearchResult Record)))
-  -> a
-  -> b
-  -> c
-  -> ExceptT ApiError m [Record]
-runEs' action server index mappingName = do
-  results <- runEs action server index mappingName
-  return $ E.extractRecords [] results
-
-runEs
-  :: Monad m
-  => (a -> b -> c -> m (Either EsError d))
-  -> a
-  -> b
-  -> c
-  -> ExceptT ApiError m d
-runEs action server index mappingName = do
-  results <- lift $ action server index mappingName
-  ExceptT (return $ first E.esToApiError results)
-
 validate' :: Record -> Either ApiError Record
-validate' record = vResultToEither (validate userPostDefinition record)
-
--- ^
--- Make a make a map with the ids as keys and records as values
-mkRecordMap :: [Record] -> Map.Map RecordId Record
-mkRecordMap xs = Map.fromList (addId <$> xs)
-  where
-    addId r = (fromJust $ getIdValue r, r)
-
--- ^
--- Make a 400 error to be returned when attempting to construct an invalid user post
-mk400Err :: String -> Record -> ApiError
-mk400Err msg record =
-  mkApiError400 $ msg <> " Original input: " <> LBS.unpack (A.encode record)
-
-lookup'
-  :: Eq a
-  => a -> [(a, c)] -> c
-lookup' name = fromJust . lookup name
+validate' = validateRecord userPostDefinition

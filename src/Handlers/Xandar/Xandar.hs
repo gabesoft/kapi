@@ -6,10 +6,9 @@ import Api.Xandar
 import Handlers.Xandar.Common
 import qualified Handlers.Xandar.Subscriptions as S
 import qualified Handlers.Xandar.UserPosts as UP
-import Persistence.Xandar.Feeds (feedDefinition, feedIndices)
-import Persistence.Xandar.Posts (postDefinition, postIndices)
-import Persistence.Xandar.Subscriptions (subscriptionIndices)
-import Persistence.Xandar.Users (userDefinition, userIndices)
+import Persistence.Xandar.Common
+       (feedDefinition, feedIndices, postDefinition, postIndices,
+        subscriptionIndices, userDefinition, userIndices)
 import Servant
 import Types.Common
 

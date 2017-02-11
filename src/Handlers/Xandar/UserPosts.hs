@@ -23,7 +23,8 @@ import qualified Handlers.Xandar.Common as C
 import Parsers.Filter (parse)
 import Persistence.Common
 import Persistence.ElasticSearch
-import Persistence.Xandar.UserPosts (insertUserPosts, userPostDefinition)
+import Persistence.Xandar.Common (userPostDefinition)
+import Persistence.Xandar.UserPosts (insertUserPosts)
 import Servant
 import Types.Common
 

@@ -27,10 +27,8 @@ library
                      , Persistence.Common
                      , Persistence.MongoDB
                      , Persistence.ElasticSearch
-                     , Persistence.Xandar.Users
-                     , Persistence.Xandar.Feeds
+                     , Persistence.Xandar.Common
                      , Persistence.Xandar.Subscriptions
-                     , Persistence.Xandar.Posts
                      , Persistence.Xandar.UserPosts
                      , Types.Common
   build-depends:       base >= 4.7 && < 5

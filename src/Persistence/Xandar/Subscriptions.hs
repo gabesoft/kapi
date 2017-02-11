@@ -1,36 +1,26 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleContexts #-}
 
--- |
--- Feed subscription model schema an indices
+-- ^
+-- Persistence functions for feed subscriptions
 module Persistence.Xandar.Subscriptions where
 
-import Data.Bson
+import Control.Monad.Except
+import Control.Monad.Trans.Control
+import qualified Data.Aeson as A
+import Data.Bifunctor
+import Data.Bson hiding (lookup, label)
+import qualified Data.ByteString.Lazy.Char8 as LBS
+import Data.Either
 import qualified Data.Map.Strict as Map
-import Database.MongoDB (Index(..))
+import Data.Maybe
+import Data.Monoid ((<>))
+import Data.Text (Text)
+import Database.Bloodhound (EsError(..), SearchResult(..))
+import Database.MongoDB (Database, Pipe, Failure, Index(..))
+import Debug.Trace
 import Persistence.Common
+import qualified Persistence.ElasticSearch as E
+import qualified Persistence.MongoDB as M
+import Persistence.Xandar.Common
 import Types.Common
-
-subscriptionIndices :: [Index]
-subscriptionIndices =
-  [ Index
-    { iColl = recordCollection subscriptionDefinition
-    , iKey = ["userId" =: (1 :: Int), "feedId" =: (1 :: Int)]
-    , iName = "userid_feedid_unique"
-    , iUnique = True
-    , iDropDups = True
-    , iExpireAfterSeconds = Nothing
-    }
-  ]
-
-subscriptionDefinition :: RecordDefinition
-subscriptionDefinition =
-  RecordDefinition "feedsubscriptions" $
-  Map.fromList
-    [ mkIdDef "userId"
-    , mkIdDef "feedId"
-    , mkOptDef' "title"
-    , mkOptDef' "notes"
-    , mkOptDef "tags" (Just [] :: Maybe [String])
-    , mkReqDef "disabled" (Just False :: Maybe Bool)
-    , mkOptDef "unreadCount" (Just 0 :: Maybe Int)
-    ]
