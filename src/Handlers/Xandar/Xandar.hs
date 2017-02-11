@@ -1,41 +1,35 @@
--- |
+-- ^
 -- Handlers for Xandar endpoints
 module Handlers.Xandar.Xandar where
 
 import Api.Xandar
 import Handlers.Xandar.Common
+import qualified Handlers.Xandar.Subscriptions as S
 import qualified Handlers.Xandar.UserPosts as UP
-import Persistence.Xandar.FeedSubscriptions
-       (feedSubscriptionDefinition, feedSubscriptionIndices)
 import Persistence.Xandar.Feeds (feedDefinition, feedIndices)
 import Persistence.Xandar.Posts (postDefinition, postIndices)
+import Persistence.Xandar.Subscriptions (subscriptionIndices)
 import Persistence.Xandar.Users (userDefinition, userIndices)
 import Servant
 import Types.Common
 
--- |
+-- ^
 -- Create an application for providing the user functionality
 app :: ApiConfig -> Application
 app =
-  app'
-    apiProxy
-    (userHandlers :<|> feedHandlers :<|> postHandlers :<|> subscriptionHandlers :<|> userPostHandlers)
+  app' apiProxy (userHandlers :<|>
+                 feedHandlers :<|>
+                 postHandlers :<|>
+                 subscriptionHandlers :<|>
+                 userPostHandlers
+                )
   where
     userHandlers :: ServerT XandarUserApi Api
-    userHandlers =
-      handlers userDefinition mkUserGetSingleLink mkUserGetMultipleLink
+    userHandlers = handlers userDefinition mkUserGetSingleLink mkUserGetMultipleLink
     feedHandlers :: ServerT XandarFeedApi Api
-    feedHandlers =
-      handlers feedDefinition mkFeedGetSingleLink mkFeedGetMultipleLink
+    feedHandlers = handlers feedDefinition mkFeedGetSingleLink mkFeedGetMultipleLink
     postHandlers :: ServerT XandarPostApi Api
-    postHandlers =
-      handlers postDefinition mkPostGetSingleLink mkPostGetMultipleLink
-    subscriptionHandlers :: ServerT XandarSubscriptionApi Api
-    subscriptionHandlers =
-      handlers
-        feedSubscriptionDefinition
-        mkSubscriptionGetSingleLink
-        mkSubscriptionGetMultipleLink
+    postHandlers = handlers postDefinition mkPostGetSingleLink mkPostGetMultipleLink
     handlers def mkGetSingleLink mkGetMultipleLink =
       getMultiple mkGetMultipleLink def :<|>
       getSingle def :<|>
@@ -58,11 +52,24 @@ app =
       UP.modifyMultiple :<|>
       UP.optionsSingle :<|>
       UP.optionsMultiple
+    subscriptionHandlers :: ServerT XandarSubscriptionApi Api
+    subscriptionHandlers =
+      S.getMultiple :<|>
+      S.getSingle :<|>
+      S.deleteSingle :<|>
+      S.createSingleOrMultiple :<|>
+      S.replaceSingle :<|>
+      S.replaceMultiple :<|>
+      S.modifySingle :<|>
+      S.modifyMultiple :<|>
+      S.optionsSingle :<|>
+      S.optionsMultiple
 
--- |
+-- ^
 -- Perform any initialization to be done on server start
 appInit :: ApiConfig -> IO ()
 appInit =
-  addDbIndices userIndices >> addDbIndices feedIndices >>
+  addDbIndices userIndices >>
+  addDbIndices feedIndices >>
   addDbIndices postIndices >>
-  addDbIndices feedSubscriptionIndices
+  addDbIndices subscriptionIndices

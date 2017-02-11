@@ -31,6 +31,11 @@ GET http://:host/:path?where=(post.title contains 'monad')&per_page=2
 GET http://:host/:path?where=(subscriptionId eq 56d7df90c788cb1d6eb92789)&include=createdAt,updatedAt,title,subscriptionId
 
 #
+# Find by subscription id 2
+#
+GET http://:host/:path?where=(subscriptionId eq 56d7de0dc788cb1d6eb91ac6)&include=title,feedId,subscriptionId,link,tags
+
+#
 # Find by id
 #
 GET http://:host/:path?where=(_id eq 56fac40f48c80e51524d5889-56d7df90c788cb1d6eb92789)&include=createdAt,updatedAt,title,feedId,post.title

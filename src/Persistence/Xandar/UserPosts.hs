@@ -22,9 +22,8 @@ import Debug.Trace
 import Persistence.Common
 import qualified Persistence.ElasticSearch as E
 import qualified Persistence.MongoDB as M
-import Persistence.Xandar.FeedSubscriptions
-       (feedSubscriptionDefinition)
 import Persistence.Xandar.Posts (postDefinition)
+import Persistence.Xandar.Subscriptions (subscriptionDefinition)
 import Types.Common
 
 userPostDefinition :: RecordDefinition
@@ -120,7 +119,7 @@ mkUserPost replace (Just sub, Just post) (existing, input)
     base = foldr (uncurry setValue) (mergeRecords sub' $ mkPost post) ids
     mkRecord _ Nothing = base
     mkRecord True _ = base
-    mkRecord False (Just existing) = excludeFields [idLabel] existing
+    mkRecord False (Just e) = excludeFields [idLabel] e
     input' =
       excludeFields
         ["post", "userId", "feedId", createdAtLabel, updatedAtLabel, idLabel]
@@ -161,9 +160,9 @@ getIds sub post = (recId, output)
       , ("postId", idLabel, post)
       ]
     get (outLabel, label, r) = (outLabel, fromJust $ getValue label r)
-    subId = lookup' "subscriptionId" output
-    postId = lookup' "postId" output
-    recId = mkUserPostId subId postId
+    subId' = lookup' "subscriptionId" output
+    postId' = lookup' "postId" output
+    recId = mkUserPostId subId' postId'
 
 -- ^
 -- Generate an id for a user post
@@ -174,7 +173,7 @@ mkUserPostId' record =
 -- ^
 -- Generate an id given a subscription id and a post id
 mkUserPostId :: RecordId -> RecordId -> RecordId
-mkUserPostId subId postId = subId <> "-" <> postId
+mkUserPostId subId' postId' = subId' <> "-" <> postId'
 
 -- ^
 -- Get multiple posts by id
@@ -188,7 +187,7 @@ getPostsById ids = M.dbFind postDefinition (M.idsQuery ids) [] [] 0 0
 getSubsById
   :: (MonadBaseControl IO m, MonadIO m)
   => [RecordId] -> Database -> Pipe -> m (Either Failure [Record])
-getSubsById ids = M.dbFind feedSubscriptionDefinition (M.idsQuery ids) [] [] 0 0
+getSubsById ids = M.dbFind subscriptionDefinition (M.idsQuery ids) [] [] 0 0
 
 -- ^
 -- Get the subscription id of a user-post

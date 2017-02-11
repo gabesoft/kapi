@@ -19,6 +19,7 @@ library
                      , Data.AesonBson
                      , Data.AesonBson.Instances
                      , Handlers.Xandar.Common
+                     , Handlers.Xandar.Subscriptions
                      , Handlers.Xandar.UserPosts
                      , Handlers.Xandar.Xandar
                      , Parsers.Filter
@@ -28,7 +29,7 @@ library
                      , Persistence.ElasticSearch
                      , Persistence.Xandar.Users
                      , Persistence.Xandar.Feeds
-                     , Persistence.Xandar.FeedSubscriptions
+                     , Persistence.Xandar.Subscriptions
                      , Persistence.Xandar.Posts
                      , Persistence.Xandar.UserPosts
                      , Types.Common

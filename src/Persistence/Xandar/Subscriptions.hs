@@ -2,7 +2,7 @@
 
 -- |
 -- Feed subscription model schema an indices
-module Persistence.Xandar.FeedSubscriptions where
+module Persistence.Xandar.Subscriptions where
 
 import Data.Bson
 import qualified Data.Map.Strict as Map
@@ -10,10 +10,10 @@ import Database.MongoDB (Index(..))
 import Persistence.Common
 import Types.Common
 
-feedSubscriptionIndices :: [Index]
-feedSubscriptionIndices =
+subscriptionIndices :: [Index]
+subscriptionIndices =
   [ Index
-    { iColl = recordCollection feedSubscriptionDefinition
+    { iColl = recordCollection subscriptionDefinition
     , iKey = ["userId" =: (1 :: Int), "feedId" =: (1 :: Int)]
     , iName = "userid_feedid_unique"
     , iUnique = True
@@ -22,8 +22,8 @@ feedSubscriptionIndices =
     }
   ]
 
-feedSubscriptionDefinition :: RecordDefinition
-feedSubscriptionDefinition =
+subscriptionDefinition :: RecordDefinition
+subscriptionDefinition =
   RecordDefinition "feedsubscriptions" $
   Map.fromList
     [ mkIdDef "userId"
