@@ -25,6 +25,7 @@ import Database.MongoDB.Query (Failure(..))
 import Network.HTTP.Types.Status
 import Persistence.Common
 import Persistence.MongoDB
+import Persistence.Xandar.Common (runDb, mergeRecords', validateHasId')
 import Servant
 import Servant.Utils.Enter (Enter)
 import Types.Common
@@ -74,11 +75,11 @@ getMultiple'
   -> ExceptT ApiError m ([Record], Pagination)
 getMultiple' def include query sort page perPage = do
   query' <- ExceptT (return getQuery)
-  count <- runDb (dbCount def query')
+  count <- runDb' (dbCount def query')
   let pagination = mkPagination page perPage count
   let start = paginationStart pagination
   let limit = paginationLimit pagination
-  records <- runDb $ dbFind def query' sort' include' start limit
+  records <- runDb' $ dbFind def query' sort' include' start limit
   return (records, pagination)
   where
     sort' = mkSortFields (splitLabels sort)
@@ -91,7 +92,7 @@ deleteSingle :: RecordDefinition -> Text -> Api NoContent
 deleteSingle def uid = verify >> mkApiResponse (const $ return NoContent) delete
   where
     verify = getSingle def mempty uid
-    delete = runDb $ dbDeleteById def uid
+    delete = runDb' $ dbDeleteById def uid
 
 -- ^
 -- Create one or more records
@@ -168,7 +169,7 @@ updateMultiple :: RecordDefinition -> Bool -> [Record] -> Api [ApiResult]
 updateMultiple def replace = mapM (mkApiResult . update)
   where
     update u = do
-      valid <- ExceptT . return $ vResultToEither (validateHasId u)
+      valid <- ExceptT . return $ validateHasId' u
       updateSingle' def replace (fromJust $ getIdValue u) valid
 
 -- ^
@@ -178,13 +179,8 @@ updateSingle'
   => RecordDefinition -> Bool -> Text -> Record -> ExceptT ApiError m Record
 updateSingle' def replace uid updated = do
   existing <- getExisting def uid
-  valid <- validate' def (merge existing updated)
+  valid <- validate' def (mergeRecords' replace existing updated)
   insertOrUpdateSingle def dbUpdate valid
-  where
-    merge =
-      if replace
-        then replaceRecords [createdAtLabel, updatedAtLabel, idLabel]
-        else mergeRecords
 
 -- ^
 -- Insert a single valid record
@@ -197,7 +193,7 @@ insertSingle def input = do
   insertOrUpdateSingle def dbInsert valid
 
 -- ^
--- Insert or update a valid 'record' record according to 'action'
+-- Insert or update a valid 'input' record according to 'action'
 insertOrUpdateSingle
   :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
   => RecordDefinition
@@ -205,8 +201,8 @@ insertOrUpdateSingle
   -> Record
   -> ExceptT ApiError m Record
 insertOrUpdateSingle def action input = do
-  uid <- runDb $ action def (populateDefaults def input)
-  record <- runDb $ dbGetById def uid
+  uid <- runDb' $ action def (populateDefaults def input)
+  record <- runDb' $ dbGetById def uid
   return (fromJust record)
 
 -- ^
@@ -215,7 +211,7 @@ getExisting
   :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
   => RecordDefinition -> Text -> ExceptT ApiError m Record
 getExisting def uid = do
-  record <- runDb (dbGetById def uid)
+  record <- runDb' (dbGetById def uid)
   ExceptT . return $ maybe (Left mkApiError404) Right record
 
 -- ^
@@ -227,14 +223,13 @@ addDbIndices indices conf = do
 
 -- ^
 -- Run a database action
-runDb
-  :: (MonadReader ApiConfig m, MonadIO m)
+runDb'
+  :: (MonadReader ApiConfig m, MonadBaseControl IO m, MonadIO m)
   => (Database -> Pipe -> m (Either Failure a)) -> ExceptT ApiError m a
-runDb action = do
+runDb' action = do
   conf <- ask
   pipe <- dbPipe conf
-  results <- lift $ action (dbName conf) pipe
-  ExceptT . return $ first dbToApiError results
+  runDb action (dbName conf) pipe
 
 -- ^
 -- Prepare an API response

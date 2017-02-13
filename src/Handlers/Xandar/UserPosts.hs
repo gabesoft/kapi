@@ -23,7 +23,7 @@ import qualified Handlers.Xandar.Common as C
 import Parsers.Filter (parse)
 import Persistence.Common
 import Persistence.ElasticSearch
-import Persistence.Xandar.Common (userPostDefinition)
+import Persistence.Xandar.Common (userPostDefinition, runEs)
 import Persistence.Xandar.UserPosts (insertUserPosts)
 import Servant
 import Types.Common
@@ -41,7 +41,7 @@ esIndex = confGetEsIndex appName
 -- ^
 -- Get a single record by id
 getSingle :: Maybe Text -> Text -> Api (Headers '[Header "ETag" String] Record)
-getSingle etag uid = mkApiResponse respond (runEs $ getByIds [uid])
+getSingle etag uid = mkApiResponse respond (runEs' $ getByIds [uid])
   where
     respond = maybe (throwError err404) (mkSingleResult etag) . extractRecord
 
@@ -66,12 +66,12 @@ getMultiple'
   -> Maybe Int
   -> ExceptT ApiError m ([Record], Pagination)
 getMultiple' include query sortFields page perPage = do
-  count <- runEs . countDocuments =<< getCountSearch
+  count <- runEs' . countDocuments =<< getCountSearch
   let pagination = mkPagination page perPage count
   let start = paginationStart pagination
   let limit = paginationLimit pagination
   search <- getSearch start limit
-  results <- runEs . searchDocuments $ search
+  results <- runEs' . searchDocuments $ search
   return (extractRecords include' results, pagination)
   where
     getCountSearch = ExceptT . return $ prepareSearch include' query sort' 0 0
@@ -85,7 +85,7 @@ deleteSingle :: Text -> Api NoContent
 deleteSingle uid = verify >> mkApiResponse (const $ return NoContent) delete
   where
     verify = getSingle mempty uid
-    delete = runEs $ deleteDocument uid
+    delete = runEs' $ deleteDocument uid
 
 -- ^
 -- Create one or more records
@@ -190,7 +190,7 @@ updateSingle'
   :: (MonadReader ApiConfig m, MonadIO m)
   => Bool -> Text -> Record -> ExceptT ApiError m ApiResult
 updateSingle' replace uid input = do
-  result <- runEs (getByIds [uid])
+  result <- runEs' (getByIds [uid])
   existing <- ExceptT $ return (extract result)
   createSingle' replace (merge existing input)
   where
@@ -200,15 +200,12 @@ updateSingle' replace uid input = do
 
 -- ^
 -- Run an elastic-search action
-runEs
+runEs'
   :: (MonadReader ApiConfig m, MonadIO m)
   => (Text -> Text -> Text -> IO (Either EsError d)) -> ExceptT ApiError m d
-runEs action = do
+runEs' action = do
   conf <- ask
-  let server = esServer conf
-  let index = esIndex conf
-  results <- liftIO $ action server index mappingName
-  ExceptT (return $ first esToApiError results)
+  runEs action (esServer conf) (esIndex conf) mappingName
 
 -- ^
 -- Make a 'Search' object from query string parameters
@@ -225,11 +222,3 @@ prepareSearch include query sortFields start limit = expr >>= toSearch
     expr = sequence $ first toErr . parse <$> query
     toSearch e = first esToApiError $ mkSearch e sortFields include start limit
     toErr msg = mkApiError400 ("Invalid query: " ++ msg)
-
--- ^
--- Extract a 'Record' from a 'SearchResult'
-extractRecord :: SearchResult Record -> Maybe Record
-extractRecord results =
-  case extractRecords [] results of
-    [] -> Nothing
-    x:_ -> Just x

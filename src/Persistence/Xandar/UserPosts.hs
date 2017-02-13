@@ -38,7 +38,7 @@ insertUserPosts replace input (dbName, pipe) (server, index) = do
   let validated = validate' <$> input
   let valid = rights validated
   let invalid = lefts validated
-  existing <- runEs' (E.getByIds $ mkUserPostId' <$> valid) server index mapping
+  existing <- runEsAndExtract (E.getByIds $ mkUserPostId' <$> valid) server index mapping
   subs <- runDb (getSubsById $ subId <$> valid) dbName pipe
   posts <- runDb (getPostsById $ postId <$> valid) dbName pipe
   results <- mkUserPosts replace (subs, posts) (existing, valid)
@@ -56,7 +56,7 @@ indexDocuments [] _ _ _ = return []
 indexDocuments input server index mapping = do
   _ <- runEs (E.indexDocuments input) server index mapping >>= printLog
   _ <- runEs refreshIndex server index mapping
-  runEs' (E.getByIds $ snd <$> input) server index mapping
+  runEsAndExtract (E.getByIds $ snd <$> input) server index mapping
   where
     refreshIndex s i _ = E.refreshIndex s i
     printLog msg = liftIO $ print $ trace "Insert user posts" msg
@@ -165,14 +165,14 @@ mkUserPostId subId' postId' = subId' <> "-" <> postId'
 getPostsById
   :: (MonadBaseControl IO m, MonadIO m)
   => [RecordId] -> Database -> Pipe -> m (Either Failure [Record])
-getPostsById ids = M.dbFind postDefinition (M.idsQuery ids) [] [] 0 0
+getPostsById = getRecordsById postDefinition
 
 -- ^
 -- Get multiple subscriptions by id
 getSubsById
   :: (MonadBaseControl IO m, MonadIO m)
   => [RecordId] -> Database -> Pipe -> m (Either Failure [Record])
-getSubsById ids = M.dbFind subscriptionDefinition (M.idsQuery ids) [] [] 0 0
+getSubsById = getRecordsById subscriptionDefinition
 
 -- ^
 -- Get the subscription id of a user-post
@@ -184,5 +184,13 @@ subId = getValue' "subscriptionId"
 postId :: Record -> RecordId
 postId = getValue' "postId"
 
+-- ^
+-- Validate a user-post
 validate' :: Record -> Either ApiError Record
 validate' = validateRecord userPostDefinition
+
+-- ^
+-- Make a 400 error to be returned when attempting to construct an invalid user post
+mk400Err :: String -> Record -> ApiError
+mk400Err msg record =
+  mkApiError400 $ msg <> " Original input: " <> LBS.unpack (A.encode record)

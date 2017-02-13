@@ -15,6 +15,7 @@ module Persistence.MongoDB
   , documentToRecord
   , idQuery
   , idsQuery
+  , idsQuery'
   , mkInDocument
   , mkIncludeField
   , mkIncludeFields
@@ -205,7 +206,12 @@ idQuery recId = [idLabel =: recIdToObjId recId]
 -- ^
 -- Get a query for finding multiple records by id
 idsQuery :: [RecordId] -> [Field]
-idsQuery recIds = [idLabel =: ("$in" =: recIdToObjId <$> recIds)]
+idsQuery = idsQuery' idLabel
+
+-- ^
+-- Get a query for finding multiple records by id
+idsQuery' :: Label -> [RecordId] -> [Field]
+idsQuery' name recIds = [name =: ("$in" =: recIdToObjId <$> recIds)]
 
 -- ^
 -- Convert a record id to an object id value

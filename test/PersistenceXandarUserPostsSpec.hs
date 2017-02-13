@@ -12,6 +12,7 @@ import qualified Data.Map.Strict as Map
 import Mocks.Common
 import Network.HTTP.Types
 import Persistence.Common
+import Persistence.Xandar.Common
 import Persistence.Xandar.UserPosts
 import Test.Hspec
 import Test.QuickCheck

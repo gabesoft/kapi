@@ -159,9 +159,18 @@ userPostDefinition =
     , mkOptDef' "tags"
     ]
 
+-- ^
+-- Validate a record against its definition
 validateRecord :: RecordDefinition -> Record -> Either ApiError Record
 validateRecord def record = vResultToEither (validate def record)
 
+-- ^
+-- Validate that a record contains a valid id field
+validateHasId' :: Record -> Either ApiError Record
+validateHasId' = vResultToEither . M.validateHasId
+
+-- ^
+-- Run a MongoDB action
 runDb
   :: (MonadBaseControl IO m)
   => (Database -> Pipe -> m (Either Failure c))
@@ -172,40 +181,60 @@ runDb action dbName pipe = do
   results <- lift $ action dbName pipe
   ExceptT (return $ first M.dbToApiError results)
 
-runEs'
-  :: Monad m
-  => (a -> b -> c -> m (Either EsError (SearchResult Record)))
+-- ^
+-- Run an elastic-search action and extract the results
+runEsAndExtract
+  :: MonadIO m
+  => (a -> b -> c -> IO (Either EsError (SearchResult Record)))
   -> a
   -> b
   -> c
   -> ExceptT ApiError m [Record]
-runEs' action server index mappingName = do
+runEsAndExtract action server index mappingName = do
   results <- runEs action server index mappingName
   return $ E.extractRecords [] results
 
+-- ^
+-- Run an elastic-search action
 runEs
-  :: Monad m
-  => (a -> b -> c -> m (Either EsError d))
+  :: MonadIO m
+  => (a -> b -> c -> IO (Either EsError d))
   -> a
   -> b
   -> c
   -> ExceptT ApiError m d
 runEs action server index mappingName = do
-  results <- lift $ action server index mappingName
+  results <- liftIO $ action server index mappingName
   ExceptT (return $ first E.esToApiError results)
+
+-- ^
+-- Get multiple records by id
+getRecordsById
+  :: (MonadBaseControl IO m, MonadIO m)
+  => RecordDefinition
+  -> [RecordId]
+  -> Database
+  -> Pipe
+  -> m (Either Failure [Record])
+getRecordsById def ids = M.dbFind def (M.idsQuery ids) [] [] 0 0
 
 -- ^
 -- Make a make a map with the ids as keys and records as values
 mkRecordMap :: [Record] -> Map.Map RecordId Record
-mkRecordMap xs = Map.fromList (addId <$> xs)
-  where
-    addId r = (fromJust $ getIdValue r, r)
+mkRecordMap = mkRecordMap' idLabel
 
 -- ^
--- Make a 400 error to be returned when attempting to construct an invalid user post
-mk400Err :: String -> Record -> ApiError
-mk400Err msg record =
-  mkApiError400 $ msg <> " Original input: " <> LBS.unpack (A.encode record)
+-- Merge an existing and an updated record according to the 'replace' flag
+mergeRecords' :: Bool -> Record -> Record -> Record
+mergeRecords' True = replaceRecords [createdAtLabel, updatedAtLabel, idLabel]
+mergeRecords' False = mergeRecords
+
+-- ^
+-- Make a make a map with the ids as keys and records as values
+mkRecordMap' :: Label -> [Record] -> Map.Map RecordId Record
+mkRecordMap' name xs = Map.fromList (addId <$> xs)
+  where
+    addId r = (getValue' name r, r)
 
 lookup'
   :: Eq a

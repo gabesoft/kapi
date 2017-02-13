@@ -152,6 +152,14 @@ getIdValue' :: Record -> RecordId
 getIdValue' = fromJust . getValue idLabel
 
 -- ^
+-- Return true if the value of a field is a 'True' value
+isValueOn :: Label -> Record -> Bool
+isValueOn label record = isJust val && fromJust val
+  where
+    val :: Maybe Bool
+    val = getValue label record
+
+-- ^
 -- Set the value of a field to the current time
 setTimestamp'
   :: MonadIO m
@@ -311,7 +319,7 @@ mergeRecords (Record d1) (Record d2) = Record $ foldl add d1 d2
       | otherwise = rk := rv
 
 -- ^
--- Replace one record with another keeping some fields fields unmodified
+-- Replace one record with another keeping some fields unmodified
 replaceRecords :: [Label] -> Record -> Record -> Record
 replaceRecords preserveLabels r1 r2 = exclude' (mergeRecords r1 r2')
   where

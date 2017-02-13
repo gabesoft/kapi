@@ -33,7 +33,7 @@ GET http://:host/:path?where=(subscriptionId eq 56d7df90c788cb1d6eb92789)&includ
 #
 # Find by subscription id 2
 #
-GET http://:host/:path?where=(subscriptionId eq 56d7de0dc788cb1d6eb91ac6)&include=title,feedId,subscriptionId,link,tags
+GET http://:host/:path?where=(subscriptionId eq 56d7d89dc788cb1d6eb919b1)&include=title,feedId,subscriptionId,link,tags
 
 #
 # Get unread counts

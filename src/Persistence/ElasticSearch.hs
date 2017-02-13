@@ -9,6 +9,7 @@ module Persistence.ElasticSearch
   , deleteDocuments
   , deleteIndex
   , esToApiError
+  , extractRecord
   , extractRecords
   , getByIds
   , indexDocument
@@ -23,6 +24,7 @@ module Persistence.ElasticSearch
 
 import Control.Applicative
 import Control.Monad (join)
+import Control.Monad.Catch
 import Data.Aeson (ToJSON)
 import qualified Data.Aeson as A
 import Data.Bifunctor
@@ -147,6 +149,18 @@ deleteDocuments recordIds server index mappingName =
     op recordId =
       BulkDelete (IndexName index) (MappingName mappingName) (DocId recordId)
     stream = V.fromList (op <$> recordIds)
+
+-- ^
+-- Delete all documents matching a query
+deleteByQuery search server index mappingName = do
+  hits <- scanSearch
+  undefined
+  where
+    search' = search {fields = Just [FieldName idLabel]}
+    scanSearch
+      :: (B.MonadBH m, MonadThrow m)
+      => m [B.Hit Record]
+    scanSearch = B.scanSearch (IndexName index) (MappingName mappingName) search'
 
 -- ^
 -- Get documents by id
@@ -387,6 +401,14 @@ esToApiError err =
     intToStatus 404 = status404
     intToStatus 500 = status500
     intToStatus code = error $ "unknown status code " ++ show code
+
+-- ^
+-- Extract a 'Record' from a 'SearchResult'
+extractRecord :: SearchResult Record -> Maybe Record
+extractRecord results =
+  case extractRecords [] results of
+    [] -> Nothing
+    x:_ -> Just x
 
 -- ^
 -- Extract all 'Record's from a 'SearchResult'
