@@ -33,12 +33,17 @@ GET http://:host/:path?where=(subscriptionId eq 56d7df90c788cb1d6eb92789)&includ
 #
 # Find by subscription id
 #
-GET http://:host/:path?where=(subscriptionId eq 56d7df90c788cb1d6eb92789)&include=createdAt,updatedAt,title,subscriptionId
+GET http://:host/:path?where=(subscriptionId eq 58a3fc135984184d4f000002)&include=createdAt,updatedAt,title,subscriptionId,tags
 
 #
 # Find by subscription ids (head)
 #
 HEAD http://:host/:path?where=(subscriptionId in [56d7d89dc788cb1d6eb919b1, 56d7df90c788cb1d6eb92789, 56d7ddf5c788cb1d6eb919d7])&include=title,feedId,subscriptionId,link,tags
+
+#
+# Find by subscription ids (head) 2
+#
+HEAD http://:host/:path?where=(subscriptionId in [56d7de66c788cb1d6eb91ce3, 56d7de26c788cb1d6eb91bdc, 56d7e0cdc788cb1d6eb93268])&include=title,feedId,subscriptionId,link,tags
 
 #
 # Get unread counts

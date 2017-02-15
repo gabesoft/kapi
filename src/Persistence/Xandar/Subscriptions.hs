@@ -31,6 +31,10 @@ import Types.Common
 
 userPostMapping = recordCollection userPostDefinition
 
+getSingleSubscription = undefined
+
+getMultipleSubscriptions = undefined
+
 -- ^
 -- Insert multiple subscriptions and index related posts
 insertSubscriptions :: [Record]
@@ -72,13 +76,13 @@ updateSubscriptions replace input (dbName, pipe) (server, index) = do
   -- index user-posts of enabled subscriptions
   _ <-
     insertUserPosts
-      False
+      True
       (mkUserPosts' existing saved posts)
       (dbName, pipe)
       (server, index)
   -- delete user-posts of disabled subscriptions
   let disabledIds = getIdValue' <$> filter (not . isEnabled) saved
-  _ <- runEs (deletePosts disabledIds) server index userPostMapping
+  deletePosts disabledIds server index userPostMapping
   -- TODO: update tags
   return $ (Succ <$> saved) <> (Fail <$> lefts validated <> lefts records)
   where
@@ -90,9 +94,12 @@ updateSubscriptions replace input (dbName, pipe) (server, index) = do
 
 -- ^
 -- Delete the subscription the given id and its related user-posts
+deleteSubscription
+  :: (MonadBaseControl IO m, MonadIO m)
+  => RecordId -> (Database, Pipe) -> (Text, Text) -> ExceptT ApiError m ()
 deleteSubscription subId (dbName, pipe) (server, index) = do
   sub <- getExistingSub subId dbName pipe
-  runEs (deletePosts [subId]) server index userPostMapping
+  deletePosts [subId] server index userPostMapping
 
 -- TODO: consolidate with Handlers.Common#getExisting
 getExistingSub
@@ -104,15 +111,22 @@ getExistingSub subId dbName pipe = do
 
 -- ^
 -- Delete the user-posts related to the input subscriptions from the search index
-deletePosts :: [RecordId] -> Text -> Text -> Text -> IO (Either EsError Text)
-deletePosts ids server index mappingName = either (return . Left) delete search
+deletePosts
+  :: MonadIO m
+  => [Text] -> Text -> Text -> Text -> ExceptT ApiError m ()
+deletePosts subIds server index mappingName = do
+  search <- ExceptT (return search')
+  runEs (E.deleteByQuery search) server index mappingName >>= printLog
   where
-    filter' = FilterRelOp In "subscriptionId" (TermList $ TermId <$> ids)
-    search = mkSearch (Just filter') [] [] 0 0
-    delete s = E.deleteByQuery s server index mappingName
+    filter' = FilterRelOp In "subscriptionId" (TermList $ TermId <$> subIds)
+    search' = first esToApiError $ mkSearch (Just filter') [] [] 0 0
+    printLog _ = liftIO $ print $ trace "Delete user posts for" subIds
 
 -- TODO: consolidate the two mkUserPosts functions
-mkUserPosts' eSubs nSubs posts = undefined
+mkUserPosts'
+  :: Functor f
+  => [Record] -> [Record] -> f Record -> f Record
+mkUserPosts' eSubs nSubs = fmap mkUserPost
   where
     eSubMap = mkRecordMap' "feedId" eSubs
     nSubMap = mkRecordMap' "feedId" nSubs
@@ -128,7 +142,10 @@ mkUserPosts' eSubs nSubs posts = undefined
         , "postId" =: getIdValue' post
         ]
 
-mkUserPosts subs posts = mkUserPost <$> posts
+mkUserPosts
+  :: Functor f
+  => [Record] -> f Record -> f (RecordData Field)
+mkUserPosts subs = fmap mkUserPost
   where
     subMap = mkRecordMap' "feedId" subs
     getSub post = fromJust $ Map.lookup (feedId post) subMap

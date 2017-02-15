@@ -258,6 +258,11 @@ dbName :: ApiConfig -> Database
 dbName = confGetDb appName
 
 -- ^
+-- Elastic-search index
+esIndex :: ApiConfig -> Text
+esIndex = confGetEsIndex appName
+
+-- ^
 -- Create a MongoDB connection pipe
 dbPipe
   :: MonadIO m

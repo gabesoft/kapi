@@ -59,7 +59,7 @@ indexDocuments input server index mapping = do
   runEsAndExtract (E.getByIds $ snd <$> input) server index mapping
   where
     refreshIndex s i _ = E.refreshIndex s i
-    printLog msg = liftIO $ print $ trace "Insert user posts" msg
+    printLog _ = liftIO $ print $ trace "Insert user posts" (length input)
 
 -- ^
 -- Construct user post documents

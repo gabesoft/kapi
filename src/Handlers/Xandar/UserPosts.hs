@@ -18,7 +18,7 @@ import Database.Bloodhound (SearchResult(..), EsError, Search)
 import Handlers.Xandar.Common
        (throwApiError, mkPagination, splitLabels, mkGetMultipleResult,
         mkCreateMultipleResult, mkApiResponse, dbName, dbPipe,
-        getCreateLink, mkLink, mkSingleResult)
+        getCreateLink, mkLink, mkSingleResult, esIndex)
 import qualified Handlers.Xandar.Common as C
 import Parsers.Filter (parse)
 import Persistence.Common
@@ -32,11 +32,6 @@ import Types.Common
 -- Elastic-search mapping name
 mappingName :: Text
 mappingName = recordCollection userPostDefinition
-
--- ^
--- Elastic-search index
-esIndex :: ApiConfig -> Text
-esIndex = confGetEsIndex appName
 
 -- ^
 -- Get a single record by id
@@ -113,8 +108,8 @@ createMultiple
   :: (Text -> String)
   -> [Record]
   -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData ApiResult))
-createMultiple getLink inputs =
-  mkApiResponse (mkCreateMultipleResult getLink) (createMultiple' True inputs)
+createMultiple getLink input =
+  mkApiResponse (mkCreateMultipleResult getLink) (createMultiple' True input)
 
 -- ^
 -- Update (replace) a single record
@@ -159,7 +154,7 @@ createSingle' replace input = head <$> createMultiple' replace [input]
 createMultiple'
   :: (MonadReader ApiConfig m, MonadIO m)
   => Bool -> [Record] -> ExceptT ApiError m [ApiResult]
-createMultiple' replace inputs = do
+createMultiple' replace input = do
   conf <- ask
   pipe <- dbPipe conf
   ExceptT $
@@ -167,14 +162,14 @@ createMultiple' replace inputs = do
     runExceptT $
     insertUserPosts
       replace
-      inputs
+      input
       (dbName conf, pipe)
       (esServer conf, esIndex conf)
 
 -- ^
 -- Update multiple records
 updateMultiple :: Bool -> [Record] -> Api [ApiResult]
-updateMultiple replace inputs = mkApiResponse return (createMultiple' replace inputs)
+updateMultiple replace input = mkApiResponse return (createMultiple' replace input)
 
 -- ^
 -- Update a single record

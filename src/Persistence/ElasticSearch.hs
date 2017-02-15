@@ -130,6 +130,7 @@ indexDocuments :: [(Record, Text)]
                -> Text
                -> Text
                -> IO (Either EsError Text)
+indexDocuments [] _ _ _ = return (Right mempty)
 indexDocuments items server index mappingName = withBH server (B.bulk stream)
   where
     op (record, recordId) =
@@ -150,6 +151,7 @@ deleteDocument recordId server index mappingName =
 -- ^
 -- Delete multiple documents
 deleteDocuments :: [Text] -> Text -> Text -> Text -> IO (Either EsError Text)
+deleteDocuments [] _ _ _ = return (Right mempty)
 deleteDocuments recordIds server index mappingName =
   withBH server (B.bulk stream)
   where
