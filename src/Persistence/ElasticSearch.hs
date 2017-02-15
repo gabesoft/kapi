@@ -5,6 +5,7 @@
 module Persistence.ElasticSearch
   ( createIndex
   , countDocuments
+  , deleteByQuery
   , deleteDocument
   , deleteDocuments
   , deleteIndex
@@ -25,6 +26,7 @@ module Persistence.ElasticSearch
 import Control.Applicative
 import Control.Monad (join)
 import Control.Monad.Catch
+import Control.Monad.IO.Class
 import Data.Aeson (ToJSON)
 import qualified Data.Aeson as A
 import Data.Bifunctor
@@ -72,6 +74,11 @@ deleteIndex server index = withBH server (B.deleteIndex $ IndexName index)
 -- Refresh an index. Should be called after writing to an index.
 refreshIndex :: Text -> Text -> IO (Either EsError Text)
 refreshIndex server index = withBH server (B.refreshIndex $ IndexName index)
+
+-- ^
+-- Maximum number of results returned from a search
+maxSize :: Int
+maxSize = 1048576
 
 -- ^
 -- Add a new type to an existing index
@@ -152,15 +159,24 @@ deleteDocuments recordIds server index mappingName =
 
 -- ^
 -- Delete all documents matching a query
+deleteByQuery :: Search -> Text -> Text -> Text -> IO (Either EsError Text)
 deleteByQuery search server index mappingName = do
-  hits <- scanSearch
-  undefined
+  hits <- B.withBH defaultManagerSettings (Server server) scanSearch
+  let docIds = getId . B.hitDocId <$> hits
+  deleteDocuments docIds server index mappingName
   where
-    search' = search {fields = Just [FieldName idLabel]}
+    getId (DocId docId) = docId
+    search' =
+      search
+      { fields = Just [FieldName idLabel]
+      , from = B.From 0
+      , size = B.Size maxSize
+      }
     scanSearch
       :: (B.MonadBH m, MonadThrow m)
       => m [B.Hit Record]
-    scanSearch = B.scanSearch (IndexName index) (MappingName mappingName) search'
+    scanSearch =
+      B.scanSearch (IndexName index) (MappingName mappingName) search'
 
 -- ^
 -- Get documents by id
@@ -209,7 +225,8 @@ mkEsError code = EsError code . T.pack
 -- ^
 -- Create a search object for finding records by id
 mkIdsSearch :: Text -> [Text] -> Search
-mkIdsSearch mappingName ids = B.mkSearch (Just query) Nothing
+mkIdsSearch mappingName ids =
+  mkSearch' (Just query) Nothing Nothing [] 0 (length ids)
   where
     query = IdsQuery (MappingName mappingName) (DocId <$> ids)
 

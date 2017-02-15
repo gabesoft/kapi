@@ -20,6 +20,11 @@ GET http://:host/:path?per_page=10
 GET http://:host/:path?per_page=10&where=(disabled eq true)&include=feedId,title,userId
 
 #
+# Get all enabled subscriptions
+#
+GET http://:host/:path?per_page=10&where=(disabled eq false)&include=feedId,title,userId,disabled
+
+#
 # Get a subscription by feed id
 #
 GET http://:host/:path?where=(feedId eq 56d7d88bc788cb1d6eb9199c)

@@ -18,14 +18,18 @@ import Data.Maybe
 import Data.Monoid ((<>))
 import Data.Text (Text)
 import Database.Bloodhound (EsError(..), SearchResult(..))
+import qualified Database.Bloodhound as B
 import Database.MongoDB (Database, Pipe, Failure, Index(..))
 import Debug.Trace
 import Persistence.Common
+import Persistence.ElasticSearch
 import qualified Persistence.ElasticSearch as E
 import qualified Persistence.MongoDB as M
 import Persistence.Xandar.Common
 import Persistence.Xandar.UserPosts (insertUserPosts)
 import Types.Common
+
+userPostMapping = recordCollection userPostDefinition
 
 -- ^
 -- Insert multiple subscriptions and index related posts
@@ -51,27 +55,78 @@ insertSubscriptions input (dbName, pipe) (server, index) = do
 
 -- ^
 -- Update multiple subscriptions and index related posts
+updateSubscriptions
+  :: Bool
+  -> [Record]
+  -> (Database, Pipe)
+  -> (Text, Text)
+  -> ExceptT ApiError IO [ApiItem ApiError Record]
 updateSubscriptions replace input (dbName, pipe) (server, index) = do
   let validated = validateHasId' <$> input
   let valid = rights validated
   existing <- runDb (getSubsById $ getIdValue' <$> valid) dbName pipe
   let existingMap = mkRecordMap existing
-  let subPairs = mkPair existingMap <$> valid
-  let subs = rights $ snd <$> subPairs
-  let errs = lefts $ snd <$> subPairs
-  saved <- mapM save subs
-
-  -- TODO: index posts for enabled (read = enabled changed)
-  --       and update tags
-  --       delete posts for disabled
-
-  return $ (Succ <$> saved) <> (Fail <$> lefts validated <> errs)
+  let records = mkRecord existingMap <$> valid
+  saved <- mapM save (rights records)
+  posts <- runDb (getPostsBySub $ filter isEnabled saved) dbName pipe
+  -- index user-posts of enabled subscriptions
+  _ <-
+    insertUserPosts
+      False
+      (mkUserPosts' existing saved posts)
+      (dbName, pipe)
+      (server, index)
+  -- delete user-posts of disabled subscriptions
+  let disabledIds = getIdValue' <$> filter (not . isEnabled) saved
+  _ <- runEs (deletePosts disabledIds) server index userPostMapping
+  -- TODO: update tags
+  return $ (Succ <$> saved) <> (Fail <$> lefts validated <> lefts records)
   where
     save r = saveDb M.dbUpdate r dbName pipe
-    mkPair existingMap r = (r, mkRecord (get existingMap r) r)
     get m r = Map.lookup (getIdValue' r) m
-    mkRecord Nothing r = Left mkApiError404
-    mkRecord (Just e) r = Right $ mergeRecords' replace e r
+    mkRecord existingMap r = mkRecord' (get existingMap r) r
+    mkRecord' Nothing r = Left mkApiError404
+    mkRecord' (Just e) r = Right $ mergeRecords' replace e r
+
+-- ^
+-- Delete the subscription the given id and its related user-posts
+deleteSubscription subId (dbName, pipe) (server, index) = do
+  sub <- getExistingSub subId dbName pipe
+  runEs (deletePosts [subId]) server index userPostMapping
+
+-- TODO: consolidate with Handlers.Common#getExisting
+getExistingSub
+  :: (MonadIO m, MonadBaseControl IO m)
+  => RecordId -> Database -> Pipe -> ExceptT ApiError m Record
+getExistingSub subId dbName pipe = do
+  sub <- runDb (M.dbGetById subscriptionDefinition subId) dbName pipe
+  ExceptT . return $ maybe (Left mkApiError404) Right sub
+
+-- ^
+-- Delete the user-posts related to the input subscriptions from the search index
+deletePosts :: [RecordId] -> Text -> Text -> Text -> IO (Either EsError Text)
+deletePosts ids server index mappingName = either (return . Left) delete search
+  where
+    filter' = FilterRelOp In "subscriptionId" (TermList $ TermId <$> ids)
+    search = mkSearch (Just filter') [] [] 0 0
+    delete s = E.deleteByQuery s server index mappingName
+
+-- TODO: consolidate the two mkUserPosts functions
+mkUserPosts' eSubs nSubs posts = undefined
+  where
+    eSubMap = mkRecordMap' "feedId" eSubs
+    nSubMap = mkRecordMap' "feedId" nSubs
+    getNSub post = fromJust $ Map.lookup (feedId post) nSubMap
+    getESub post = fromJust $ Map.lookup (feedId post) eSubMap
+    addRead e n r
+      | e /= n = mergeRecords r $ Record ["read" =: True]
+      | otherwise = r
+    mkUserPost post =
+      addRead (isEnabled $ getESub post) (isEnabled $ getNSub post) $
+      Record
+        [ "subscriptionId" =: getIdValue' (getNSub post)
+        , "postId" =: getIdValue' post
+        ]
 
 mkUserPosts subs posts = mkUserPost <$> posts
   where

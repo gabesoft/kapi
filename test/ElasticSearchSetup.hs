@@ -6,10 +6,12 @@
 module Test.ElasticSearchSetup where
 
 import Control.Applicative
+import Control.Monad.Catch
 import Control.Monad.Except
 import qualified Data.Aeson as A
 import Data.Bson
 import qualified Data.ByteString.Lazy.Char8 as LBS
+import Data.Int
 import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.Text (Text)
@@ -17,9 +19,12 @@ import qualified Data.Text as T
 import qualified Database.Bloodhound as B
 import Database.MongoDB (Pipe)
 import Handlers.Xandar.Common (dbPipe)
+import Network.HTTP.Client
+import Network.HTTP.Types.Status
 import Parsers.Filter
 import Persistence.Common
 import Persistence.ElasticSearch
+import Persistence.Xandar.Common
 import Persistence.Xandar.UserPosts
 import TestHelper
 import Types.Common
@@ -54,12 +59,6 @@ src' :: Text -> [Text] -> [Text] -> RecordStart -> ResultLimit -> B.Search
 src' input sort fields start limit =
   fromRight $ mkSearch (Just $ fromRight $ parse input) sort fields start limit
 
-fromRight
-  :: Show s
-  => Either s a -> a
-fromRight (Right x) = x
-fromRight (Left y) = error (show y)
-
 withBH :: (Text -> Text -> Text -> t) -> t
 withBH f = f eServer eIndex eMapping
 
@@ -80,6 +79,16 @@ readItems = do
           mkUserPostId
           (getValue "subscriptionId" post)
           (getValue "postId" post))
+
+scanSearch input = B.withBH defaultManagerSettings (B.Server eServer) scanSearch
+  where
+    search = src input 0 1048576
+    search' = search {B.fields = Just [B.FieldName idLabel]}
+    scanSearch
+      :: (B.MonadBH m, MonadThrow m)
+      => m [B.Hit Record]
+    scanSearch =
+      B.scanSearch (B.IndexName eIndex) (B.MappingName eMapping) search'
 
 input1 :: RecordData Field
 input1 =
