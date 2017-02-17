@@ -30,6 +30,21 @@ GET http://:host/:path?where=(feedId eq '56d7de0dc788cb1d6eb91abb')&include=titl
 GET http://:host/:path?where=(feedId eq 56d7de0dc788cb1d6eb91abb)&include=title,feedId,link
 
 #
+# Count posts for feed
+#
+HEAD http://:host/:path?where=(feedId eq 56d7defcc788cb1d6eb922c8)&include=title,feedId,link
+
+#
+# Count posts for feed 2
+#
+HEAD http://:host/:path?where=(feedId eq 56d7df24c788cb1d6eb92486)&include=title,feedId,link
+
+#
+# Count posts for feed 3
+#
+HEAD http://:host/:path?where=(feedId eq 56d7e122c788cb1d6eb93495)&include=title,feedId,link
+
+#
 # Get multiple posts by id
 #
 GET http://:host/:path?where=(_id in ['56d7de0dc788cb1d6eb91abc', '56d7de0dc788cb1d6eb91abd', '56d7de0dc788cb1d6eb91abe'])&include=title,feedId,link

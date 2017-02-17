@@ -36,14 +36,19 @@ GET http://:host/:path?where=(subscriptionId eq 56d7df90c788cb1d6eb92789)&includ
 GET http://:host/:path?where=(subscriptionId eq 58a3fc135984184d4f000002)&include=createdAt,updatedAt,title,subscriptionId,tags
 
 #
-# Find by subscription ids (head)
+# Count by subscription ids (head)
 #
 HEAD http://:host/:path?where=(subscriptionId in [56d7d89dc788cb1d6eb919b1, 56d7df90c788cb1d6eb92789, 56d7ddf5c788cb1d6eb919d7])&include=title,feedId,subscriptionId,link,tags
 
 #
-# Find by subscription ids (head) 2
+# Count by subscription ids (head) 2
 #
-HEAD http://:host/:path?where=(subscriptionId in [56d7de66c788cb1d6eb91ce3, 56d7de26c788cb1d6eb91bdc, 56d7e0cdc788cb1d6eb93268])&include=title,feedId,subscriptionId,link,tags
+HEAD http://:host/:path?where=(subscriptionId in [56d7defcc788cb1d6eb922d8, 56d7df24c788cb1d6eb92491, 56d7e123c788cb1d6eb934a0])&include=title,feedId,subscriptionId,link,tags
+
+#
+# Find by subscription ids (head)
+#
+GET http://:host/:path?where=(subscriptionId in [56d7defcc788cb1d6eb922d8, 56d7df24c788cb1d6eb92491, 56d7e123c788cb1d6eb934a0])&sort=post.title&per_page=10&include=postId,tags,subscriptionId,post.title
 
 #
 # Get unread counts
@@ -301,5 +306,93 @@ Content-Type: :json
     "postId": "56d7de0dc788cb1d6eb91ac5",
     "feedId": "56d7de0dc788cb1d6eb91abb",
     "tags": [ "javascript", "programming" ]
+  }
+]
+
+#
+# Patch multiple posts 2
+#
+PATCH http://:host/:path
+Content-Type: :json
+[
+  {
+    "_id": "56d7defcc788cb1d6eb922d8-5818816509a64c359672e696",
+    "postId": "5818816509a64c359672e696",
+    "subscriptionId": "56d7defcc788cb1d6eb922d8",
+    "tags": [
+      "technology", "tag1", "tag2"
+    ]
+  },
+  {
+    "_id": "56d7defcc788cb1d6eb922d8-56d7defcc788cb1d6eb922cb",
+    "postId": "56d7defcc788cb1d6eb922cb",
+    "subscriptionId": "56d7defcc788cb1d6eb922d8",
+    "tags": [
+      "technology", "tagA", "tagB", "tagC"
+    ]
+  },
+  {
+    "_id": "56d7defcc788cb1d6eb922d8-579f3956ed521f1f17052fb1",
+    "postId": "579f3956ed521f1f17052fb1",
+    "subscriptionId": "56d7defcc788cb1d6eb922d8",
+    "tags": [
+      "machine-learning", "database", "writing"
+    ]
+  },
+  {
+    "_id": "56d7defcc788cb1d6eb922d8-56fe4deb48c80e51524d7685",
+    "postId": "56fe4deb48c80e51524d7685",
+    "subscriptionId": "56d7defcc788cb1d6eb922d8",
+    "tags": [
+      "technology", "javascript", "facebook", "social"
+    ]
+  },
+  {
+    "_id": "56d7defcc788cb1d6eb922d8-57594299ed521f1f17021e12",
+    "postId": "57594299ed521f1f17021e12",
+    "subscriptionId": "56d7defcc788cb1d6eb922d8",
+    "tags": [
+      "technology", "haskell", "programming", "emacs"
+    ]
+  },
+  {
+    "_id": "56d7defcc788cb1d6eb922d8-574ed076ed521f1f1701e845",
+    "postId": "574ed076ed521f1f1701e845",
+    "subscriptionId": "56d7defcc788cb1d6eb922d8",
+    "tags": [
+      "technology", "vim"
+    ]
+  },
+  {
+    "_id": "56d7defcc788cb1d6eb922d8-57765115ed521f1f17035cdd",
+    "postId": "57765115ed521f1f17035cdd",
+    "subscriptionId": "56d7defcc788cb1d6eb922d8",
+    "tags": [
+      "technology"
+    ]
+  },
+  {
+    "_id": "56d7defcc788cb1d6eb922d8-57c82395ed521f1f170735a0",
+    "postId": "57c82395ed521f1f170735a0",
+    "subscriptionId": "56d7defcc788cb1d6eb922d8",
+    "tags": [
+      "technology"
+    ]
+  },
+  {
+    "_id": "56d7defcc788cb1d6eb922d8-5790e9cded521f1f17046a40",
+    "postId": "5790e9cded521f1f17046a40",
+    "subscriptionId": "56d7defcc788cb1d6eb922d8",
+    "tags": [
+      "technology"
+    ]
+  },
+  {
+    "_id": "56d7defcc788cb1d6eb922d8-5818717a09a64c359672e67e",
+    "postId": "5818717a09a64c359672e67e",
+    "subscriptionId": "56d7defcc788cb1d6eb922d8",
+    "tags": [
+      "technology"
+    ]
   }
 ]

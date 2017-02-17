@@ -9,7 +9,7 @@ import Control.Monad.Except
 import Control.Monad.Trans.Control
 import qualified Data.Aeson as A
 import Data.Bifunctor
-import Data.Bson hiding (lookup)
+import Data.Bson hiding (lookup, label)
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import qualified Data.Map.Strict as Map
 import Data.Maybe
@@ -220,8 +220,8 @@ getRecordsById def ids = M.dbFind def (M.idsQuery ids) [] [] 0 0
 
 -- ^
 -- Make a make a map with the ids as keys and records as values
-mkRecordMap :: [Record] -> Map.Map RecordId Record
-mkRecordMap = mkRecordMap' idLabel
+mkIdIndexedMap :: [Record] -> Map.Map RecordId Record
+mkIdIndexedMap = mkRecordMap idLabel
 
 -- ^
 -- Merge an existing and an updated record according to the 'replace' flag
@@ -230,11 +230,11 @@ mergeRecords' True = replaceRecords [createdAtLabel, updatedAtLabel, idLabel]
 mergeRecords' False = mergeRecords
 
 -- ^
--- Make a make a map with the ids as keys and records as values
-mkRecordMap' :: Label -> [Record] -> Map.Map RecordId Record
-mkRecordMap' name xs = Map.fromList (addId <$> xs)
+-- Make a make a map keyed by the specified field and having records as values
+mkRecordMap :: Label -> [Record] -> Map.Map RecordId Record
+mkRecordMap label xs = Map.fromList (addId <$> xs)
   where
-    addId r = (getValue' name r, r)
+    addId r = (getValue' label r, r)
 
 lookup'
   :: Eq a

@@ -17,7 +17,7 @@ GET http://:host/:path?per_page=10
 #
 # Get all disabled subscriptions
 #
-GET http://:host/:path?per_page=10&where=(disabled eq true)&include=feedId,title,userId,disabled
+GET http://:host/:path?per_page=40&where=(disabled eq true)&include=feedId,title,userId,disabled
 
 #
 # Get all enabled subscriptions
@@ -28,6 +28,11 @@ GET http://:host/:path?per_page=10&where=(disabled eq false)&include=feedId,titl
 # Get a subscription by feed id
 #
 GET http://:host/:path?where=(feedId eq 56d7d88bc788cb1d6eb9199c)
+
+#
+# Get all subscription for feeds
+#
+GET http://:host/:path?where=(feedId in [56d7defcc788cb1d6eb922c8, 56d7df24c788cb1d6eb92486, 56d7e122c788cb1d6eb93495])
 
 #
 # Get all subscriptions - sort & partial response
@@ -119,20 +124,19 @@ PATCH http://:host/:path
 Content-Type: :json
 [
   {
-    "_id": "56d7de66c788cb1d6eb91ce3",
+    "_id": "56d7defcc788cb1d6eb922d8",
     "disabled": false,
-    "title": "DerickBailey.com",
+    "tags": ["mongodb", "redis"]
+  },
+  {
+    "_id": "56d7df24c788cb1d6eb92491",
+    "disabled": false,
     "tags": ["javascript"]
   },
   {
-    "_id": "56d7de26c788cb1d6eb91bdc",
+    "_id": "56d7e123c788cb1d6eb934a0",
     "disabled": false,
-    "title": "Nodejitsu"
-  },
-  {
-    "_id": "56d7e0cdc788cb1d6eb93268",
-    "disabled": false,
-    "title": "Facebook code"
+    "tags": ["facebook", "social"]
   }
 ]
 

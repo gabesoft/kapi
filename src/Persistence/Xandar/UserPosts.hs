@@ -35,10 +35,11 @@ insertUserPosts
   -> ExceptT ApiError IO [ApiResult]
 insertUserPosts replace input (dbName, pipe) (server, index) = do
   let mapping = recordCollection userPostDefinition
-  let validated = validate' <$> input
+  let validated = validate' <$> input -- TODO for update this should not fail on post id missing
   let valid = rights validated
   let invalid = lefts validated
-  existing <- runEsAndExtract (E.getByIds $ mkUserPostId' <$> valid) server index mapping
+  let userPostIds = mkUserPostId' <$> valid
+  existing <- runEsAndExtract (E.getByIds userPostIds) server index mapping
   subs <- runDb (getSubsById $ subId <$> valid) dbName pipe
   posts <- runDb (getPostsById $ postId <$> valid) dbName pipe
   results <- mkUserPosts replace (subs, posts) (existing, valid)
@@ -75,9 +76,9 @@ mkUserPosts replace (subs, posts) (existing, input) = mapM mkRecord input
     getSubPost r = (get subMap subId r, get postMap postId r)
     findExisting = get existingMap mkUserPostId'
     get m fid r = Map.lookup (fid r) m
-    existingMap = mkRecordMap existing
-    subMap = mkRecordMap subs
-    postMap = mkRecordMap posts
+    existingMap = mkIdIndexedMap existing
+    subMap = mkIdIndexedMap subs
+    postMap = mkIdIndexedMap posts
 
 -- ^
 -- Given a subscription, post, input data, and possibly an
