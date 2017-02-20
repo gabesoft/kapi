@@ -24,7 +24,9 @@ import Database.MongoDB (Pipe, Database, Index)
 import Database.MongoDB.Query (Failure(..))
 import Network.HTTP.Types.Status
 import Persistence.Common
-import Persistence.Facade (runDb, RunDb, validate', validateId')
+import Persistence.Facade
+       (runDb, RunDb, validate', validateId', dbInsertRecords,
+        dbUpdateRecords)
 import Persistence.MongoDB
 import Persistence.Xandar.Common (mergeRecords')
 import Servant
@@ -112,10 +114,13 @@ createSingle
   -> (Text -> String)
   -> Record
   -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData ApiResult))
-createSingle def getLink input =
-  mkApiResponse (return . respond) (insertSingle def input)
+createSingle def getLink input = insert (return . respond) input
+  -- mkApiResponse (return . respond) (insertSingle def input)
   where
     respond r = addHeader (getCreateLink getLink r) $ noHeader (Single $ Succ r)
+    insert f r = do
+      records <- runApiItems2T $ dbInsertRecords appName def [input]
+      either throwApiError f (itemsToEither records)
 
 -- ^
 -- Create multiple records

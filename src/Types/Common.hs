@@ -1,3 +1,5 @@
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE DeriveGeneric #-}
@@ -12,6 +14,7 @@ import Data.AesonBson (aesonify, bsonify)
 import Data.Bifunctor
 import Data.Bson as BSON
 import qualified Data.ByteString.Lazy.Char8 as LBS
+import Data.Either
 import Data.Functor.Classes
 import qualified Data.Map.Strict as Map
 import Data.Maybe
@@ -167,6 +170,16 @@ data ApiItems2 e a = ApiItems2
 concatItems :: [ApiItems2 [e] [a]] -> ApiItems2 [e] [a]
 concatItems = foldr (<>) mempty
 
+itemsFromEither :: [Either a b] -> ApiItems2 [a] [b]
+itemsFromEither xs = uncurry ApiItems2 (partitionEithers xs)
+
+itemsToEither
+  :: (Show e, Show a)
+  => ApiItems2 [e] [a] -> Either e a
+itemsToEither (ApiItems2 (e:_) _) = Left e
+itemsToEither (ApiItems2 [] (a:_)) = Right a
+itemsToEither items = error $ "Invalid items " ++ show items
+
 type ApiResults2 = ApiItems2 [ApiError] [Record]
 
 instance Eq2 ApiItems2 where
@@ -203,9 +216,15 @@ instance Monoid e =>
     let (ApiItems2 e a) = k as
     in ApiItems2 (es <> e) a
 
+instance Monoid e =>
+         MonadFix (ApiItems2 e) where
+  mfix f =
+    let a = f (succs2 a)
+    in a
+
 instance ToJSON ApiResults2 where
   toJSON (ApiItems2 [] as) = toJSON as
-  toJSON (ApiItems2 [e] []) = object ["error" .= toJSON e]
+  toJSON (ApiItems2 [e] []) = toJSON (Fail e :: ApiItem ApiError Record)
   toJSON (ApiItems2 es as) = toJSON ((Succ <$> as) <> (Fail <$> es))
 
 newtype ApiItems2T e m a =
@@ -234,6 +253,10 @@ throwApiE = ApiItems2T . return . throwApi
 
 instance (Eq e, Eq1 m) => Eq1 (ApiItems2T e m) where
     liftEq eq (ApiItems2T a) (ApiItems2T b) = liftEq (liftEq eq) a b
+
+instance (Eq e, Eq1 m, Eq a) =>
+         Eq (ApiItems2T e m a) where
+  (==) = eq1
 
 instance (Functor m) =>
          Functor (ApiItems2T e m) where
@@ -271,6 +294,11 @@ instance (Monoid e) =>
 instance (MonadIO m, Monoid e) =>
          MonadIO (ApiItems2T e m) where
   liftIO = lift . liftIO
+
+instance (Monoid e, MonadReader r m) =>
+         MonadReader r (ApiItems2T e m) where
+  ask = lift ask
+  reader = lift . reader
 
 -- ^
 -- A collection of 'ApiItem's

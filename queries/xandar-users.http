@@ -97,6 +97,16 @@ Content-Type: :json
 }
 
 #
+# Create an invalid user
+#
+POST http://:host/:path
+Content-Type: :json
+{
+  "githubUrl" : "https://api.github.com/users/admin",
+  "admin": true
+}
+
+#
 # Create multiple users
 #
 POST http://:host/:path
