@@ -126,7 +126,7 @@ Content-Type: :json
   {
     "_id": "56d7defcc788cb1d6eb922d8",
     "disabled": false,
-    "tags": ["mongodb", "redis"]
+    "tags": ["mongodb", "sql"]
   },
   {
     "_id": "56d7df24c788cb1d6eb92491",

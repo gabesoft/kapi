@@ -78,12 +78,6 @@ mkOptDef
 mkOptDef name = mkFieldDef name False False
 
 -- ^
--- Convert the result of a validation to 'Either'
-vResultToEither :: (a, ValidationResult) -> Either ApiError a
-vResultToEither (a, ValidationErrors []) = Right a
-vResultToEither (_, err) = Left (ApiError status400 (encode err))
-
--- ^
 -- Get the MongoDB database name for an app name
 -- from a configuration object
 confGetDb :: AppName -> ApiConfig -> Database
@@ -97,8 +91,8 @@ confGetEsIndex name = fromJust . Map.lookup name . esIndices
 
 -- ^
 -- Validate a record against it's definition
-validate :: RecordDefinition -> Record -> (Record, ValidationResult)
-validate def r = (r, ValidationErrors $ catMaybes results)
+validateRecord :: RecordDefinition -> Record -> (Record, ValidationResult)
+validateRecord def r = (r, ValidationErrors $ catMaybes results)
   where
     names = nub $ Map.keys (recordFields def) ++ recordLabels r
     results = validateField True def r <$> names

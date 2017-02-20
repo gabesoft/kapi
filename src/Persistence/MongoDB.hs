@@ -25,7 +25,7 @@ module Persistence.MongoDB
   , mkSortFields
   , queryToDoc
   , recordToDocument
-  , validateHasId
+  , validateRecordHasId
   ) where
 
 import Control.Exception.Lifted (handleJust)
@@ -174,7 +174,7 @@ dbAction = handleJust Just (return . Left)
 -- ^
 -- Create a record ready to be returned from a query action
 mkOutRecord :: RecordDefinition -> Document -> Record
-mkOutRecord = documentToRecord
+mkOutRecord def = excludeFields ["__v"] . documentToRecord def
 
 -- ^
 -- Create a document ready to be saved or updated
@@ -236,8 +236,8 @@ mapIdToObjId name = modField name (>>= recIdToObjId)
 
 -- ^
 -- Validate that a record has a valid id field
-validateHasId :: Record -> (Record, ValidationResult)
-validateHasId r = (r, ValidationErrors $ catMaybes [valField])
+validateRecordHasId :: Record -> (Record, ValidationResult)
+validateRecordHasId r = (r, ValidationErrors $ catMaybes [valField])
   where
     valField = validateField False def (mapIdToObjId idLabel r) idLabel
     def = RecordDefinition mempty $ Map.fromList [mkReqDef' idLabel]

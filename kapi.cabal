@@ -25,6 +25,7 @@ library
                      , Parsers.Filter
                      , Parsers.Unescape
                      , Persistence.Common
+                     , Persistence.Facade
                      , Persistence.MongoDB
                      , Persistence.ElasticSearch
                      , Persistence.Xandar.Common

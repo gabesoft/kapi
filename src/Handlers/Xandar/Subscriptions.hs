@@ -64,11 +64,14 @@ createMultiple input =
   where
     getLink = mkSubscriptionGetSingleLink
 
-createSingle' input = head <$> createMultiple' [input]
+createSingle'
+  :: (MonadReader ApiConfig m, MonadIO m)
+  => Record -> ExceptT ApiError m ApiResult
+createSingle' input = head . apiItems <$> createMultiple' [input]
 
 createMultiple'
   :: (MonadIO m, MonadReader ApiConfig m)
-  => [Record] -> ExceptT ApiError m [ApiResult]
+  => [Record] -> ExceptT ApiError m ApiResults
 createMultiple' input = do
   conf <- ask
   pipe <- C.dbPipe conf
@@ -90,19 +93,19 @@ updateSingle replace rid input = C.mkApiResponse respond update
 
 updateMultiple
   :: (MonadReader ApiConfig m, MonadIO m, MonadError ServantErr m)
-  => Bool -> [Record] -> m [ApiItem ApiError Record]
+  => Bool -> [Record] -> m ApiResults
 updateMultiple replace input =
   C.mkApiResponse return (updateMultiple' replace input)
 
 updateSingle'
   :: (MonadReader ApiConfig m, MonadIO m)
-  => Bool -> RecordId -> Record -> ExceptT ApiError m (ApiItem ApiError Record)
+  => Bool -> RecordId -> Record -> ExceptT ApiError m ApiResult
 updateSingle' replace rid input =
-  head <$> updateMultiple' replace [setIdValue rid input]
+  head . apiItems <$> updateMultiple' replace [setIdValue rid input]
 
 updateMultiple'
   :: (MonadIO m, MonadReader ApiConfig m)
-  => Bool -> [Record] -> ExceptT ApiError m [ApiItem ApiError Record]
+  => Bool -> [Record] -> ExceptT ApiError m ApiResults
 updateMultiple' replace input = do
   conf <- ask
   pipe <- C.dbPipe conf
@@ -127,12 +130,12 @@ modifySingle = updateSingle False
 
 -- ^
 -- Update (replace) multiple records
-replaceMultiple :: [Record] -> Api [ApiResult]
+replaceMultiple :: [Record] -> Api ApiResults
 replaceMultiple = updateMultiple True
 
 -- ^
 -- Update (modify) multiple records
-modifyMultiple :: [Record] -> Api [ApiResult]
+modifyMultiple :: [Record] -> Api ApiResults
 modifyMultiple = updateMultiple False
 
 -- ^

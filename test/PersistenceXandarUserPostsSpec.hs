@@ -36,7 +36,7 @@ main =
        runIO (verifyMakeUserPosts [inputValid1, inputInvalid2] result1)
 
 verifyValidation :: Record -> (Record, ValidationResult) -> Expectation
-verifyValidation input exp = validate userPostDefinition input `shouldBe` exp
+verifyValidation input exp = validateRecord userPostDefinition input `shouldBe` exp
 
 verifyMakeUserPost
   :: MonadIO m

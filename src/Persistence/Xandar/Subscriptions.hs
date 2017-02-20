@@ -22,6 +22,7 @@ import Database.MongoDB (Database, Pipe, Failure)
 import Debug.Trace
 import Persistence.Common
 import qualified Persistence.ElasticSearch as E
+import Persistence.Facade (validate, validateId)
 import qualified Persistence.MongoDB as M
 import Persistence.Xandar.Common
 import Persistence.Xandar.UserPosts (insertUserPosts, mkUserPostId, indexDocuments)
@@ -39,9 +40,9 @@ getMultipleSubscriptions = undefined
 insertSubscriptions :: [Record]
                     -> (Database, Pipe)
                     -> (Text, Text)
-                    -> ExceptT ApiError IO [ApiResult]
+                    -> ExceptT ApiError IO ApiResults
 insertSubscriptions input (dbName, pipe) (server, index) = do
-  let validated = validate' <$> input
+  let validated = validateSubscription <$> input
   let valid = rights validated
   feeds <- runDb (getFeedsById $ feedId <$> valid) dbName pipe
   saved <- mapM save (mkSubscriptions feeds valid)
@@ -52,7 +53,7 @@ insertSubscriptions input (dbName, pipe) (server, index) = do
       (mkUserPosts saved posts)
       (dbName, pipe)
       (server, index)
-  return $ (Succ <$> saved) <> (Fail <$> lefts validated)
+  return $ mkApiItems (Fail <$> lefts validated) (Succ <$> saved)
   where
     save r = saveDb M.dbInsert r dbName pipe
 
@@ -63,28 +64,27 @@ updateSubscriptions
   -> [Record]
   -> (Database, Pipe)
   -> (Text, Text)
-  -> ExceptT ApiError IO [ApiItem ApiError Record]
+  -> ExceptT ApiError IO ApiResults
 updateSubscriptions replace input (dbName, pipe) (server, index) = do
-  let validated1 = validateHasId' <$> input
+  let validated1 = validateId <$> input
   let valid = rights validated1
   existing <- runDb (getSubsById $ getIdValue' <$> valid) dbName pipe
   let records = mkRecord (mkIdIndexedMap existing) <$> valid
-  let validated2 = validate' <$> rights records
+  let validated2 = validateSubscription <$> rights records
   saved <- mapM save (rights validated2)
   _ <- insertUserPosts' existing saved (dbName, pipe) (server, index)
   let disabledIds = getIdValue' <$> filter (not . isEnabled) saved
   deletePosts disabledIds server index userPostMapping
   return $
-    (Succ <$> saved) <>
-    (Fail <$> lefts validated1 <> lefts records <> lefts validated2)
+    mkApiItems
+      (Fail <$> lefts validated1 <> lefts records <> lefts validated2)
+      (Succ <$> saved)
   where
     save r = saveDb M.dbUpdate r dbName pipe
     get m r = Map.lookup (getIdValue' r) m
     mkRecord existingMap r = mkRecord' (get existingMap r) r
     mkRecord' Nothing _ = Left mkApiError404
-    mkRecord' (Just e) r =
-      Right $ mergeRecords' replace (excludeFields exclude e) r
-    exclude = ["__v"]
+    mkRecord' (Just e) r = Right $ mergeRecords' replace e r
 
 insertUserPosts'
   :: [Record]
@@ -96,9 +96,9 @@ insertUserPosts' eSubs nSubs (dbName, pipe) (server, index) = do
   let mapping = recordCollection userPostDefinition
   posts <- runDb (getPostsBySub $ filter isEnabled nSubs) dbName pipe
   let userPostIds = getUserPostIds (mkFeedIndexedMap nSubs) posts
-  existing <- runEsAndExtract (E.getByIds userPostIds) server index mapping
+  existing <- runEsAndExtract (E.getByIds userPostIds) mapping server index
   results <- mkUserPosts'' (eSubs, nSubs, posts) existing
-  created <- indexDocuments (rights results) server index mapping
+  created <- indexDocuments (rights results) mapping server index
   return $ (Succ <$> created) <> (Fail <$> lefts results)
 
 mkUserPosts''
@@ -210,7 +210,7 @@ deletePosts
   => [Text] -> Text -> Text -> Text -> ExceptT ApiError m ()
 deletePosts subIds server index mappingName = do
   search <- ExceptT (return search')
-  runEs (E.deleteByQuery search) server index mappingName >>= printLog
+  runEs (E.deleteByQuery search) mappingName server index >>= printLog
   where
     filter' = FilterRelOp In "subscriptionId" (TermList $ TermId <$> subIds)
     search' = first E.esToApiError $ E.mkSearch (Just filter') [] [] 0 0
@@ -275,8 +275,3 @@ feedId = getValue' "feedId"
 -- Return true if a subscription is enabled
 isEnabled :: Record -> Bool
 isEnabled = not . isValueOn "disabled"
-
--- ^
--- Validate a subscription
-validate' :: Record -> Either ApiError Record
-validate' = validateRecord subscriptionDefinition

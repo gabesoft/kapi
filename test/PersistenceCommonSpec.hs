@@ -195,7 +195,7 @@ verifyPopulateDefaults :: RecordDefinition -> Record -> Record -> Expectation
 verifyPopulateDefaults def r exp = populateDefaults def r `shouldBe` exp
 
 verifyValidate :: RecordDefinition -> Record -> ValidationResult -> Expectation
-verifyValidate def r exp = snd (validate def r) `shouldBe` exp
+verifyValidate def r exp = snd (validateRecord def r) `shouldBe` exp
 
 verifyPagination :: Int -> Int -> Int -> Pagination -> Expectation
 verifyPagination page size total exp = paginate page size total `shouldBe` exp

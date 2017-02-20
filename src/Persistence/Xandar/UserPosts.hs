@@ -21,6 +21,7 @@ import Database.MongoDB (Database, Pipe, Failure)
 import Debug.Trace
 import Persistence.Common
 import qualified Persistence.ElasticSearch as E
+import Persistence.Facade (validate, validateId)
 import qualified Persistence.MongoDB as M
 import Persistence.Xandar.Common
 import Types.Common
@@ -32,19 +33,19 @@ insertUserPosts
   -> [Record]
   -> (Database, Pipe)
   -> (Text, Text)
-  -> ExceptT ApiError IO [ApiResult]
+  -> ExceptT ApiError IO ApiResults
 insertUserPosts replace input (dbName, pipe) (server, index) = do
   let mapping = recordCollection userPostDefinition
-  let validated = validate' <$> input -- TODO for update this should not fail on post id missing
+  let validated = validateUserPost <$> input -- TODO for update this should not fail on post id missing
   let valid = rights validated
   let invalid = lefts validated
   let userPostIds = mkUserPostId' <$> valid
-  existing <- runEsAndExtract (E.getByIds userPostIds) server index mapping
+  existing <- runEsAndExtract (E.getByIds userPostIds) mapping server index
   subs <- runDb (getSubsById $ subId <$> valid) dbName pipe
   posts <- runDb (getPostsById $ postId <$> valid) dbName pipe
   results <- mkUserPosts replace (subs, posts) (existing, valid)
-  created <- indexDocuments (rights results) server index mapping
-  return $ (Succ <$> created) <> (Fail <$> lefts results <> invalid)
+  created <- indexDocuments (rights results) mapping server index
+  return $ mkApiItems (Fail <$> lefts results <> invalid) (Succ <$> created)
 
 -- ^
 -- Index multiple documents and re-query them
@@ -54,12 +55,12 @@ indexDocuments :: [(Record, RecordId)]
                -> Text
                -> ExceptT ApiError IO [Record]
 indexDocuments [] _ _ _ = return []
-indexDocuments input server index mapping = do
-  _ <- runEs (E.indexDocuments input) server index mapping >>= printLog
-  _ <- runEs refreshIndex server index mapping
-  runEsAndExtract (E.getByIds $ snd <$> input) server index mapping
+indexDocuments input mapping server index = do
+  _ <- runEs (E.indexDocuments input) mapping server index >>= printLog
+  _ <- runEs refreshIndex mapping server index
+  runEsAndExtract (E.getByIds $ snd <$> input) mapping server index
   where
-    refreshIndex s i _ = E.refreshIndex s i
+    refreshIndex _ = E.refreshIndex
     printLog _ = liftIO $ print $ trace "Insert user posts" (length input)
 
 -- ^
@@ -184,11 +185,6 @@ subId = getValue' "subscriptionId"
 -- Get the post id of a user-post
 postId :: Record -> RecordId
 postId = getValue' "postId"
-
--- ^
--- Validate a user-post
-validate' :: Record -> Either ApiError Record
-validate' = validateRecord userPostDefinition
 
 -- ^
 -- Make a 400 error to be returned when attempting to construct an invalid user post

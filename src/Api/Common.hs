@@ -40,13 +40,13 @@ type GenericApi =
   -- delete
   :<|> Capture "id" Text :> DeleteNoContent '[JSON] NoContent
   -- create
-  :<|> ReqBody '[JSON] (ApiData Record) :> PostCreated '[JSON] (Headers '[Header "Location" String, Header "Link" String] (ApiData (ApiItem ApiError Record)))
+  :<|> ReqBody '[JSON] (ApiData Record) :> PostCreated '[JSON] (Headers '[Header "Location" String, Header "Link" String] (ApiData ApiResult))
   -- update (replace)
   :<|> Capture "id" Text :> ReqBody '[JSON] Record :> Put '[JSON] Record
-  :<|> ReqBody '[JSON] [Record] :> Put '[JSON] [ApiItem ApiError Record]
+  :<|> ReqBody '[JSON] [Record] :> Put '[JSON] ApiResults
   -- update (modify)
   :<|> Capture "id" Text :> ReqBody '[JSON] Record :> Patch '[JSON] Record
-  :<|> ReqBody '[JSON] [Record] :> Patch '[JSON] [ApiItem ApiError Record]
+  :<|> ReqBody '[JSON] [Record] :> Patch '[JSON] ApiResults
   -- options
   :<|> Capture "id" Text :> OptionsNoContent '[JSON] (Headers '[Header "Access-Control-Allow-Methods" String] NoContent)
   :<|> OptionsNoContent '[JSON] (Headers '[Header "Access-Control-Allow-Methods" String] NoContent)

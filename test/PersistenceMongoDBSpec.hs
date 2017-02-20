@@ -77,7 +77,7 @@ main =
        verifyRecordToDocument recDef sampleRecInvalidFK sampleDocMissingFK
 
 verifyValidateId :: Record -> ValidationResult -> Expectation
-verifyValidateId r exp = snd (validateHasId r) `shouldBe` exp
+verifyValidateId r exp = snd (validateRecordHasId r) `shouldBe` exp
 
 verifyMkInDocument
   :: MonadIO m

@@ -18,6 +18,7 @@ import Database.Bloodhound (EsError(..), SearchResult(..))
 import Database.MongoDB (Database, Pipe, Failure, Index(..))
 import Persistence.Common
 import qualified Persistence.ElasticSearch as E
+import Persistence.Facade (validate)
 import qualified Persistence.MongoDB as M
 import Types.Common
 
@@ -159,24 +160,30 @@ userPostDefinition =
     , mkOptDef' "tags"
     ]
 
--- ^
--- Validate a record against its definition
-validateRecord :: RecordDefinition -> Record -> Either ApiError Record
-validateRecord def record = vResultToEither (validate def record)
+validateSubscription :: Record -> Either ApiError Record
+validateSubscription = validate subscriptionDefinition
 
--- ^
--- Validate that a record contains a valid id field
-validateHasId' :: Record -> Either ApiError Record
-validateHasId' = vResultToEither . M.validateHasId
+validateUserPost :: Record -> Either ApiError Record
+validateUserPost = validate userPostDefinition
 
+validateUser :: Record -> Either ApiError Record
+validateUser = validate userDefinition
+
+validatePost :: Record -> Either ApiError Record
+validatePost = validate postDefinition
+
+validateFeed :: Record -> Either ApiError Record
+validateFeed = validate feedDefinition
+
+-- TODO: remove all run methods
 -- ^
 -- Run a MongoDB action
 runDb
   :: (MonadBaseControl IO m)
-  => (Database -> Pipe -> m (Either Failure c))
+  => (Database -> Pipe -> m (Either Failure a))
   -> Database
   -> Pipe
-  -> ExceptT ApiError m c
+  -> ExceptT ApiError m a
 runDb action dbName pipe = do
   results <- lift $ action dbName pipe
   ExceptT (return $ first M.dbToApiError results)
@@ -190,21 +197,20 @@ runEsAndExtract
   -> b
   -> c
   -> ExceptT ApiError m [Record]
-runEsAndExtract action server index mappingName = do
-  results <- runEs action server index mappingName
-  return $ E.extractRecords [] results
+runEsAndExtract action mappingName server index =
+  E.extractRecords [] <$> runEs action mappingName server index
 
 -- ^
 -- Run an elastic-search action
 runEs
   :: MonadIO m
-  => (a -> b -> c -> IO (Either EsError d))
-  -> a
-  -> b
-  -> c
+  => (mapping -> server -> index -> IO (Either EsError d))
+  -> mapping
+  -> server
+  -> index
   -> ExceptT ApiError m d
-runEs action server index mappingName = do
-  results <- liftIO $ action server index mappingName
+runEs action mappingName server index = do
+  results <- liftIO $ action mappingName server index
   ExceptT (return $ first E.esToApiError results)
 
 -- ^

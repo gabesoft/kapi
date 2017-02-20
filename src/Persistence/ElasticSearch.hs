@@ -85,7 +85,7 @@ maxSize = 1048576
 putMapping
   :: ToJSON a
   => a -> Text -> Text -> Text -> IO (Either EsError Text)
-putMapping mapping server index mappingName =
+putMapping mapping mappingName server index =
   withBH
     server
     (B.putMapping (IndexName index) (MappingName mappingName) mapping)
@@ -97,7 +97,7 @@ putMappingFromFile :: FilePath
                    -> Text
                    -> Text
                    -> IO (Either EsError Text)
-putMappingFromFile file server index mappingName = do
+putMappingFromFile file mappingName server index = do
   json <- readFile file
   let obj = A.decode (L.pack json) :: Maybe A.Object
   case obj of
@@ -109,12 +109,12 @@ putMappingFromFile file server index mappingName = do
 -- ^
 -- Index a document
 indexDocument :: Record
-              -> Text
+              -> RecordId
               -> Text
               -> Text
               -> Text
               -> IO (Either EsError Text)
-indexDocument record recordId server index mappingName =
+indexDocument record recordId mappingName server index =
   withBH server $
   B.indexDocument
     (IndexName index)
@@ -125,13 +125,13 @@ indexDocument record recordId server index mappingName =
 
 -- ^
 -- Index multiple documents
-indexDocuments :: [(Record, Text)]
+indexDocuments :: [(Record, RecordId)]
                -> Text
                -> Text
                -> Text
                -> IO (Either EsError Text)
 indexDocuments [] _ _ _ = return (Right mempty)
-indexDocuments items server index mappingName = withBH server (B.bulk stream)
+indexDocuments items mappingName server index = withBH server (B.bulk stream)
   where
     op (record, recordId) =
       BulkIndex
@@ -144,7 +144,7 @@ indexDocuments items server index mappingName = withBH server (B.bulk stream)
 -- ^
 -- Delete a document
 deleteDocument :: Text -> Text -> Text -> Text -> IO (Either EsError Text)
-deleteDocument recordId server index mappingName =
+deleteDocument recordId mappingName server index =
   withBH server $
   B.deleteDocument (IndexName index) (MappingName mappingName) (DocId recordId)
 
@@ -152,7 +152,7 @@ deleteDocument recordId server index mappingName =
 -- Delete multiple documents
 deleteDocuments :: [Text] -> Text -> Text -> Text -> IO (Either EsError Text)
 deleteDocuments [] _ _ _ = return (Right mempty)
-deleteDocuments recordIds server index mappingName =
+deleteDocuments recordIds mappingName server index =
   withBH server (B.bulk stream)
   where
     op recordId =
@@ -162,10 +162,10 @@ deleteDocuments recordIds server index mappingName =
 -- ^
 -- Delete all documents matching a query
 deleteByQuery :: Search -> Text -> Text -> Text -> IO (Either EsError Text)
-deleteByQuery search server index mappingName = do
+deleteByQuery search mappingName server index = do
   hits <- B.withBH defaultManagerSettings (Server server) scanSearch
   let docIds = getId . B.hitDocId <$> hits
-  deleteDocuments docIds server index mappingName
+  deleteDocuments docIds mappingName server index
   where
     getId (DocId docId) = docId
     search' =
@@ -187,21 +187,14 @@ getByIds :: [Text]
          -> Text
          -> Text
          -> IO (Either EsError (SearchResult Record))
-getByIds ids server index mappingName =
-  searchDocuments (mkIdsSearch mappingName ids) server index mappingName
+getByIds ids mappingName =
+  searchDocuments (mkIdsSearch mappingName ids) mappingName
 
 -- ^
 -- Return the number of documents matching a query
 countDocuments :: Search -> Text -> Text -> Text -> IO (Either EsError Int)
-countDocuments search server index mappingName = do
-  res <-
-    searchDocuments
-      (search
-       { size = Size 0
-       })
-      server
-      index
-      mappingName
+countDocuments search mappingName server index = do
+  res <- searchDocuments (search {size = Size 0}) mappingName server index
   return $ B.hitsTotal . searchHits <$> res
 
 -- ^
@@ -211,9 +204,10 @@ searchDocuments :: Search
                 -> Text
                 -> Text
                 -> IO (Either EsError (SearchResult Record))
-searchDocuments search server index mappingName = do
+searchDocuments search mappingName server index = do
   body <-
-    withBH server $ B.searchByType (IndexName index) (MappingName mappingName) search
+    withBH server $
+    B.searchByType (IndexName index) (MappingName mappingName) search
   return $ body >>= toResult
   where
     toErr msg = mkEsError 500 ("Failed to decode search results " ++ msg)
@@ -307,8 +301,10 @@ exprToQuery = toQuery
       Right $ TermQuery (Term c (anyToText v)) (mkBoost x)
     mkEqQuery (ColumnName c x) (TermBool v) =
       Right $ TermQuery (Term c (boolToText v)) (mkBoost x)
-    mkEqQuery (ColumnName c x) (TermStr v) = Right $ TermQuery (Term c v) (mkBoost x)
-    mkEqQuery (ColumnName c x) (TermId v) = Right $ TermQuery (Term c v) (mkBoost x)
+    mkEqQuery (ColumnName c x) (TermStr v) =
+      Right $ TermQuery (Term c v) (mkBoost x)
+    mkEqQuery (ColumnName c x) (TermId v) =
+      Right $ TermQuery (Term c v) (mkBoost x)
     mkEqQuery (ColumnName c x) (TermDate v) =
       Right $ TermQuery (Term c (anyToText v)) (mkBoost x)
     mkEqQuery _ TermNull = Left "Null query not yet supported."
@@ -438,6 +434,7 @@ extractRecords fields input = includeFields fields' <$> records
     result = B.searchHits input
     hits = B.hits result
     getRecord = catMaybes . (: []) . getRecord'
-    getRecord' hit = setValue idLabel (getId $ B.hitDocId hit) <$> B.hitSource hit
+    getRecord' hit =
+      setValue idLabel (getId $ B.hitDocId hit) <$> B.hitSource hit
     getId (DocId docId) = docId
     records = concat (getRecord <$> hits)

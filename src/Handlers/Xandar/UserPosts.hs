@@ -11,6 +11,7 @@ module Handlers.Xandar.UserPosts where
 import Api.Xandar
 import Control.Monad.Except
 import Control.Monad.Reader
+import Control.Monad.Trans.Control
 import Data.Bifunctor
 import Data.List (intercalate)
 import Data.Text (Text)
@@ -23,7 +24,8 @@ import qualified Handlers.Xandar.Common as C
 import Parsers.Filter (parse)
 import Persistence.Common
 import Persistence.ElasticSearch
-import Persistence.Xandar.Common (userPostDefinition, runEs)
+import Persistence.Facade (runEs, RunEs)
+import Persistence.Xandar.Common (userPostDefinition)
 import Persistence.Xandar.UserPosts (insertUserPosts)
 import Servant
 import Types.Common
@@ -36,7 +38,7 @@ mappingName = recordCollection userPostDefinition
 -- ^
 -- Get a single record by id
 getSingle :: Maybe Text -> Text -> Api (Headers '[Header "ETag" String] Record)
-getSingle etag uid = mkApiResponse respond (runEs' $ getByIds [uid])
+getSingle etag uid = mkApiResponse respond (runEs' $ getByIds [uid] mappingName)
   where
     respond = maybe (throwError err404) (mkSingleResult etag) . extractRecord
 
@@ -53,7 +55,7 @@ getMultiple getLink include query sortFields page perPage =
 -- ^
 -- Helper for `getMultiple`
 getMultiple'
-  :: (MonadReader ApiConfig m, MonadIO m)
+  :: (MonadReader ApiConfig m, MonadIO m, MonadBaseControl IO m)
   => [Text]
   -> Maybe Text
   -> [Text]
@@ -61,18 +63,19 @@ getMultiple'
   -> Maybe Int
   -> ExceptT ApiError m ([Record], Pagination)
 getMultiple' include query sortFields page perPage = do
-  count <- runEs' . countDocuments =<< getCountSearch
+  count <- runEs' . count =<< getCountSearch
   let pagination = mkPagination page perPage count
   let start = paginationStart pagination
   let limit = paginationLimit pagination
   search <- getSearch start limit
-  results <- runEs' . searchDocuments $ search
+  results <- runEs' . (`searchDocuments` mappingName) $ search
   return (extractRecords include' results, pagination)
   where
     getCountSearch = ExceptT . return $ prepareSearch include' query sort' 0 0
     getSearch start = ExceptT . return . prepareSearch [] query sort' start
     include' = splitLabels include
     sort' = splitLabels sortFields
+    count s = countDocuments s mappingName
 
 -- ^
 -- Delete a single record
@@ -80,7 +83,7 @@ deleteSingle :: Text -> Api NoContent
 deleteSingle uid = verify >> mkApiResponse (const $ return NoContent) delete
   where
     verify = getSingle mempty uid
-    delete = runEs' $ deleteDocument uid
+    delete = runEs' $ deleteDocument uid mappingName
 
 -- ^
 -- Create one or more records
@@ -123,12 +126,12 @@ modifySingle = updateSingle False
 
 -- ^
 -- Update (replace) multiple records
-replaceMultiple :: [Record] -> Api [ApiResult]
+replaceMultiple :: [Record] -> Api ApiResults
 replaceMultiple = updateMultiple True
 
 -- ^
 -- Update (modify) multiple records
-modifyMultiple :: [Record] -> Api [ApiResult]
+modifyMultiple :: [Record] -> Api ApiResults
 modifyMultiple = updateMultiple False
 
 -- ^
@@ -147,13 +150,14 @@ optionsMultiple = C.optionsMultiple
 createSingle'
   :: (MonadReader ApiConfig m, MonadIO m)
   => Bool -> Record -> ExceptT ApiError m ApiResult
-createSingle' replace input = head <$> createMultiple' replace [input]
+createSingle' replace input =
+  head . apiItems <$> createMultiple' replace [input]
 
 -- ^
 -- Helper for create or update multiple methods
 createMultiple'
   :: (MonadReader ApiConfig m, MonadIO m)
-  => Bool -> [Record] -> ExceptT ApiError m [ApiResult]
+  => Bool -> [Record] -> ExceptT ApiError m ApiResults
 createMultiple' replace input = do
   conf <- ask
   pipe <- dbPipe conf
@@ -168,7 +172,7 @@ createMultiple' replace input = do
 
 -- ^
 -- Update multiple records
-updateMultiple :: Bool -> [Record] -> Api [ApiResult]
+updateMultiple :: Bool -> [Record] -> Api ApiResults
 updateMultiple replace input = mkApiResponse return (createMultiple' replace input)
 
 -- ^
@@ -182,10 +186,10 @@ updateSingle replace uid input = mkApiResponse respond run
 -- ^
 -- Helper for update single methods
 updateSingle'
-  :: (MonadReader ApiConfig m, MonadIO m)
+  :: (MonadReader ApiConfig m, MonadIO m, MonadBaseControl IO m)
   => Bool -> Text -> Record -> ExceptT ApiError m ApiResult
 updateSingle' replace uid input = do
-  result <- runEs' (getByIds [uid])
+  result <- runEs' (getByIds [uid] mappingName)
   existing <- ExceptT $ return (extract result)
   createSingle' replace (merge existing input)
   where
@@ -195,12 +199,8 @@ updateSingle' replace uid input = do
 
 -- ^
 -- Run an elastic-search action
-runEs'
-  :: (MonadReader ApiConfig m, MonadIO m)
-  => (Text -> Text -> Text -> IO (Either EsError d)) -> ExceptT ApiError m d
-runEs' action = do
-  conf <- ask
-  runEs action (esServer conf) (esIndex conf) mappingName
+runEs' :: RunEs m a a
+runEs' = runEs appName
 
 -- ^
 -- Make a 'Search' object from query string parameters

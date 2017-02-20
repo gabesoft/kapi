@@ -47,7 +47,7 @@ GET http://:host/:path?page=4&per_page=5
 #
 # Get a single feed
 #
-GET http://:host/:path/5869ec3e59841810dc000009
+GET http://:host/:path/56d7ddf3c788cb1d6eb919b2
 
 #
 # Get a single feed using ETag

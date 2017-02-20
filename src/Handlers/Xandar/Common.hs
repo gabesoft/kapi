@@ -24,8 +24,9 @@ import Database.MongoDB (Pipe, Database, Index)
 import Database.MongoDB.Query (Failure(..))
 import Network.HTTP.Types.Status
 import Persistence.Common
+import Persistence.Facade (runDb, RunDb, validate', validateId')
 import Persistence.MongoDB
-import Persistence.Xandar.Common (runDb, mergeRecords', validateHasId')
+import Persistence.Xandar.Common (mergeRecords')
 import Servant
 import Servant.Utils.Enter (Enter)
 import Types.Common
@@ -124,7 +125,8 @@ createMultiple
   -> [Record]
   -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData ApiResult))
 createMultiple def getLink inputs =
-  mapM (mkApiResult . insertSingle def) inputs >>= mkCreateMultipleResult getLink
+  (mkApiItems' <$> mapM (mkApiResult . insertSingle def) inputs) >>=
+  mkCreateMultipleResult getLink
 
 -- ^
 -- Update (replace) a single record
@@ -138,12 +140,12 @@ modifySingle def = updateSingle def False
 
 -- ^
 -- Update (replace) multiple records
-replaceMultiple :: RecordDefinition -> [Record] -> Api [ApiResult]
+replaceMultiple :: RecordDefinition -> [Record] -> Api ApiResults
 replaceMultiple def = updateMultiple def True
 
 -- ^
 -- Update (modify) multiple records
-modifyMultiple :: RecordDefinition -> [Record] -> Api [ApiResult]
+modifyMultiple :: RecordDefinition -> [Record] -> Api ApiResults
 modifyMultiple def = updateMultiple def False
 
 -- ^
@@ -165,11 +167,11 @@ updateSingle def replace uid record =
 
 -- ^
 -- Modify or replace multiple records
-updateMultiple :: RecordDefinition -> Bool -> [Record] -> Api [ApiResult]
-updateMultiple def replace = mapM (mkApiResult . update)
+updateMultiple :: RecordDefinition -> Bool -> [Record] -> Api ApiResults
+updateMultiple def replace = fmap mkApiItems' . mapM (mkApiResult . update)
   where
     update u = do
-      valid <- ExceptT . return $ validateHasId' u
+      valid <- validateId' u
       updateSingle' def replace (fromJust $ getIdValue u) valid
 
 -- ^
@@ -223,13 +225,8 @@ addDbIndices indices conf = do
 
 -- ^
 -- Run a database action
-runDb'
-  :: (MonadReader ApiConfig m, MonadBaseControl IO m, MonadIO m)
-  => (Database -> Pipe -> m (Either Failure a)) -> ExceptT ApiError m a
-runDb' action = do
-  conf <- ask
-  pipe <- dbPipe conf
-  runDb action (dbName conf) pipe
+runDb' :: RunDb m a a
+runDb' = runDb appName
 
 -- ^
 -- Prepare an API response
@@ -303,12 +300,13 @@ mkSingleResult etag record = maybe (return res) (checkEtag sha res) etag
 
 mkCreateMultipleResult
   :: (Text -> String)
-  -> [ApiItem ApiError Record]
+  -> ApiResults
   -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData ApiResult))
-mkCreateMultipleResult getLink records =
+mkCreateMultipleResult getLink results =
   return . noHeader $
   addHeader (intercalate ", " $ links records) (Multiple records)
   where
+    records = apiItems results
     links = fmap $ apiItem (const "<>") (mkLink . getCreateLink getLink)
 
 -- ^
@@ -379,10 +377,3 @@ getCreateLink getLink = getLink . fromJust . getIdValue
 -- Split a list o comma separated field names and remove all empty entries
 splitLabels :: (Foldable t, Functor t) => t Text -> [Text]
 splitLabels input = filter (not . T.null) $ concat (T.splitOn "," <$> input)
-
--- ^
--- Validate a record
-validate'
-  :: Monad m
-  => RecordDefinition -> Record -> ExceptT ApiError m Record
-validate' def record = ExceptT $ return (vResultToEither $ validate def record)
