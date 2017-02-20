@@ -14,6 +14,7 @@ import Control.Monad.Reader
 import Data.Text (Text)
 import qualified Handlers.Xandar.Common as C
 import Persistence.Common
+import Persistence.Facade (dbPipe)
 import Persistence.Xandar.Common (subscriptionDefinition)
 import Persistence.Xandar.Subscriptions
 import Servant
@@ -74,7 +75,7 @@ createMultiple'
   => [Record] -> ExceptT ApiError m ApiResults
 createMultiple' input = do
   conf <- ask
-  pipe <- C.dbPipe conf
+  pipe <- dbPipe conf
   ExceptT $
     liftIO $
     runExceptT $
@@ -108,7 +109,7 @@ updateMultiple'
   => Bool -> [Record] -> ExceptT ApiError m ApiResults
 updateMultiple' replace input = do
   conf <- ask
-  pipe <- C.dbPipe conf
+  pipe <- dbPipe conf
   ExceptT $
     liftIO $
     runExceptT $

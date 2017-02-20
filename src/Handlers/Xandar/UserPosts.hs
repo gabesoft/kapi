@@ -18,13 +18,13 @@ import Data.Text (Text)
 import Database.Bloodhound (SearchResult(..), EsError, Search)
 import Handlers.Xandar.Common
        (throwApiError, mkPagination, splitLabels, mkGetMultipleResult,
-        mkCreateMultipleResult, mkApiResponse, dbName, dbPipe,
-        getCreateLink, mkLink, mkSingleResult, esIndex)
+        mkCreateMultipleResult, mkApiResponse, dbName, getCreateLink,
+        mkLink, mkSingleResult, esIndex)
 import qualified Handlers.Xandar.Common as C
 import Parsers.Filter (parse)
 import Persistence.Common
 import Persistence.ElasticSearch
-import Persistence.Facade (runEs, RunEs)
+import Persistence.Facade (runEs, RunEs, dbPipe)
 import Persistence.Xandar.Common (userPostDefinition)
 import Persistence.Xandar.UserPosts (insertUserPosts)
 import Servant

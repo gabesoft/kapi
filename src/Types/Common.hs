@@ -173,12 +173,12 @@ concatItems = foldr (<>) mempty
 itemsFromEither :: [Either a b] -> ApiItems2 [a] [b]
 itemsFromEither xs = uncurry ApiItems2 (partitionEithers xs)
 
-itemsToEither
-  :: (Show e, Show a)
-  => ApiItems2 [e] [a] -> Either e a
-itemsToEither (ApiItems2 (e:_) _) = Left e
-itemsToEither (ApiItems2 [] (a:_)) = Right a
-itemsToEither items = error $ "Invalid items " ++ show items
+itemsToEither :: ApiItems2 [e] [a] -> [Either e a]
+itemsToEither (ApiItems2 es as) = (Left <$> es) <> (Right <$> as)
+
+-- TODO: remove after rename ApiItems2 -> ApiItems
+itemsToApiResults :: ApiResults2 -> ApiResults
+itemsToApiResults (ApiItems2 es as) = ApiItems (Fail <$> es) (Succ <$> as)
 
 type ApiResults2 = ApiItems2 [ApiError] [Record]
 

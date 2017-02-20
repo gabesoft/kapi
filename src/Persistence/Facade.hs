@@ -10,6 +10,8 @@ module Persistence.Facade
   , RunEs
   , dbInsertRecords
   , dbUpdateRecords
+  , dbPipe
+  , getExisting
   , runDb
   , runEs
   , validate
@@ -55,8 +57,8 @@ dbInsertRecords
 dbInsertRecords appName def input = do
   valid <- validateManyT def input
   let records = populateDefaults def <$> valid
-  savedIds <- runDbT appName (dbAction dbInsert def records)
-  saved <- runDbT appName (dbAction dbGetById def savedIds)
+  savedIds <- runDbMany appName (dbAction dbInsert def records)
+  saved <- runDbMany appName (dbAction dbGetById def savedIds)
   return (fromJust <$> saved)
 
 dbUpdateRecords
@@ -75,8 +77,8 @@ dbUpdateRecords appName replace def input = do
   let merged = merge (mkIdIndexedMap valid1) <$> existing
   valid2 <- validateManyT def merged
   let records = populateDefaults def <$> valid2
-  savedIds <- runDbT appName (dbAction dbUpdate def records)
-  saved <- runDbT appName (dbAction dbGetById def savedIds)
+  savedIds <- runDbMany appName (dbAction dbUpdate def records)
+  saved <- runDbMany appName (dbAction dbGetById def savedIds)
   return (fromJust <$> saved)
   where
     get record = fromJust . Map.lookup (getIdValue' record)
@@ -92,8 +94,8 @@ getExisting
   -> [RecordId]
   -> ApiItems2T [ApiError] m [Record]
 getExisting appName def ids = do
-  records <- runDbT appName (dbAction dbGetById def ids)
-  let results = maybe (Left mkApiError404) Right <$> records
+  records <- runDbMany appName (dbAction dbGetById def ids)
+  let results = maybe (Left $ mkApiError404' "Record not found") Right <$> records
   ApiItems2T . return $ itemsFromEither results
 
 -- ^
@@ -123,7 +125,7 @@ validateIdManyT records =
   ApiItems2T . return . concatItems $
   (vResultToItems . validateRecordHasId) <$> records
 
-runDbT
+runDbMany
   :: ( MonadIO m
      , MonadReader ApiConfig m
      , MonadBaseControl IO m
@@ -131,7 +133,7 @@ runDbT
   => AppName
   -> (Database -> Pipe -> m [Either Failure a])
   -> ApiItems2T [ApiError] m [a]
-runDbT appName action = do
+runDbMany appName action = do
   conf <- ask
   pipe <- dbPipe conf
   results <- lift $ action (confGetDb appName conf) pipe

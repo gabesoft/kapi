@@ -491,3 +491,8 @@ mkApiError400 = mkApiError status400
 -- Create an 'ApiError' with an HTTP status of 404
 mkApiError404 :: ApiError
 mkApiError404 = mkApiError status404 mempty
+
+-- ^
+-- Create an 'ApiError' with an HTTP status of 404 and a message
+mkApiError404' :: String -> ApiError
+mkApiError404' = mkApiError status404

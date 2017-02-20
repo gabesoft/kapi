@@ -57,7 +57,7 @@ GET http://:host/:path?where=(admin in [])
 #
 # Get a single user
 #
-GET http://:host/:path/5869ec3e59841810dc000009
+GET http://:host/:path/58ab43d55984185882000007
 
 #
 # Run a HEAD request on a single user
@@ -77,8 +77,8 @@ GET http://:host/:path/non-existent
 #
 # Get a single user using ETag
 #
-GET http://:host/:path/5869ec3e59841810dc000009
-If-None-Match: 76d932c295d6a8d637ab7b36b43fc1d6f7e8a377
+GET http://:host/:path/58ab3f4059841827d1000003
+If-None-Match: 8751d26bd52c1d762b2dc1662c1e581adaed121c
 
 #
 # Delete a non-existent user
@@ -150,3 +150,25 @@ Content-Type: :json
 {
     "email": "updated3@aol.com"
 }
+
+#
+# Replace multiple
+#
+PUT http://:host/:path
+Content-Type: :json
+[
+  {
+    "email": "user12017-02-20-30-1487619029@aol.com",
+    "admin": true,
+    "_id": "58ab43d55984185882000007",
+    "disabled": false,
+    "githubUrl": "https://api.github.com/users/user1"
+  },
+  {
+    "email": "admin12017-02-20-30-1487619029@aol.com",
+    "admin": true,
+    "_id": "58ab43d55984185882000008",
+    "disabled": false,
+    "githubUrl": "https://api.github.com/users/admin1"
+  }
+]
