@@ -36,7 +36,7 @@ subscriptionIndices =
 
 subscriptionDefinition :: RecordDefinition
 subscriptionDefinition =
-  RecordDefinition "feedsubscriptions" $
+  RecordDefinition "feedsubscriptions" "subscriptions" $
   Map.fromList
     [ mkIdDef "userId"
     , mkIdDef "feedId"
@@ -61,7 +61,7 @@ userIndices =
 
 userDefinition :: RecordDefinition
 userDefinition =
-  RecordDefinition "users" $
+  RecordDefinition "users" "users" $
   Map.fromList
     [ mkReqDef' "email"
     , mkReqDef "disabled" (Just False)
@@ -85,7 +85,7 @@ feedIndices =
 
 feedDefinition :: RecordDefinition
 feedDefinition =
-  RecordDefinition "feeds" $
+  RecordDefinition "feeds" "feeds" $
   Map.fromList
     [ mkOptDef' "author"
     , mkOptDef' "data"
@@ -129,7 +129,7 @@ postIndices =
 
 postDefinition :: RecordDefinition
 postDefinition =
-  RecordDefinition "posts" $
+  RecordDefinition "posts" "posts" $
   Map.fromList
     [ mkOptDef' "author"
     , mkOptDef' "comments"
@@ -148,7 +148,7 @@ postDefinition =
 
 userPostDefinition :: RecordDefinition
 userPostDefinition =
-  RecordDefinition "post" $
+  RecordDefinition "post" "user-posts" $
   Map.fromList
     [ mkReqDef' "subscriptionId"
     , mkReqDef' "postId"

@@ -47,6 +47,7 @@ data FieldDefinition = FieldDefinition
 
 data RecordDefinition = RecordDefinition
   { recordCollection :: Text
+  , recordCollectionName :: Text
   , recordFields :: Map.Map Label FieldDefinition
   } deriving (Eq, Show)
 
@@ -101,7 +102,7 @@ data ApiError = ApiError
 instance ToJSON ApiError where
   toJSON (ApiError Nothing _ msg) = object ["message" .= LBS.unpack msg]
   toJSON (ApiError (Just r) _ msg) =
-    object ["message" .= LBS.unpack msg, "input" .= toJSON r]
+    object ["message" .= LBS.unpack msg, "record" .= toJSON r]
 
 -- ^
 -- The result of a record validation
@@ -308,6 +309,7 @@ instance (MonadIO m, Monoid e) =>
 instance (Monoid e, MonadReader r m) =>
          MonadReader r (ApiItems2T e m) where
   ask = lift ask
+  local = mapApiItems2T . local
   reader = lift . reader
 
 instance (Monoid e) =>
@@ -316,13 +318,15 @@ instance (Monoid e) =>
   liftWith f = ApiItems2T $ return <$> f runApiItems2T
   restoreT = ApiItems2T
 
-instance (Monoid e) => MonadBase (ApiItems2 e) (ApiItems2 e) where
-    liftBase = id
+instance (Monoid e) =>
+         MonadBase (ApiItems2 e) (ApiItems2 e) where
+  liftBase = id
 
-instance (Monoid e) => MonadBaseControl (ApiItems2 e) (ApiItems2 e) where
-    type StM (ApiItems2 e) a = a
-    liftBaseWith f = f id
-    restoreM = return
+instance (Monoid e) =>
+         MonadBaseControl (ApiItems2 e) (ApiItems2 e) where
+  type StM (ApiItems2 e) a = a
+  liftBaseWith f = f id
+  restoreM = return
 
 instance (Monoid e, MonadBase b m) =>
          MonadBase b (ApiItems2T e m) where
@@ -333,7 +337,6 @@ instance (Monoid e, MonadBaseControl b m) =>
   type StM (ApiItems2T e m) a = ComposeSt (ApiItems2T e) m a
   liftBaseWith = defaultLiftBaseWith
   restoreM = defaultRestoreM
-
 
 -- ^
 -- A collection of 'ApiItem's

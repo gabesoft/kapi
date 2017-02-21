@@ -25,7 +25,8 @@ import qualified Persistence.ElasticSearch as E
 import Persistence.Facade (validate, validateId)
 import qualified Persistence.MongoDB as M
 import Persistence.Xandar.Common
-import Persistence.Xandar.UserPosts (insertUserPosts, mkUserPostId, indexDocuments)
+import Persistence.Xandar.UserPosts
+       (insertUserPosts, mkUserPostId, indexDocumentsOld)
 import qualified Persistence.Xandar.UserPosts as U
 import Types.Common
 
@@ -98,7 +99,7 @@ insertUserPosts' eSubs nSubs (dbName, pipe) (server, index) = do
   let userPostIds = getUserPostIds (mkFeedIndexedMap nSubs) posts
   existing <- runEsAndExtractOld (E.getByIds userPostIds) mapping server index
   results <- mkUserPosts'' (eSubs, nSubs, posts) existing
-  created <- indexDocuments (rights results) mapping server index
+  created <- indexDocumentsOld (rights results) mapping server index
   return $ (Succ <$> created) <> (Fail <$> lefts results)
 
 mkUserPosts''

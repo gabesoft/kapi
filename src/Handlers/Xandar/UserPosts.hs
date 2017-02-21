@@ -25,7 +25,8 @@ import Persistence.Common
 import Persistence.ElasticSearch
 import Persistence.Facade (runEs, dbPipe)
 import Persistence.Xandar.Common (userPostDefinition)
-import Persistence.Xandar.UserPosts (insertUserPosts)
+import Persistence.Xandar.UserPosts
+       (insertUserPosts, esInsert, esInsertMulti, esUpdate, esUpdateMulti)
 import Servant
 import Types.Common
 
@@ -99,10 +100,14 @@ createSingle
   :: (Text -> String)
   -> Record
   -> Api (Headers '[ Header "Location" String, Header "Link" String] (ApiData ApiResult))
-createSingle getLink input = mkApiResponse respond (createSingle' True input)
+createSingle getLink input = insert (mkCreateSingleResult getLink)
+    -- mkApiResponse respond (createSingle' True input)
   where
-    success r = addHeader (getCreateLink getLink r) $ noHeader (Single $ Succ r)
-    respond = apiItem throwApiError (mkCreateSingleResult getLink)
+    -- success r = addHeader (getCreateLink getLink r) $ noHeader (Single $ Succ r)
+    -- respond = apiItem throwApiError (mkCreateSingleResult getLink)
+    insert f = do
+      result <- runExceptT $ esInsert appName input
+      either throwApiError f result
 
 -- ^
 -- Create multiple records

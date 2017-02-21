@@ -3,7 +3,17 @@
 
 -- ^
 -- Persistence functionality for user-posts
-module Persistence.Xandar.UserPosts where
+module Persistence.Xandar.UserPosts
+  ( esInsert
+  , esInsertMulti
+  , esUpdate
+  , esUpdateMulti
+  , indexDocuments
+  , indexDocumentsOld
+  , insertUserPosts
+  , mkUserPostId
+  , mkUserPosts
+  ) where
 
 import Control.Monad.Except
 import Control.Monad.Reader
@@ -25,7 +35,7 @@ import Persistence.Common
 import qualified Persistence.ElasticSearch as E
 import Persistence.Facade
        (validate, validateId, validateMulti, validateIdMulti,
-        getExistingMulti, runEs, runEsAndExtract)
+        getExistingMulti, runEs, runEsAndExtract, toSingle)
 import qualified Persistence.MongoDB as M
 import Persistence.Xandar.Common
 import Types.Common
@@ -48,38 +58,55 @@ insertUserPosts replace input (dbName, pipe) (server, index) = do
   subs <- runDbOld (getSubsById $ subId <$> valid) dbName pipe
   posts <- runDbOld (getPostsById $ postId <$> valid) dbName pipe
   results <- mkUserPosts replace (subs, posts) (existing, valid)
-  created <- indexDocuments (rights results) mapping server index
+  created <- indexDocumentsOld (rights results) mapping server index
   return $ mkApiItems (Fail <$> lefts results <> invalid) (Succ <$> created)
 
-insertMulti
+esInsert
+  :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
+  => AppName -> Record -> ExceptT ApiError m Record
+esInsert appName = toSingle (esInsertMulti appName)
+
+esUpdate
+  :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
+  => Bool -> AppName -> Record -> ExceptT ApiError m Record
+esUpdate replace appName = toSingle (esUpdateMulti replace appName)
+
+esInsertMulti
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
   => AppName -> [Record] -> ApiItems2T [ApiError] m [Record]
-insertMulti appName input = do
+esInsertMulti appName input = do
   valid <- validateMulti userPostDefinition input
   subs <- getExistingMulti appName subscriptionDefinition (subId <$> valid)
   posts <- getExistingMulti appName postDefinition (postId <$> valid)
   records <- mkNewUserPosts (subs, posts) valid
-  created <- runExceptT $ index appName records
-  undefined
+  indexDocuments appName records
 
-index
+esUpdateMulti
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
-  => AppName -> [(Record, RecordId)] -> ExceptT ApiError m [Record]
-index appName input = do
+  => Bool -> AppName -> [Record] -> ApiItems2T [ApiError] m [Record]
+esUpdateMulti = undefined
+
+indexDocuments
+  :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
+  => AppName -> [(Record, RecordId)] -> ApiItems2T [ApiError] m [Record]
+indexDocuments appName input = do
   let mapping = recordCollection userPostDefinition
-  _ <- runEs appName (E.indexDocuments input mapping)
-  _ <- runEs appName E.refreshIndex
-  runEsAndExtract appName (E.getByIds (snd <$> input) mapping)
+  _ <- runExceptT $ runEs appName (E.indexDocuments input mapping)
+  _ <- runExceptT $ runEs appName E.refreshIndex
+  records <-
+    runExceptT $ runEsAndExtract appName (E.getByIds (snd <$> input) mapping)
+  ApiItems2T . return $
+    either (flip ApiItems2 [] . (: [])) (ApiItems2 []) records
 
 -- ^
 -- Index multiple documents and re-query them
-indexDocuments :: [(Record, RecordId)]
+indexDocumentsOld :: [(Record, RecordId)]
                -> Text
                -> Text
                -> Text
                -> ExceptT ApiError IO [Record]
-indexDocuments [] _ _ _ = return []
-indexDocuments input mapping server index = do
+indexDocumentsOld [] _ _ _ = return []
+indexDocumentsOld input mapping server index = do
   _ <- runEsOld (E.indexDocuments input) mapping server index >>= printLog
   _ <- runEsOld refreshIndex mapping server index
   runEsAndExtractOld (E.getByIds $ snd <$> input) mapping server index

@@ -116,7 +116,7 @@ GET http://:host/:path/581a32d909a64c359672ec0b-5814f2d909a64c359672dded
 GET http://:host/:path/56d7de0dc788cb1d6eb91ac6-56d7de0dc788cb1d6eb91abc
 
 #
-# Create a single post
+# Create a single post (subscription not found)
 #
 POST http://:host/:path
 Content-Type: :json
@@ -129,7 +129,7 @@ Content-Type: :json
 }
 
 #
-# Create a single post (valid 2)
+# Create a single post
 #
 POST http://:host/:path
 Content-Type: :json
@@ -137,6 +137,31 @@ Content-Type: :json
   "postId": "56d7de0dc788cb1d6eb91abf",
   "feedId": "56d7de0dc788cb1d6eb91abb",
   "subscriptionId": "56d7de0dc788cb1d6eb91ac6",
+  "read": true,
+  "tags": ["technology", "programming"]
+}
+
+#
+# Create a single post invalid
+#
+POST http://:host/:path
+Content-Type: :json
+{           
+  "postId": "56d7de0dc788cb1d6eb91abf",
+  "feedId": "56d7de0dc788cb1d6eb91abb",
+  "read": true,
+  "tags": ["technology", "programming"]
+}
+
+#
+# Create a single post (post not found)
+#
+POST http://:host/:path
+Content-Type: :json
+{           
+  "postId": "56d7d88bc788cb1d6eb9199k",
+  "subscriptionId": "56d7df90c788cb1d6eb92789",
+  "title": "Sample user post title",
   "read": true,
   "tags": ["technology", "programming"]
 }
@@ -164,19 +189,6 @@ Content-Type: :json
     "programming",
     "haskell"
   ]
-}
-
-#
-# Create a single post (invalid)
-#
-POST http://:host/:path
-Content-Type: :json
-{           
-  "postId": "56d7d88bc788cb1d6eb9199k",
-  "subscriptionId": "56d7df90c788cb1d6eb92789",
-  "title": "Sample user post title",
-  "read": true,
-  "tags": ["technology", "programming"]
 }
 
 #

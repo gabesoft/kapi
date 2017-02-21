@@ -14,6 +14,7 @@ module Persistence.Facade
   , runDb
   , runEs
   , runEsAndExtract
+  , toSingle
   , validate
   , validate'
   , validateId
@@ -45,17 +46,17 @@ import Types.Common
 dbInsert
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
   => AppName -> RecordDefinition -> Record -> ExceptT ApiError m Record
-dbInsert appName = dbSingle . dbInsertMulti appName
+dbInsert appName = toSingle . dbInsertMulti appName
 
 dbUpdate
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
   => Bool -> AppName -> RecordDefinition -> Record -> ExceptT ApiError m Record
-dbUpdate replace appName = dbSingle . dbUpdateMulti replace appName
+dbUpdate replace appName = toSingle . dbUpdateMulti replace appName
 
 getExisting
   :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
   => AppName -> RecordDefinition -> RecordId -> ExceptT ApiError m Record
-getExisting appName = dbSingle . getExistingMulti appName
+getExisting appName = toSingle . getExistingMulti appName
 
 dbInsertMulti
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
@@ -95,17 +96,19 @@ getExistingMulti
   -> ApiItems2T [ApiError] m [Record]
 getExistingMulti appName def ids = do
   records <- runDbMany appName (dbAction DB.dbGetById def ids)
-  let msg = "Record not found in " ++ T.unpack (recordCollection def) ++ " collection"
+  let msg =
+        "Record not found in " ++
+        T.unpack (recordCollectionName def) ++ " collection"
   let results = maybe (Left $ mkApiError404' msg) Right <$> records
   ApiItems2T . return $ eitherToItems results
 
 -- ^
 -- Convert an action operating on multiple records into one operating
 -- on a single record
-dbSingle
+toSingle
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
   => ([a] -> ApiItems2T [e] m [b]) -> a -> ExceptT e m b
-dbSingle action input =
+toSingle action input =
   ExceptT $ do
     records <- runApiItems2T $ action [input]
     return $ head (itemsToEither records)
