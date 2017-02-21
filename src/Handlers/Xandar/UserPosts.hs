@@ -13,18 +13,17 @@ import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.Trans.Control
 import Data.Bifunctor
-import Data.List (intercalate)
 import Data.Text (Text)
-import Database.Bloodhound (SearchResult(..), EsError, Search)
+import Database.Bloodhound (Search, EsError)
 import Handlers.Xandar.Common
        (throwApiError, mkPagination, splitLabels, mkGetMultipleResult,
         mkCreateMultipleResult, mkApiResponse, dbName, getCreateLink,
-        mkLink, mkSingleResult, esIndex)
+        mkGetSingleResult, mkCreateSingleResult, esIndex)
 import qualified Handlers.Xandar.Common as C
 import Parsers.Filter (parse)
 import Persistence.Common
 import Persistence.ElasticSearch
-import Persistence.Facade (runEs, RunEs, dbPipe)
+import Persistence.Facade (runEs, dbPipe)
 import Persistence.Xandar.Common (userPostDefinition)
 import Persistence.Xandar.UserPosts (insertUserPosts)
 import Servant
@@ -40,7 +39,7 @@ mappingName = recordCollection userPostDefinition
 getSingle :: Maybe Text -> Text -> Api (Headers '[Header "ETag" String] Record)
 getSingle etag uid = mkApiResponse respond (runEs' $ getByIds [uid] mappingName)
   where
-    respond = maybe (throwError err404) (mkSingleResult etag) . extractRecord
+    respond = maybe (throwError err404) (mkGetSingleResult etag) . extractRecord
 
 -- ^
 -- Get multiple records
@@ -63,8 +62,8 @@ getMultiple'
   -> Maybe Int
   -> ExceptT ApiError m ([Record], Pagination)
 getMultiple' include query sortFields page perPage = do
-  count <- runEs' . count =<< getCountSearch
-  let pagination = mkPagination page perPage count
+  cnt <- runEs' . count' =<< getCountSearch
+  let pagination = mkPagination page perPage cnt
   let start = paginationStart pagination
   let limit = paginationLimit pagination
   search <- getSearch start limit
@@ -75,7 +74,7 @@ getMultiple' include query sortFields page perPage = do
     getSearch start = ExceptT . return . prepareSearch [] query sort' start
     include' = splitLabels include
     sort' = splitLabels sortFields
-    count s = countDocuments s mappingName
+    count' s = countDocuments s mappingName
 
 -- ^
 -- Delete a single record
@@ -99,11 +98,11 @@ createSingleOrMultiple getLink (Multiple rs) = createMultiple getLink rs
 createSingle
   :: (Text -> String)
   -> Record
-  -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData ApiResult))
+  -> Api (Headers '[ Header "Location" String, Header "Link" String] (ApiData ApiResult))
 createSingle getLink input = mkApiResponse respond (createSingle' True input)
   where
     success r = addHeader (getCreateLink getLink r) $ noHeader (Single $ Succ r)
-    respond = apiItem throwApiError (return . success)
+    respond = apiItem throwApiError (mkCreateSingleResult getLink)
 
 -- ^
 -- Create multiple records
@@ -199,7 +198,9 @@ updateSingle' replace uid input = do
 
 -- ^
 -- Run an elastic-search action
-runEs' :: RunEs m a a
+runEs'
+  :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
+  => (Text -> Text -> IO (Either EsError a)) -> ExceptT ApiError m a
 runEs' = runEs appName
 
 -- ^

@@ -479,8 +479,9 @@ mkSortExpr name
 
 -- ^
 -- Create an 'ApiError'
+-- TODO: Add the original record field
 mkApiError :: Status -> String -> ApiError
-mkApiError status msg = ApiError status (LBS.pack msg)
+mkApiError status msg = ApiError Nothing status (LBS.pack msg)
 
 -- ^
 -- Create an 'ApiError' with an HTTP status of 400

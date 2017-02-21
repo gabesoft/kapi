@@ -408,6 +408,7 @@ mToMaybe a
 esToApiError :: EsError -> ApiError
 esToApiError err =
   ApiError
+    Nothing
     (intToStatus $ B.errorStatus err)
     (LBS.pack . T.unpack $ B.errorMessage err)
   where

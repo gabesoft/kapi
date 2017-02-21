@@ -51,9 +51,7 @@ createSingle
 createSingle input = C.mkApiResponse respond (createSingle' input)
   where
     getLink = mkSubscriptionGetSingleLink
-    success r =
-      addHeader (C.getCreateLink getLink r) $ noHeader (Single $ Succ r)
-    respond = apiItem C.throwApiError (return . success)
+    respond = apiItem C.throwApiError (C.mkCreateSingleResult getLink)
 
 -- ^
 -- Create multiple records

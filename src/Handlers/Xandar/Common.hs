@@ -20,14 +20,13 @@ import Data.List (intercalate)
 import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as T
-import Database.MongoDB (Pipe, Database, Index)
-import Database.MongoDB.Query (Failure(..))
+import Database.MongoDB (Database, Index, Pipe, Failure)
 import Network.HTTP.Types.Status
 import Persistence.Common
 import Persistence.Facade
-       (runDb, RunDb, dbInsertRecords, dbUpdateRecords, getExisting,
-        dbPipe)
-import Persistence.MongoDB
+       (runDb, dbInsert, dbInsertMulti, dbUpdate,
+        dbUpdateMulti, getExisting, dbPipe)
+import qualified Persistence.MongoDB as DB
 import Servant
 import Servant.Utils.Enter (Enter)
 import Types.Common
@@ -42,7 +41,7 @@ app' proxy handlers = serve proxy . server' handlers
     server'
       :: Enter a (Api :~> Handler) b
       => a -> ApiConfig -> b
-    server' handlers config = enter (toHandler config) handlers
+    server' hs cfg = enter (toHandler cfg) hs
     toHandler :: ApiConfig -> Api :~> Handler
     toHandler conf = Nat (`runReaderT` conf)
 
@@ -53,11 +52,11 @@ getSingle
   -> Maybe Text
   -> Text
   -> Api (Headers '[ Header "ETag" String] Record)
-getSingle def etag uid = get return >>= mkSingleResult etag
+getSingle def etag uid = get return >>= mkGetSingleResult etag
   where
     get f = do
-      records <- runApiItems2T $ getExisting appName def [uid]
-      either throwApiError f (head $ itemsToEither records)
+      result <- runExceptT $ getExisting appName def uid
+      either throwApiError f result
 
 -- ^
 -- Get multiple records
@@ -82,16 +81,16 @@ getMultiple'
   -> ExceptT ApiError m ([Record], Pagination)
 getMultiple' def include query sort page perPage = do
   query' <- ExceptT (return getQuery)
-  count <- runDb' (dbCount def query')
+  count <- runDb' (DB.dbCount def query')
   let pagination = mkPagination page perPage count
   let start = paginationStart pagination
   let limit = paginationLimit pagination
-  records <- runDb' $ dbFind def query' sort' include' start limit
+  records <- runDb' $ DB.dbFind def query' sort' include' start limit
   return (records, pagination)
   where
-    sort' = mkSortFields (splitLabels sort)
-    include' = mkIncludeFields (splitLabels include)
-    getQuery = first mkApiError400 (queryToDoc def $ fromMaybe mempty query)
+    sort' = DB.mkSortFields (splitLabels sort)
+    include' = DB.mkIncludeFields (splitLabels include)
+    getQuery = first mkApiError400 (DB.queryToDoc def $ fromMaybe mempty query)
 
 -- ^
 -- Delete a single record
@@ -99,7 +98,7 @@ deleteSingle :: RecordDefinition -> Text -> Api NoContent
 deleteSingle def uid = verify >> mkApiResponse (const $ return NoContent) delete
   where
     verify = getSingle def mempty uid
-    delete = runDb' $ dbDeleteById def uid
+    delete = runDb' $ DB.dbDeleteById def uid
 
 -- ^
 -- Create one or more records
@@ -118,12 +117,11 @@ createSingle
   -> (Text -> String)
   -> Record
   -> Api (Headers '[ Header "Location" String, Header "Link" String] (ApiData ApiResult))
-createSingle def getLink input = insert (return . respond)
+createSingle def getLink input = insert (mkCreateSingleResult getLink)
   where
-    respond r = addHeader (getCreateLink getLink r) $ noHeader (Single $ Succ r)
     insert f = do
-      records <- runApiItems2T $ dbInsertRecords appName def [input]
-      either throwApiError f (head $ itemsToEither records)
+      result <- runExceptT $ dbInsert appName def input
+      either throwApiError f result
 
 -- ^
 -- Create multiple records
@@ -135,7 +133,7 @@ createMultiple
 createMultiple def getLink input = insert >>= mkCreateMultipleResult getLink
   where
     insert = do
-      records <- runApiItems2T $ dbInsertRecords appName def input
+      records <- runApiItems2T $ dbInsertMulti appName def input
       return $ itemsToApiResults records
 
 -- ^
@@ -176,8 +174,8 @@ updateSingle def replace uid input = update return
   where
     record = setIdValue uid input
     update f = do
-      records <- runApiItems2T $ dbUpdateRecords appName replace def [record]
-      either throwApiError f (head $ itemsToEither records)
+      result <- runExceptT $ dbUpdate replace appName def record
+      either throwApiError f result
 
 -- ^
 -- Modify or replace multiple records
@@ -185,7 +183,7 @@ updateMultiple :: RecordDefinition -> Bool -> [Record] -> Api ApiResults
 updateMultiple def replace input = update
   where
     update = do
-      records <- runApiItems2T $ dbUpdateRecords appName replace def input
+      records <- runApiItems2T $ dbUpdateMulti replace appName def input
       return $ itemsToApiResults records
 
 -- ^
@@ -193,11 +191,13 @@ updateMultiple def replace input = update
 addDbIndices :: [Index] -> ApiConfig -> IO ()
 addDbIndices indices conf = do
   pipe <- dbPipe conf
-  mapM_ (\idx -> dbAddIndex idx (dbName conf) pipe) indices
+  mapM_ (\idx -> DB.dbAddIndex idx (dbName conf) pipe) indices
 
 -- ^
 -- Run a database action
-runDb' :: RunDb m a a
+runDb'
+  :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
+  => (Database -> Pipe -> m (Either Failure a)) -> ExceptT ApiError m a
 runDb' = runDb appName
 
 -- ^
@@ -244,15 +244,27 @@ mkServantErr err =
       | otherwise = encode (Fail err :: ApiItem ApiError ())
 
 -- ^
--- Create a result that can be returned from a 'getSingle' method
-mkSingleResult :: Maybe Text
-               -> Record
-               -> Api (Headers '[ Header "ETag" String] Record)
-mkSingleResult etag record = maybe (return res) (checkEtag sha res) etag
+-- Create a result to be returned from a 'getSingle' method
+mkGetSingleResult :: Maybe Text
+                  -> Record
+                  -> Api (Headers '[ Header "ETag" String] Record)
+mkGetSingleResult etag record = maybe (return res) (checkEtag sha res) etag
   where
     sha = recToSha record
     res = addHeader sha record
 
+-- ^
+-- Create a result to be returned from a 'createSingle' method
+mkCreateSingleResult
+  :: (Text -> String)
+  -> Record
+  -> Api (Headers '[ Header "Location" String, Header "Link" String] (ApiData ApiResult))
+mkCreateSingleResult getLink record =
+  return $
+  addHeader (getCreateLink getLink record) $ noHeader (Single $ Succ record)
+
+-- ^
+-- Create a result to be returned from a 'createMultiple' method
 mkCreateMultipleResult
   :: (Text -> String)
   -> ApiResults
@@ -265,7 +277,7 @@ mkCreateMultipleResult getLink results =
     links = fmap $ apiItem (const "<>") (mkLink . getCreateLink getLink)
 
 -- ^
--- Create a result for the 'getMultiple' endpoint
+-- Create a result to be returned from a 'getMultiple' endpoint
 mkGetMultipleResult
   :: ( AddHeader h4 String a orig3
      , AddHeader h3 String orig3 orig2

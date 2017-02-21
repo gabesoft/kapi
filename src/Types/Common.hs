@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -8,7 +9,9 @@
 -- ^ Common types
 module Types.Common where
 
+import Control.Monad.Base
 import Control.Monad.Reader
+import Control.Monad.Trans.Control
 import Data.Aeson as AESON
 import Data.AesonBson (aesonify, bsonify)
 import Data.Bifunctor
@@ -88,14 +91,17 @@ instance Monoid (RecordData Field) where
   mappend (Record xs) (Record ys) = Record (BSON.merge ys xs)
 
 -- ^
--- Representation for an API error
+-- Representation of an API error
 data ApiError = ApiError
-  { apiErrorStatus :: Status
-  , apiErrorMessage :: LBS.ByteString
+  { apiErorrInput :: Maybe Record -- ^ the original input that caused this error
+  , apiErrorStatus :: Status -- ^ the HTTP status
+  , apiErrorMessage :: LBS.ByteString -- ^ the error message
   } deriving (Eq, Show, Generic)
 
 instance ToJSON ApiError where
-  toJSON err = object ["message" .= LBS.unpack (apiErrorMessage err)]
+  toJSON (ApiError Nothing _ msg) = object ["message" .= LBS.unpack msg]
+  toJSON (ApiError (Just r) _ msg) =
+    object ["message" .= LBS.unpack msg, "input" .= toJSON r]
 
 -- ^
 -- The result of a record validation
@@ -170,8 +176,8 @@ data ApiItems2 e a = ApiItems2
 concatItems :: [ApiItems2 [e] [a]] -> ApiItems2 [e] [a]
 concatItems = foldr (<>) mempty
 
-itemsFromEither :: [Either a b] -> ApiItems2 [a] [b]
-itemsFromEither xs = uncurry ApiItems2 (partitionEithers xs)
+eitherToItems :: [Either a b] -> ApiItems2 [a] [b]
+eitherToItems xs = uncurry ApiItems2 (partitionEithers xs)
 
 itemsToEither :: ApiItems2 [e] [a] -> [Either e a]
 itemsToEither (ApiItems2 es as) = (Left <$> es) <> (Right <$> as)
@@ -185,8 +191,9 @@ type ApiResults2 = ApiItems2 [ApiError] [Record]
 instance Eq2 ApiItems2 where
   liftEq2 eq1 eq2 (ApiItems2 e1 a1) (ApiItems2 e2 a2) = eq1 e1 e2 && eq2 a1 a2
 
-instance (Eq e) => Eq1 (ApiItems2 e) where
-    liftEq = liftEq2 (==)
+instance (Eq e) =>
+         Eq1 (ApiItems2 e) where
+  liftEq = liftEq2 (==)
 
 instance Bifunctor ApiItems2 where
   bimap f g (ApiItems2 es as) = ApiItems2 (f es) (g as)
@@ -248,11 +255,14 @@ throwApi = flip ApiItems2 mempty
 
 -- ^
 -- Error counterpart of 'pure'
-throwApiE :: (Monad m, Monoid a) => e -> ApiItems2T e m a
+throwApiE
+  :: (Monad m, Monoid a)
+  => e -> ApiItems2T e m a
 throwApiE = ApiItems2T . return . throwApi
 
-instance (Eq e, Eq1 m) => Eq1 (ApiItems2T e m) where
-    liftEq eq (ApiItems2T a) (ApiItems2T b) = liftEq (liftEq eq) a b
+instance (Eq e, Eq1 m) =>
+         Eq1 (ApiItems2T e m) where
+  liftEq eq (ApiItems2T a) (ApiItems2T b) = liftEq (liftEq eq) a b
 
 instance (Eq e, Eq1 m, Eq a) =>
          Eq (ApiItems2T e m a) where
@@ -299,6 +309,31 @@ instance (Monoid e, MonadReader r m) =>
          MonadReader r (ApiItems2T e m) where
   ask = lift ask
   reader = lift . reader
+
+instance (Monoid e) =>
+         MonadTransControl (ApiItems2T e) where
+  type StT (ApiItems2T e) a = ApiItems2 e a
+  liftWith f = ApiItems2T $ return <$> f runApiItems2T
+  restoreT = ApiItems2T
+
+instance (Monoid e) => MonadBase (ApiItems2 e) (ApiItems2 e) where
+    liftBase = id
+
+instance (Monoid e) => MonadBaseControl (ApiItems2 e) (ApiItems2 e) where
+    type StM (ApiItems2 e) a = a
+    liftBaseWith f = f id
+    restoreM = return
+
+instance (Monoid e, MonadBase b m) =>
+         MonadBase b (ApiItems2T e m) where
+  liftBase = liftBaseDefault
+
+instance (Monoid e, MonadBaseControl b m) =>
+         MonadBaseControl b (ApiItems2T e m) where
+  type StM (ApiItems2T e m) a = ComposeSt (ApiItems2T e) m a
+  liftBaseWith = defaultLiftBaseWith
+  restoreM = defaultRestoreM
+
 
 -- ^
 -- A collection of 'ApiItem's

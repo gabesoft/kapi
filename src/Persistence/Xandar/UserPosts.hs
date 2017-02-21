@@ -6,6 +6,7 @@
 module Persistence.Xandar.UserPosts where
 
 import Control.Monad.Except
+import Control.Monad.Reader
 import Control.Monad.Trans.Control
 import qualified Data.Aeson as A
 import Data.Bifunctor
@@ -19,9 +20,12 @@ import Data.Text (Text)
 import Database.Bloodhound (EsError(..), SearchResult(..))
 import Database.MongoDB (Database, Pipe, Failure)
 import Debug.Trace
+import Network.HTTP.Types
 import Persistence.Common
 import qualified Persistence.ElasticSearch as E
-import Persistence.Facade (validate, validateId)
+import Persistence.Facade
+       (validate, validateId, validateMulti, validateIdMulti,
+        getExistingMulti, runEs, runEsAndExtract)
 import qualified Persistence.MongoDB as M
 import Persistence.Xandar.Common
 import Types.Common
@@ -40,12 +44,32 @@ insertUserPosts replace input (dbName, pipe) (server, index) = do
   let valid = rights validated
   let invalid = lefts validated
   let userPostIds = mkUserPostId' <$> valid
-  existing <- runEsAndExtract (E.getByIds userPostIds) mapping server index
-  subs <- runDb (getSubsById $ subId <$> valid) dbName pipe
-  posts <- runDb (getPostsById $ postId <$> valid) dbName pipe
+  existing <- runEsAndExtractOld (E.getByIds userPostIds) mapping server index
+  subs <- runDbOld (getSubsById $ subId <$> valid) dbName pipe
+  posts <- runDbOld (getPostsById $ postId <$> valid) dbName pipe
   results <- mkUserPosts replace (subs, posts) (existing, valid)
   created <- indexDocuments (rights results) mapping server index
   return $ mkApiItems (Fail <$> lefts results <> invalid) (Succ <$> created)
+
+insertMulti
+  :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
+  => AppName -> [Record] -> ApiItems2T [ApiError] m [Record]
+insertMulti appName input = do
+  valid <- validateMulti userPostDefinition input
+  subs <- getExistingMulti appName subscriptionDefinition (subId <$> valid)
+  posts <- getExistingMulti appName postDefinition (postId <$> valid)
+  records <- mkNewUserPosts (subs, posts) valid
+  created <- runExceptT $ index appName records
+  undefined
+
+index
+  :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
+  => AppName -> [(Record, RecordId)] -> ExceptT ApiError m [Record]
+index appName input = do
+  let mapping = recordCollection userPostDefinition
+  _ <- runEs appName (E.indexDocuments input mapping)
+  _ <- runEs appName E.refreshIndex
+  runEsAndExtract appName (E.getByIds (snd <$> input) mapping)
 
 -- ^
 -- Index multiple documents and re-query them
@@ -56,12 +80,37 @@ indexDocuments :: [(Record, RecordId)]
                -> ExceptT ApiError IO [Record]
 indexDocuments [] _ _ _ = return []
 indexDocuments input mapping server index = do
-  _ <- runEs (E.indexDocuments input) mapping server index >>= printLog
-  _ <- runEs refreshIndex mapping server index
-  runEsAndExtract (E.getByIds $ snd <$> input) mapping server index
+  _ <- runEsOld (E.indexDocuments input) mapping server index >>= printLog
+  _ <- runEsOld refreshIndex mapping server index
+  runEsAndExtractOld (E.getByIds $ snd <$> input) mapping server index
   where
     refreshIndex _ = E.refreshIndex
     printLog _ = liftIO $ print $ trace "Insert user posts" (length input)
+
+mkNewUserPosts
+  :: (MonadIO m)
+  => ([Record], [Record])
+  -> [Record]
+  -> ApiItems2T [ApiError] m [(Record, RecordId)]
+mkNewUserPosts (subs, posts) input = mkUserPosts' True (subs, posts) ([], input)
+
+mkUserPosts'
+  :: (MonadIO m)
+  => Bool
+  -> ([Record], [Record])
+  -> ([Record], [Record])
+  -> ApiItems2T [ApiError] m [(Record, RecordId)]
+mkUserPosts' replace (subs, posts) (existing, input) = do
+  records <- mapM mkRecord input
+  ApiItems2T . return $ eitherToItems records
+  where
+    mkRecord r = mkUserPost replace (getSubPost r) (findExisting r, r)
+    getSubPost r = (get subMap subId r, get postMap postId r)
+    findExisting = get existingMap mkUserPostId'
+    get m fid r = Map.lookup (fid r) m
+    existingMap = mkIdIndexedMap existing
+    subMap = mkIdIndexedMap subs
+    postMap = mkIdIndexedMap posts
 
 -- ^
 -- Construct user post documents
@@ -189,5 +238,4 @@ postId = getValue' "postId"
 -- ^
 -- Make a 400 error to be returned when attempting to construct an invalid user post
 mk400Err :: String -> Record -> ApiError
-mk400Err msg record =
-  mkApiError400 $ msg <> " Original input: " <> LBS.unpack (A.encode record)
+mk400Err msg record = ApiError (Just record) status400 (LBS.pack msg)

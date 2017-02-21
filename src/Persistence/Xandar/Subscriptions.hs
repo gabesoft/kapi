@@ -44,9 +44,9 @@ insertSubscriptions :: [Record]
 insertSubscriptions input (dbName, pipe) (server, index) = do
   let validated = validateSubscription <$> input
   let valid = rights validated
-  feeds <- runDb (getFeedsById $ feedId <$> valid) dbName pipe
+  feeds <- runDbOld (getFeedsById $ feedId <$> valid) dbName pipe
   saved <- mapM save (mkSubscriptions feeds valid)
-  posts <- runDb (getPostsBySub $ filter isEnabled saved) dbName pipe
+  posts <- runDbOld (getPostsBySub $ filter isEnabled saved) dbName pipe
   _ <-
     insertUserPosts -- TODO: use custom index method since we have all data necessary
       True
@@ -68,7 +68,7 @@ updateSubscriptions
 updateSubscriptions replace input (dbName, pipe) (server, index) = do
   let validated1 = validateId <$> input
   let valid = rights validated1
-  existing <- runDb (getSubsById $ getIdValue' <$> valid) dbName pipe
+  existing <- runDbOld (getSubsById $ getIdValue' <$> valid) dbName pipe
   let records = mkRecord (mkIdIndexedMap existing) <$> valid
   let validated2 = validateSubscription <$> rights records
   saved <- mapM save (rights validated2)
@@ -94,9 +94,9 @@ insertUserPosts'
   -> ExceptT ApiError IO [ApiItem ApiError Record]
 insertUserPosts' eSubs nSubs (dbName, pipe) (server, index) = do
   let mapping = recordCollection userPostDefinition
-  posts <- runDb (getPostsBySub $ filter isEnabled nSubs) dbName pipe
+  posts <- runDbOld (getPostsBySub $ filter isEnabled nSubs) dbName pipe
   let userPostIds = getUserPostIds (mkFeedIndexedMap nSubs) posts
-  existing <- runEsAndExtract (E.getByIds userPostIds) mapping server index
+  existing <- runEsAndExtractOld (E.getByIds userPostIds) mapping server index
   results <- mkUserPosts'' (eSubs, nSubs, posts) existing
   created <- indexDocuments (rights results) mapping server index
   return $ (Succ <$> created) <> (Fail <$> lefts results)
@@ -200,7 +200,7 @@ getExistingSub
   :: (MonadIO m, MonadBaseControl IO m)
   => RecordId -> Database -> Pipe -> ExceptT ApiError m Record
 getExistingSub subId dbName pipe = do
-  sub <- runDb (M.dbGetById subscriptionDefinition subId) dbName pipe
+  sub <- runDbOld (M.dbGetById subscriptionDefinition subId) dbName pipe
   ExceptT . return $ maybe (Left mkApiError404) Right sub
 
 -- ^
@@ -210,7 +210,7 @@ deletePosts
   => [Text] -> Text -> Text -> Text -> ExceptT ApiError m ()
 deletePosts subIds server index mappingName = do
   search <- ExceptT (return search')
-  runEs (E.deleteByQuery search) mappingName server index >>= printLog
+  runEsOld (E.deleteByQuery search) mappingName server index >>= printLog
   where
     filter' = FilterRelOp In "subscriptionId" (TermList $ TermId <$> subIds)
     search' = first E.esToApiError $ E.mkSearch (Just filter') [] [] 0 0
@@ -262,8 +262,8 @@ saveDb
   -> ExceptT ApiError m Record
 saveDb action input dbName pipe = do
   let def = subscriptionDefinition
-  uid <- runDb (action def $ populateDefaults def input) dbName pipe
-  record <- runDb (M.dbGetById def uid) dbName pipe
+  uid <- runDbOld (action def $ populateDefaults def input) dbName pipe
+  record <- runDbOld (M.dbGetById def uid) dbName pipe
   return (fromJust record)
 
 -- ^

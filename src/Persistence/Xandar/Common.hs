@@ -178,38 +178,38 @@ validateFeed = validate feedDefinition
 -- TODO: remove all run methods
 -- ^
 -- Run a MongoDB action
-runDb
+runDbOld
   :: (MonadBaseControl IO m)
   => (Database -> Pipe -> m (Either Failure a))
   -> Database
   -> Pipe
   -> ExceptT ApiError m a
-runDb action dbName pipe = do
+runDbOld action dbName pipe = do
   results <- lift $ action dbName pipe
   ExceptT (return $ first M.dbToApiError results)
 
 -- ^
 -- Run an elastic-search action and extract the results
-runEsAndExtract
+runEsAndExtractOld
   :: MonadIO m
   => (a -> b -> c -> IO (Either EsError (SearchResult Record)))
   -> a
   -> b
   -> c
   -> ExceptT ApiError m [Record]
-runEsAndExtract action mappingName server index =
-  E.extractRecords [] <$> runEs action mappingName server index
+runEsAndExtractOld action mappingName server index =
+  E.extractRecords [] <$> runEsOld action mappingName server index
 
 -- ^
 -- Run an elastic-search action
-runEs
+runEsOld
   :: MonadIO m
   => (mapping -> server -> index -> IO (Either EsError d))
   -> mapping
   -> server
   -> index
   -> ExceptT ApiError m d
-runEs action mappingName server index = do
+runEsOld action mappingName server index = do
   results <- liftIO $ action mappingName server index
   ExceptT (return $ first E.esToApiError results)
 
