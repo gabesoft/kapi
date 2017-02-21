@@ -55,7 +55,7 @@ getSingle
 getSingle def etag uid = get return >>= mkGetSingleResult etag
   where
     get f = do
-      result <- runExceptT $ getExisting appName def uid
+      result <- runExceptT $ getExisting def uid
       either throwApiError f result
 
 -- ^
@@ -81,11 +81,11 @@ getMultiple'
   -> ExceptT ApiError m ([Record], Pagination)
 getMultiple' def include query sort page perPage = do
   query' <- ExceptT (return getQuery)
-  count <- runDb' (DB.dbCount def query')
+  count <- runDb (DB.dbCount def query')
   let pagination = mkPagination page perPage count
   let start = paginationStart pagination
   let limit = paginationLimit pagination
-  records <- runDb' $ DB.dbFind def query' sort' include' start limit
+  records <- runDb $ DB.dbFind def query' sort' include' start limit
   return (records, pagination)
   where
     sort' = DB.mkSortFields (splitLabels sort)
@@ -98,7 +98,7 @@ deleteSingle :: RecordDefinition -> Text -> Api NoContent
 deleteSingle def uid = verify >> mkApiResponse (const $ return NoContent) delete
   where
     verify = getSingle def mempty uid
-    delete = runDb' $ DB.dbDeleteById def uid
+    delete = runDb $ DB.dbDeleteById def uid
 
 -- ^
 -- Create one or more records
@@ -120,7 +120,7 @@ createSingle
 createSingle def getLink input = insert (mkCreateSingleResult getLink)
   where
     insert f = do
-      result <- runExceptT $ dbInsert appName def input
+      result <- runExceptT $ dbInsert def input
       either throwApiError f result
 
 -- ^
@@ -133,7 +133,7 @@ createMultiple
 createMultiple def getLink input = insert >>= mkCreateMultipleResult getLink
   where
     insert = do
-      records <- runApiItems2T $ dbInsertMulti appName def input
+      records <- runApiItems2T $ dbInsertMulti def input
       return $ itemsToApiResults records
 
 -- ^
@@ -174,7 +174,7 @@ updateSingle def replace uid input = update return
   where
     record = setIdValue uid input
     update f = do
-      result <- runExceptT $ dbUpdate replace appName def record
+      result <- runExceptT $ dbUpdate replace def record
       either throwApiError f result
 
 -- ^
@@ -183,7 +183,7 @@ updateMultiple :: RecordDefinition -> Bool -> [Record] -> Api ApiResults
 updateMultiple def replace input = update
   where
     update = do
-      records <- runApiItems2T $ dbUpdateMulti replace appName def input
+      records <- runApiItems2T $ dbUpdateMulti replace def input
       return $ itemsToApiResults records
 
 -- ^
@@ -191,14 +191,8 @@ updateMultiple def replace input = update
 addDbIndices :: [Index] -> ApiConfig -> IO ()
 addDbIndices indices conf = do
   pipe <- dbPipe conf
-  mapM_ (\idx -> DB.dbAddIndex idx (dbName conf) pipe) indices
-
--- ^
--- Run a database action
-runDb'
-  :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
-  => (Database -> Pipe -> m (Either Failure a)) -> ExceptT ApiError m a
-runDb' = runDb appName
+  let app = appName conf
+  mapM_ (\idx -> DB.dbAddIndex idx (confGetDb app conf) pipe) indices
 
 -- ^
 -- Prepare an API response
@@ -208,16 +202,6 @@ mkApiResponse
 mkApiResponse f action = do
   result <- runExceptT action
   either throwApiError f result
-
--- ^
--- Get the configured database name for this app
-dbName :: ApiConfig -> Database
-dbName = confGetDb appName
-
--- ^
--- Elastic-search index
-esIndex :: ApiConfig -> Text
-esIndex = confGetEsIndex appName
 
 -- ^
 -- Convert an 'ApiError' into a 'ServantErr' and throw

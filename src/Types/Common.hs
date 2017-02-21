@@ -395,6 +395,7 @@ type AppName = Text
 -- Api configuration data
 data ApiConfig = ApiConfig
   { apiPort :: PortNumber
+  , appName :: AppName
   , mongoHost :: HostName
   , mongoPort :: PortNumber
   , mongoDbs :: Map.Map AppName Database

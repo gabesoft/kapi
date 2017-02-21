@@ -479,7 +479,7 @@ mkSortExpr name
 
 -- ^
 -- Create an 'ApiError'
--- TODO: Add the original record field
+-- TODO: Add the original input field
 mkApiError :: Status -> String -> ApiError
 mkApiError status msg = ApiError Nothing status (LBS.pack msg)
 
@@ -497,3 +497,8 @@ mkApiError404 = mkApiError status404 mempty
 -- Create an 'ApiError' with an HTTP status of 404 and a message
 mkApiError404' :: String -> ApiError
 mkApiError404' = mkApiError status404
+
+-- ^
+-- A record definition that contains only a required id field
+idDefinition :: RecordDefinition
+idDefinition = RecordDefinition mempty mempty $ Map.fromList [mkReqDef' idLabel]

@@ -19,7 +19,8 @@ module Persistence.Facade
   , validate'
   , validateId
   , validateId'
-  , validateIdMulti
+  , validateDbIdMulti
+  , validateEsIdMulti
   , validateMulti
   ) where
 
@@ -45,44 +46,40 @@ import Types.Common
 
 dbInsert
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
-  => AppName -> RecordDefinition -> Record -> ExceptT ApiError m Record
-dbInsert appName = toSingle . dbInsertMulti appName
+  => RecordDefinition -> Record -> ExceptT ApiError m Record
+dbInsert = toSingle . dbInsertMulti
 
 dbUpdate
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
-  => Bool -> AppName -> RecordDefinition -> Record -> ExceptT ApiError m Record
-dbUpdate replace appName = toSingle . dbUpdateMulti replace appName
+  => Bool -> RecordDefinition -> Record -> ExceptT ApiError m Record
+dbUpdate replace = toSingle . dbUpdateMulti replace
 
 getExisting
   :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
-  => AppName -> RecordDefinition -> RecordId -> ExceptT ApiError m Record
-getExisting appName = toSingle . getExistingMulti appName
+  => RecordDefinition -> RecordId -> ExceptT ApiError m Record
+getExisting = toSingle . getExistingMulti
 
 dbInsertMulti
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
-  => AppName -> RecordDefinition -> [Record] -> ApiItems2T [ApiError] m [Record]
-dbInsertMulti appName def input = do
+  => RecordDefinition -> [Record] -> ApiItems2T [ApiError] m [Record]
+dbInsertMulti def input = do
   valid <- validateMulti def input
   let records = populateDefaults def <$> valid
-  savedIds <- runDbMany appName (dbAction DB.dbInsert def records)
-  saved <- runDbMany appName (dbAction DB.dbGetById def savedIds)
+  savedIds <- runDbMany (dbAction DB.dbInsert def records)
+  saved <- runDbMany (dbAction DB.dbGetById def savedIds)
   return (fromJust <$> saved)
 
 dbUpdateMulti
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
-  => Bool
-  -> AppName
-  -> RecordDefinition
-  -> [Record]
-  -> ApiItems2T [ApiError] m [Record]
-dbUpdateMulti replace appName def input = do
-  valid1 <- validateIdMulti input
-  existing <- getExistingMulti appName def $ getIdValue' <$> valid1
+  => Bool -> RecordDefinition -> [Record] -> ApiItems2T [ApiError] m [Record]
+dbUpdateMulti replace def input = do
+  valid1 <- validateDbIdMulti input
+  existing <- getExistingMulti def $ getIdValue' <$> valid1
   let merged = merge (mkIdIndexedMap valid1) <$> existing
   valid2 <- validateMulti def merged
   let records = populateDefaults def <$> valid2
-  savedIds <- runDbMany appName (dbAction DB.dbUpdate def records)
-  saved <- runDbMany appName (dbAction DB.dbGetById def savedIds)
+  savedIds <- runDbMany (dbAction DB.dbUpdate def records)
+  saved <- runDbMany (dbAction DB.dbGetById def savedIds)
   return (fromJust <$> saved)
   where
     get record = fromJust . Map.lookup (getIdValue' record)
@@ -90,12 +87,9 @@ dbUpdateMulti replace appName def input = do
 
 getExistingMulti
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
-  => AppName
-  -> RecordDefinition
-  -> [RecordId]
-  -> ApiItems2T [ApiError] m [Record]
-getExistingMulti appName def ids = do
-  records <- runDbMany appName (dbAction DB.dbGetById def ids)
+  => RecordDefinition -> [RecordId] -> ApiItems2T [ApiError] m [Record]
+getExistingMulti def ids = do
+  records <- runDbMany (dbAction DB.dbGetById def ids)
   let msg =
         "Record not found in " ++
         T.unpack (recordCollectionName def) ++ " collection"
@@ -130,11 +124,9 @@ dbAction singleAction def rs dbName pipe =
 -- Run a MongoDB action that handle multiple records
 runDbMany
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
-  => AppName
-  -> (Database -> Pipe -> m [Either Failure a])
-  -> ApiItems2T [ApiError] m [a]
-runDbMany appName action = do
-  results <- runDb' appName action
+  => (Database -> Pipe -> m [Either Failure a]) -> ApiItems2T [ApiError] m [a]
+runDbMany action = do
+  results <- runDb' action
   let items = first DB.dbToApiError <$> results
   ApiItems2T . return $ ApiItems2 (lefts items) (rights items)
 
@@ -142,37 +134,36 @@ runDbMany appName action = do
 -- Run a MongoDB action that handles a single record
 runDb
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
-  => AppName
-  -> (Database -> Pipe -> m (Either Failure a))
-  -> ExceptT ApiError m a
-runDb appName action = do
-  results <- runDb' appName action
+  => (Database -> Pipe -> m (Either Failure a)) -> ExceptT ApiError m a
+runDb action = do
+  results <- runDb' action
   ExceptT (return $ first DB.dbToApiError results)
 
 runDb'
   :: (Monad m, MonadTrans t, MonadIO (t m), MonadReader ApiConfig (t m))
-  => AppName -> (Database -> Pipe -> m b) -> t m b
-runDb' appName action = do
+  => (Database -> Pipe -> m b) -> t m b
+runDb' action = do
   conf <- ask
+  let app = appName conf
   pipe <- dbPipe conf
-  lift $ action (confGetDb appName conf) pipe
+  lift $ action (confGetDb app conf) pipe
 
 -- ^
 -- Run an Elastic-Search action
 runEs
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
-  => AppName -> (Text -> Text -> IO (Either EsError a)) -> ExceptT ApiError m a
-runEs appName action = do
+  => (Text -> Text -> IO (Either EsError a)) -> ExceptT ApiError m a
+runEs action = do
   conf <- ask
-  results <- liftIO $ action (esServer conf) (confGetEsIndex appName conf)
+  let app = appName conf
+  results <- liftIO $ action (esServer conf) (confGetEsIndex app conf)
   ExceptT (return $ first ES.esToApiError results)
 
 runEsAndExtract
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
-  => AppName
-  -> (Text -> Text -> IO (Either EsError (SearchResult Record)))
+  => (Text -> Text -> IO (Either EsError (SearchResult Record)))
   -> ExceptT ApiError m [Record]
-runEsAndExtract appName = fmap (ES.extractRecords []) . runEs appName
+runEsAndExtract = fmap (ES.extractRecords []) . runEs
 
 -- ^
 -- Ensure that a record is valid according to its definition
@@ -207,10 +198,17 @@ validateMulti def = validateMulti' (validateRecord def)
 
 -- ^
 -- Ensure that all records specified have a valid id
-validateIdMulti
+validateDbIdMulti
   :: (Monad m)
   => [Record] -> ApiItems2T [ApiError] m [Record]
-validateIdMulti = validateMulti' DB.validateRecordHasId
+validateDbIdMulti = validateMulti' DB.validateRecordHasId
+
+-- ^
+-- Ensure that all records specified have a valid id
+validateEsIdMulti
+  :: (Monad m)
+  => [Record] -> ApiItems2T [ApiError] m [Record]
+validateEsIdMulti = validateMulti' ES.validateRecordHasId
 
 validateMulti'
   :: (Monad m)
@@ -228,7 +226,8 @@ vResultToEither (a, err) = Left (ApiError (Just a) status400 (encode err))
 
 vResultToItems :: (Record, ValidationResult) -> ApiResults2
 vResultToItems (a, ValidationErrors []) = ApiItems2 [] [a]
-vResultToItems (a, err) = ApiItems2 [ApiError (Just a) status400 (encode err)] []
+vResultToItems (a, err) =
+  ApiItems2 [ApiError (Just a) status400 (encode err)] []
 
 -- ^
 -- Create a MongoDB connection pipe

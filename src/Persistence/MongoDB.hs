@@ -239,8 +239,7 @@ mapIdToObjId name = modField name (>>= recIdToObjId)
 validateRecordHasId :: Record -> (Record, ValidationResult)
 validateRecordHasId r = (r, ValidationErrors $ catMaybes [valField])
   where
-    valField = validateField False def (mapIdToObjId idLabel r) idLabel
-    def = RecordDefinition mempty mempty $ Map.fromList [mkReqDef' idLabel]
+    valField = validateField False idDefinition (mapIdToObjId idLabel r) idLabel
 
 -- ^
 -- Make a field that will be used for sorting

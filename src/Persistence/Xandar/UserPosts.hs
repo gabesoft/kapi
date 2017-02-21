@@ -34,7 +34,7 @@ import Network.HTTP.Types
 import Persistence.Common
 import qualified Persistence.ElasticSearch as E
 import Persistence.Facade
-       (validate, validateId, validateMulti, validateIdMulti,
+       (validate, validateId, validateMulti, validateEsIdMulti,
         getExistingMulti, runEs, runEsAndExtract, toSingle)
 import qualified Persistence.MongoDB as M
 import Persistence.Xandar.Common
@@ -63,38 +63,40 @@ insertUserPosts replace input (dbName, pipe) (server, index) = do
 
 esInsert
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
-  => AppName -> Record -> ExceptT ApiError m Record
-esInsert appName = toSingle (esInsertMulti appName)
+  => Record -> ExceptT ApiError m Record
+esInsert = toSingle esInsertMulti
 
 esUpdate
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
-  => Bool -> AppName -> Record -> ExceptT ApiError m Record
-esUpdate replace appName = toSingle (esUpdateMulti replace appName)
+  => Bool -> Record -> ExceptT ApiError m Record
+esUpdate replace = toSingle (esUpdateMulti replace)
 
 esInsertMulti
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
-  => AppName -> [Record] -> ApiItems2T [ApiError] m [Record]
-esInsertMulti appName input = do
+  => [Record] -> ApiItems2T [ApiError] m [Record]
+esInsertMulti input = do
   valid <- validateMulti userPostDefinition input
-  subs <- getExistingMulti appName subscriptionDefinition (subId <$> valid)
-  posts <- getExistingMulti appName postDefinition (postId <$> valid)
+  subs <- getExistingMulti subscriptionDefinition (subId <$> valid)
+  posts <- getExistingMulti postDefinition (postId <$> valid)
   records <- mkNewUserPosts (subs, posts) valid
-  indexDocuments appName records
+  indexDocuments records
 
 esUpdateMulti
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
-  => Bool -> AppName -> [Record] -> ApiItems2T [ApiError] m [Record]
-esUpdateMulti = undefined
+  => Bool -> [Record] -> ApiItems2T [ApiError] m [Record]
+esUpdateMulti replace input = do
+  valid1 <- validateEsIdMulti input
+  undefined -- TODO: left here
 
 indexDocuments
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
-  => AppName -> [(Record, RecordId)] -> ApiItems2T [ApiError] m [Record]
-indexDocuments appName input = do
+  => [(Record, RecordId)] -> ApiItems2T [ApiError] m [Record]
+indexDocuments input = do
   let mapping = recordCollection userPostDefinition
-  _ <- runExceptT $ runEs appName (E.indexDocuments input mapping)
-  _ <- runExceptT $ runEs appName E.refreshIndex
+  _ <- runExceptT $ runEs (E.indexDocuments input mapping)
+  _ <- runExceptT $ runEs E.refreshIndex
   records <-
-    runExceptT $ runEsAndExtract appName (E.getByIds (snd <$> input) mapping)
+    runExceptT $ runEsAndExtract (E.getByIds (snd <$> input) mapping)
   ApiItems2T . return $
     either (flip ApiItems2 [] . (: [])) (ApiItems2 []) records
 

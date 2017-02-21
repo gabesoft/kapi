@@ -17,8 +17,8 @@ import Data.Text (Text)
 import Database.Bloodhound (Search, EsError)
 import Handlers.Xandar.Common
        (throwApiError, mkPagination, splitLabels, mkGetMultipleResult,
-        mkCreateMultipleResult, mkApiResponse, dbName, getCreateLink,
-        mkGetSingleResult, mkCreateSingleResult, esIndex)
+        mkCreateMultipleResult, mkApiResponse, getCreateLink,
+        mkGetSingleResult, mkCreateSingleResult)
 import qualified Handlers.Xandar.Common as C
 import Parsers.Filter (parse)
 import Persistence.Common
@@ -38,7 +38,7 @@ mappingName = recordCollection userPostDefinition
 -- ^
 -- Get a single record by id
 getSingle :: Maybe Text -> Text -> Api (Headers '[Header "ETag" String] Record)
-getSingle etag uid = mkApiResponse respond (runEs' $ getByIds [uid] mappingName)
+getSingle etag uid = mkApiResponse respond (runEs $ getByIds [uid] mappingName)
   where
     respond = maybe (throwError err404) (mkGetSingleResult etag) . extractRecord
 
@@ -63,12 +63,12 @@ getMultiple'
   -> Maybe Int
   -> ExceptT ApiError m ([Record], Pagination)
 getMultiple' include query sortFields page perPage = do
-  cnt <- runEs' . count' =<< getCountSearch
+  cnt <- runEs . count' =<< getCountSearch
   let pagination = mkPagination page perPage cnt
   let start = paginationStart pagination
   let limit = paginationLimit pagination
   search <- getSearch start limit
-  results <- runEs' . (`searchDocuments` mappingName) $ search
+  results <- runEs . (`searchDocuments` mappingName) $ search
   return (extractRecords include' results, pagination)
   where
     getCountSearch = ExceptT . return $ prepareSearch include' query sort' 0 0
@@ -83,7 +83,7 @@ deleteSingle :: Text -> Api NoContent
 deleteSingle uid = verify >> mkApiResponse (const $ return NoContent) delete
   where
     verify = getSingle mempty uid
-    delete = runEs' $ deleteDocument uid mappingName
+    delete = runEs $ deleteDocument uid mappingName
 
 -- ^
 -- Create one or more records
@@ -101,12 +101,9 @@ createSingle
   -> Record
   -> Api (Headers '[ Header "Location" String, Header "Link" String] (ApiData ApiResult))
 createSingle getLink input = insert (mkCreateSingleResult getLink)
-    -- mkApiResponse respond (createSingle' True input)
   where
-    -- success r = addHeader (getCreateLink getLink r) $ noHeader (Single $ Succ r)
-    -- respond = apiItem throwApiError (mkCreateSingleResult getLink)
     insert f = do
-      result <- runExceptT $ esInsert appName input
+      result <- runExceptT $ esInsert input
       either throwApiError f result
 
 -- ^
@@ -115,8 +112,11 @@ createMultiple
   :: (Text -> String)
   -> [Record]
   -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData ApiResult))
-createMultiple getLink input =
-  mkApiResponse (mkCreateMultipleResult getLink) (createMultiple' True input)
+createMultiple getLink input = insert >>= mkCreateMultipleResult getLink
+  where
+    insert = do
+      records <- runApiItems2T $ esInsertMulti input
+      return $ itemsToApiResults records
 
 -- ^
 -- Update (replace) a single record
@@ -165,14 +165,15 @@ createMultiple'
 createMultiple' replace input = do
   conf <- ask
   pipe <- dbPipe conf
+  let app = appName conf
   ExceptT $
     liftIO $
     runExceptT $
     insertUserPosts
       replace
       input
-      (dbName conf, pipe)
-      (esServer conf, esIndex conf)
+      (confGetDb app conf, pipe)
+      (esServer conf, confGetEsIndex app conf)
 
 -- ^
 -- Update multiple records
@@ -193,20 +194,13 @@ updateSingle'
   :: (MonadReader ApiConfig m, MonadIO m, MonadBaseControl IO m)
   => Bool -> Text -> Record -> ExceptT ApiError m ApiResult
 updateSingle' replace uid input = do
-  result <- runEs' (getByIds [uid] mappingName)
+  result <- runEs (getByIds [uid] mappingName)
   existing <- ExceptT $ return (extract result)
   createSingle' replace (merge existing input)
   where
     merge old new = mergeRecords new (includeFields include old)
     include = ["postId", "subscriptionId"]
     extract r = maybe (Left mkApiError404) Right (extractRecord r)
-
--- ^
--- Run an elastic-search action
-runEs'
-  :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
-  => (Text -> Text -> IO (Either EsError a)) -> ExceptT ApiError m a
-runEs' = runEs appName
 
 -- ^
 -- Make a 'Search' object from query string parameters

@@ -44,9 +44,6 @@ import Data.Text (Text)
 import Servant
 import Types.Common
 
-appName :: AppName
-appName = "xandar"
-
 perPageDefault :: Int
 perPageDefault = 50
 

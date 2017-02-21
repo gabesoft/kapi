@@ -4,7 +4,7 @@ module Main where
 
 import qualified Data.Map.Strict as Map
 import Data.Maybe
-import qualified Handlers.Xandar.Xandar as XX
+import qualified Handlers.Xandar.Xandar as XA
 import Network.Wai
 import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.RequestLogger
@@ -14,6 +14,7 @@ import Types.Common
 conf =
   ApiConfig
   { apiPort = 8001
+  , appName = mempty
   , mongoHost = "127.0.0.1"
   , mongoPort = 27017
   , mongoDbs = Map.fromList [("xandar", "kapi-xandar")]
@@ -28,7 +29,7 @@ main = do
   let dev = fromMaybe False $ (== "development") <$> env
   let env = withEnv dev "development mode" "production mode"
   putStrLn ("Server started on port " ++ show port ++ " in " ++ env)
-  XX.appInit conf >> runApp dev conf XX.app
+  XA.appInit (conf {appName = "xandar"}) >> runApp dev conf XA.app
 
 runApp :: Bool -> ApiConfig -> (ApiConfig -> Application) -> IO ()
 runApp dev conf app = do

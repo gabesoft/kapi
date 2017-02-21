@@ -74,13 +74,14 @@ createMultiple'
 createMultiple' input = do
   conf <- ask
   pipe <- dbPipe conf
+  let app = appName conf
   ExceptT $
     liftIO $
     runExceptT $
     insertSubscriptions
       input
-      (C.dbName conf, pipe)
-      (esServer conf, C.esIndex conf)
+      (confGetDb app conf, pipe)
+      (esServer conf, confGetEsIndex app conf)
 
 updateSingle
   :: (MonadIO m, MonadReader ApiConfig m, MonadError ServantErr m)
@@ -108,14 +109,15 @@ updateMultiple'
 updateMultiple' replace input = do
   conf <- ask
   pipe <- dbPipe conf
+  let app = appName conf
   ExceptT $
     liftIO $
     runExceptT $
     updateSubscriptions
       replace
       input
-      (C.dbName conf, pipe)
-      (esServer conf, C.esIndex conf)
+      (confGetDb app conf, pipe)
+      (esServer conf, confGetEsIndex app conf)
 
 -- ^
 -- Update (replace) a single record

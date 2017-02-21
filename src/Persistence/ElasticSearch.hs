@@ -21,6 +21,7 @@ module Persistence.ElasticSearch
   , putMappingFromFile
   , refreshIndex
   , searchDocuments
+  , validateRecordHasId
   ) where
 
 import Control.Applicative
@@ -34,6 +35,7 @@ import qualified Data.ByteString.Lazy.Char8 as L
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import Data.Char (isSpace)
 import Data.List.NonEmpty (NonEmpty(..))
+import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -439,3 +441,10 @@ extractRecords fields input = includeFields fields' <$> records
       setValue idLabel (getId $ B.hitDocId hit) <$> B.hitSource hit
     getId (DocId docId) = docId
     records = concat (getRecord <$> hits)
+
+-- ^
+-- Validate that a record has a valid id field
+validateRecordHasId :: Record -> (Record, ValidationResult)
+validateRecordHasId r = (r, ValidationErrors $ catMaybes [valField])
+  where
+    valField = validateField False idDefinition r idLabel
