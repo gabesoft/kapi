@@ -26,7 +26,7 @@ import Persistence.ElasticSearch
 import Persistence.Facade (runEs, dbPipe)
 import Persistence.Xandar.Common (userPostDefinition)
 import Persistence.Xandar.UserPosts
-       (insertUserPosts, esInsert, esInsertMulti, esUpdate, esUpdateMulti)
+       (insertUserPosts, esInsert, esInsertMulti, esReplace, esReplaceMulti, esModify, esModifyMulti)
 import Servant
 import Types.Common
 

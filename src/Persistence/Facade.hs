@@ -14,6 +14,7 @@ module Persistence.Facade
   , runDb
   , runEs
   , runEsAndExtract
+  , toMulti
   , toSingle
   , validate
   , validate'
@@ -97,8 +98,8 @@ getExistingMulti def ids = do
   ApiItems2T . return $ eitherToItems results
 
 -- ^
--- Convert an action operating on multiple records into one operating
--- on a single record
+-- TODO: rename
+-- ApiItems2T to ExceptT
 toSingle
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
   => ([a] -> ApiItems2T [e] m [b]) -> a -> ExceptT e m b
@@ -106,6 +107,17 @@ toSingle action input =
   ExceptT $ do
     records <- runApiItems2T $ action [input]
     return $ head (itemsToEither records)
+
+-- ^
+-- TODO: rename
+-- ExceptT to ApiItems2T
+toMulti
+  :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
+  => ExceptT a (ApiItems2T [a] m) [t] -> ApiItems2T [a] m [t]
+toMulti action = do
+  results <- runExceptT action
+  ApiItems2T . return $
+    either (flip ApiItems2 [] . (: [])) (ApiItems2 []) results
 
 -- ^
 -- Run multiple MongoDB actions and return all results
@@ -244,7 +256,7 @@ mkIdIndexedMap = mkRecordMap idLabel
 -- ^
 -- Merge an existing and an updated record according to the 'replace' flag
 mergeRecords' :: Bool -> Record -> Record -> Record
-mergeRecords' True = replaceRecords [createdAtLabel, updatedAtLabel, idLabel]
+mergeRecords' True = replaceRecords [createdAtLabel, idLabel]
 mergeRecords' False = mergeRecords
 
 -- ^
