@@ -80,6 +80,16 @@ esModify
   => Record -> ExceptT ApiError m Record
 esModify = toSingle esModifyMulti
 
+esReplaceMulti
+  :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
+  => [Record] -> ApiItems2T [ApiError] m [Record]
+esReplaceMulti = esUpdateMulti replaceUserPosts
+
+esModifyMulti
+  :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
+  => [Record] -> ApiItems2T [ApiError] m [Record]
+esModifyMulti = esUpdateMulti modifyUserPosts
+
 esInsertMulti
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
   => [Record] -> ApiItems2T [ApiError] m [Record]
@@ -90,43 +100,17 @@ esInsertMulti input = do
   records <- createUserPosts (subs, posts) valid
   toMulti (indexDocuments records)
 
-esReplaceMulti
+esUpdateMulti
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
-  => [Record] -> ApiItems2T [ApiError] m [Record]
-esReplaceMulti input = do
+  => ([Record] -> [Record] -> ApiItems2T [ApiError] m [(Record, RecordId)])
+  -> [Record]
+  -> ApiItems2T [ApiError] m [Record]
+esUpdateMulti update input = do
   valid1 <- validateEsIdMulti input
-  existing <- toMulti (getUserPosts valid1)
-  records <- replaceUserPosts existing valid1
+  existing <- toMulti (getUserPosts $ getIdValue' <$> valid1)
+  records <- update existing valid1
   valid2 <- validateMulti' fst validateUserPostTuple records
   toMulti (indexDocuments valid2)
-  where
-    mapping = recordCollection userPostDefinition
-    getUserPosts records =
-      runEsAndExtract $ E.getByIds (getIdValue' <$> records) mapping
-
-esModifyMulti input = undefined -- TODO: left here
-
-validateUserPostTuple :: (Record, RecordId)
-                      -> ((Record, RecordId), ValidationResult)
-validateUserPostTuple (r, rid) =
-  first (flip (,) rid) $ validateRecord userPostDefinition r
-
--- TODO: consolidate with Facade
-validateMulti'
-  :: (Monad m)
-  => (a -> Record)
-  -> (a -> (a, ValidationResult))
-  -> [a]
-  -> ApiItems2T [ApiError] m [a]
-validateMulti' f v records =
-  ApiItems2T . return . concatItems $ (vResultToItems f . v) <$> records
-
-vResultToItems :: (a -> Record)
-               -> (a, ValidationResult)
-               -> ApiItems2 [ApiError] [a]
-vResultToItems _ (a, ValidationErrors []) = ApiItems2 [] [a]
-vResultToItems f (a, err) =
-  ApiItems2 [ApiError (Just $ f a) status400 (A.encode err)] []
 
 indexDocuments
   :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
@@ -288,6 +272,12 @@ mkUserPost replace (Just sub, Just post) (existing, input)
         ["post", "userId", "feedId", createdAtLabel, updatedAtLabel, idLabel]
         input
 
+getUserPosts
+  :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
+  => [RecordId] -> ExceptT ApiError m [Record]
+getUserPosts ids =
+  runEsAndExtract $ E.getByIds ids (recordCollection userPostDefinition)
+
 -- ^
 -- Return the value of the 'post' field of a user-post
 mkPost :: Record -> Record
@@ -377,3 +367,25 @@ mk404Err def record =
   LBS.pack $
   "Record not found in " ++
   T.unpack (recordCollectionName def) ++ " collection."
+
+validateUserPostTuple :: (Record, RecordId)
+                      -> ((Record, RecordId), ValidationResult)
+validateUserPostTuple (r, rid) =
+  first (flip (,) rid) $ validateRecord userPostDefinition r
+
+-- TODO: consolidate with Facade
+validateMulti'
+  :: (Monad m)
+  => (a -> Record)
+  -> (a -> (a, ValidationResult))
+  -> [a]
+  -> ApiItems2T [ApiError] m [a]
+validateMulti' f v records =
+  ApiItems2T . return . concatItems $ (vResultToItems f . v) <$> records
+
+vResultToItems :: (a -> Record)
+               -> (a, ValidationResult)
+               -> ApiItems2 [ApiError] [a]
+vResultToItems _ (a, ValidationErrors []) = ApiItems2 [] [a]
+vResultToItems f (a, err) =
+  ApiItems2 [ApiError (Just $ f a) status400 (A.encode err)] []

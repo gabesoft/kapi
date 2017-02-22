@@ -24,8 +24,8 @@ import Database.MongoDB (Database, Index, Pipe, Failure)
 import Network.HTTP.Types.Status
 import Persistence.Common
 import Persistence.Facade
-       (runDb, dbInsert, dbInsertMulti, dbUpdate,
-        dbUpdateMulti, getExisting, dbPipe)
+       (runDb, dbInsert, dbInsertMulti, dbUpdate, dbUpdateMulti,
+        getExisting, dbPipe)
 import qualified Persistence.MongoDB as DB
 import Servant
 import Servant.Utils.Enter (Enter)
@@ -52,17 +52,14 @@ getSingle
   -> Maybe Text
   -> Text
   -> Api (Headers '[ Header "ETag" String] Record)
-getSingle def etag uid = get return >>= mkGetSingleResult etag
-  where
-    get f = do
-      result <- runExceptT $ getExisting def uid
-      either throwApiError f result
+getSingle def etag uid =
+  runSingle (getExisting def uid) return >>= mkGetSingleResult etag
 
 -- ^
 -- Get multiple records
 getMultiple :: ApiGetMultipleLink -> RecordDefinition -> ServerT GetMultiple Api
 getMultiple getLink def include query sort page perPage =
-  mkApiResponse (return . respond) getRecords
+  runSingle getRecords (return . respond)
   where
     getRecords = getMultiple' def include query sort page perPage
     mkUrl page' = getLink include query sort (Just page') perPage
@@ -95,7 +92,7 @@ getMultiple' def include query sort page perPage = do
 -- ^
 -- Delete a single record
 deleteSingle :: RecordDefinition -> Text -> Api NoContent
-deleteSingle def uid = verify >> mkApiResponse (const $ return NoContent) delete
+deleteSingle def uid = verify >> runSingle delete (const $ return NoContent)
   where
     verify = getSingle def mempty uid
     delete = runDb $ DB.dbDeleteById def uid
@@ -117,11 +114,8 @@ createSingle
   -> (Text -> String)
   -> Record
   -> Api (Headers '[ Header "Location" String, Header "Link" String] (ApiData ApiResult))
-createSingle def getLink input = insert (mkCreateSingleResult getLink)
-  where
-    insert f = do
-      result <- runExceptT $ dbInsert def input
-      either throwApiError f result
+createSingle def getLink input =
+  runSingle (dbInsert def input) (mkCreateSingleResult getLink)
 
 -- ^
 -- Create multiple records
@@ -130,11 +124,8 @@ createMultiple
   -> (Text -> String)
   -> [Record]
   -> Api (Headers '[ Header "Location" String, Header "Link" String] (ApiData ApiResult))
-createMultiple def getLink input = insert >>= mkCreateMultipleResult getLink
-  where
-    insert = do
-      records <- runApiItems2T $ dbInsertMulti def input
-      return $ itemsToApiResults records
+createMultiple def getLink input =
+  runMulti (dbInsertMulti def input) >>= mkCreateMultipleResult getLink
 
 -- ^
 -- Update (replace) a single record
@@ -149,12 +140,12 @@ modifySingle def = updateSingle def False
 -- ^
 -- Update (replace) multiple records
 replaceMultiple :: RecordDefinition -> [Record] -> Api ApiResults
-replaceMultiple def = updateMultiple def True
+replaceMultiple = updateMultiple True
 
 -- ^
 -- Update (modify) multiple records
 modifyMultiple :: RecordDefinition -> [Record] -> Api ApiResults
-modifyMultiple def = updateMultiple def False
+modifyMultiple = updateMultiple False
 
 -- ^
 -- Handle an options request for a single record endpoint
@@ -170,21 +161,13 @@ optionsMultiple = return $ addHeader "GET, POST, PATCH, PUT" NoContent
 -- ^
 -- Modify or replace a single record
 updateSingle :: RecordDefinition -> Bool -> Text -> Record -> Api Record
-updateSingle def replace uid input = update return
-  where
-    record = setIdValue uid input
-    update f = do
-      result <- runExceptT $ dbUpdate replace def record
-      either throwApiError f result
+updateSingle def replace uid input =
+  runSingle (dbUpdate replace def $ setIdValue uid input) return
 
 -- ^
 -- Modify or replace multiple records
-updateMultiple :: RecordDefinition -> Bool -> [Record] -> Api ApiResults
-updateMultiple def replace input = update
-  where
-    update = do
-      records <- runApiItems2T $ dbUpdateMulti replace def input
-      return $ itemsToApiResults records
+updateMultiple :: Bool -> RecordDefinition -> [Record] -> Api ApiResults
+updateMultiple replace def = runMulti . dbUpdateMulti replace def
 
 -- ^
 -- Add database indices
@@ -193,6 +176,26 @@ addDbIndices indices conf = do
   pipe <- dbPipe conf
   let app = appName conf
   mapM_ (\idx -> DB.dbAddIndex idx (confGetDb app conf) pipe) indices
+
+-- ^
+-- Run an action that handles a single record
+-- TODO: rename to runExceptAction
+runSingle
+  :: MonadError ServantErr m
+  => ExceptT ApiError m a -> (a -> m b) -> m b
+runSingle action f = do
+  result <- runExceptT action
+  either throwApiError f result
+
+-- ^
+-- Run an action that handles multiple records
+-- TODO: rename to runApiItemsAction
+runMulti
+  :: Monad m
+  => ApiItems2T [ApiError] m [Record] -> m ApiResults
+runMulti action = do
+  results <- runApiItems2T $ action
+  return $ itemsToApiResults results
 
 -- ^
 -- Prepare an API response

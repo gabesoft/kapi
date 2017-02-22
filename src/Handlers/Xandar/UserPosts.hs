@@ -18,7 +18,7 @@ import Database.Bloodhound (Search, EsError)
 import Handlers.Xandar.Common
        (throwApiError, mkPagination, splitLabels, mkGetMultipleResult,
         mkCreateMultipleResult, mkApiResponse, getCreateLink,
-        mkGetSingleResult, mkCreateSingleResult)
+        mkGetSingleResult, mkCreateSingleResult, runSingle, runMulti)
 import qualified Handlers.Xandar.Common as C
 import Parsers.Filter (parse)
 import Persistence.Common
@@ -26,7 +26,8 @@ import Persistence.ElasticSearch
 import Persistence.Facade (runEs, dbPipe)
 import Persistence.Xandar.Common (userPostDefinition)
 import Persistence.Xandar.UserPosts
-       (insertUserPosts, esInsert, esInsertMulti, esReplace, esReplaceMulti, esModify, esModifyMulti)
+       (insertUserPosts, esInsert, esInsertMulti, esReplace,
+        esReplaceMulti, esModify, esModifyMulti)
 import Servant
 import Types.Common
 
@@ -37,8 +38,8 @@ mappingName = recordCollection userPostDefinition
 
 -- ^
 -- Get a single record by id
-getSingle :: Maybe Text -> Text -> Api (Headers '[Header "ETag" String] Record)
-getSingle etag uid = mkApiResponse respond (runEs $ getByIds [uid] mappingName)
+getSingle :: Maybe Text -> Text -> Api (Headers '[ Header "ETag" String] Record)
+getSingle etag uid = runSingle (runEs $ getByIds [uid] mappingName) respond
   where
     respond = maybe (throwError err404) (mkGetSingleResult etag) . extractRecord
 
@@ -46,7 +47,7 @@ getSingle etag uid = mkApiResponse respond (runEs $ getByIds [uid] mappingName)
 -- Get multiple records
 getMultiple :: ApiGetMultipleLink -> ServerT GetMultiple Api
 getMultiple getLink include query sortFields page perPage =
-  mkApiResponse (return . respond) getRecords
+  runSingle getRecords (return . respond)
   where
     getRecords = getMultiple' include query sortFields page perPage
     mkUrl page' = getLink include query sortFields (Just page') perPage
@@ -80,7 +81,7 @@ getMultiple' include query sortFields page perPage = do
 -- ^
 -- Delete a single record
 deleteSingle :: Text -> Api NoContent
-deleteSingle uid = verify >> mkApiResponse (const $ return NoContent) delete
+deleteSingle uid = verify >> runSingle delete (const $ return NoContent)
   where
     verify = getSingle mempty uid
     delete = runEs $ deleteDocument uid mappingName
@@ -90,7 +91,7 @@ deleteSingle uid = verify >> mkApiResponse (const $ return NoContent) delete
 createSingleOrMultiple
   :: (Text -> String)
   -> ApiData Record
-  -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData ApiResult))
+  -> Api (Headers '[ Header "Location" String, Header "Link" String] (ApiData ApiResult))
 createSingleOrMultiple getLink (Single r) = createSingle getLink r
 createSingleOrMultiple getLink (Multiple rs) = createMultiple getLink rs
 
@@ -100,107 +101,48 @@ createSingle
   :: (Text -> String)
   -> Record
   -> Api (Headers '[ Header "Location" String, Header "Link" String] (ApiData ApiResult))
-createSingle getLink input = insert (mkCreateSingleResult getLink)
-  where
-    insert f = do
-      result <- runExceptT $ esInsert input
-      either throwApiError f result
+createSingle getLink input =
+  runSingle (esInsert input) (mkCreateSingleResult getLink)
 
 -- ^
 -- Create multiple records
 createMultiple
   :: (Text -> String)
   -> [Record]
-  -> Api (Headers '[Header "Location" String, Header "Link" String] (ApiData ApiResult))
-createMultiple getLink input = insert >>= mkCreateMultipleResult getLink
-  where
-    insert = do
-      records <- runApiItems2T $ esInsertMulti input
-      return $ itemsToApiResults records
+  -> Api (Headers '[ Header "Location" String, Header "Link" String] (ApiData ApiResult))
+createMultiple getLink input =
+  runMulti (esInsertMulti input) >>= mkCreateMultipleResult getLink
 
 -- ^
 -- Update (replace) a single record
 replaceSingle :: Text -> Record -> Api Record
-replaceSingle = updateSingle True
+replaceSingle uid input = runSingle (esReplace $ setIdValue uid input) return
 
 -- ^
 -- Update (modify) a single record
 modifySingle :: Text -> Record -> Api Record
-modifySingle = updateSingle False
+modifySingle uid input = runSingle (esModify $ setIdValue uid input) return
 
 -- ^
 -- Update (replace) multiple records
 replaceMultiple :: [Record] -> Api ApiResults
-replaceMultiple = updateMultiple True
+replaceMultiple = runMulti . esReplaceMulti
 
 -- ^
 -- Update (modify) multiple records
 modifyMultiple :: [Record] -> Api ApiResults
-modifyMultiple = updateMultiple False
+modifyMultiple = runMulti . esModifyMulti
 
 -- ^
 -- Handle an options request for a single record endpoint
 optionsSingle :: Text
-              -> Api (Headers '[Header "Access-Control-Allow-Methods" String] NoContent)
+              -> Api (Headers '[ Header "Access-Control-Allow-Methods" String] NoContent)
 optionsSingle = C.optionsSingle
 
 -- ^
 -- Handle an options request for a multiple record endpoint
-optionsMultiple :: Api (Headers '[Header "Access-Control-Allow-Methods" String] NoContent)
+optionsMultiple :: Api (Headers '[ Header "Access-Control-Allow-Methods" String] NoContent)
 optionsMultiple = C.optionsMultiple
-
--- ^
--- Helper for create or update single methods
-createSingle'
-  :: (MonadReader ApiConfig m, MonadIO m)
-  => Bool -> Record -> ExceptT ApiError m ApiResult
-createSingle' replace input =
-  head . apiItems <$> createMultiple' replace [input]
-
--- ^
--- Helper for create or update multiple methods
-createMultiple'
-  :: (MonadReader ApiConfig m, MonadIO m)
-  => Bool -> [Record] -> ExceptT ApiError m ApiResults
-createMultiple' replace input = do
-  conf <- ask
-  pipe <- dbPipe conf
-  let app = appName conf
-  ExceptT $
-    liftIO $
-    runExceptT $
-    insertUserPosts
-      replace
-      input
-      (confGetDb app conf, pipe)
-      (esServer conf, confGetEsIndex app conf)
-
--- ^
--- Update multiple records
-updateMultiple :: Bool -> [Record] -> Api ApiResults
-updateMultiple replace input = mkApiResponse return (createMultiple' replace input)
-
--- ^
--- Update a single record
-updateSingle :: Bool -> Text -> Record -> Api Record
-updateSingle replace uid input = mkApiResponse respond run
-  where
-    respond = apiItem throwApiError return
-    run = updateSingle' replace uid input
-
--- ^
--- Helper for update single methods
-updateSingle'
-  :: (MonadReader ApiConfig m, MonadIO m, MonadBaseControl IO m)
-  => Bool -> Text -> Record -> ExceptT ApiError m ApiResult
-updateSingle' replace uid input = do
-  result <- runEs (getByIds [uid] mappingName)
-  existing <- ExceptT $ return (extract result)
-  createSingle' replace (merge existing input)
-  where
-    merge old new = mergeRecords new (includeFields include old)
-    include = ["postId", "subscriptionId"]
-    extract r = maybe (Left mkApiError404) Right (extractRecord r)
 
 -- ^
 -- Make a 'Search' object from query string parameters
