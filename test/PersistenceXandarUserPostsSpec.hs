@@ -22,18 +22,22 @@ import Types.Common
 main :: IO ()
 main =
   hspec $
-  describe "Persistence.Xandar.UserPosts" $
-  do it "ensures a user post contains a postId and a subscriptionId" $
-       verifyValidation inputInvalid1 (inputInvalid1, invalidErrors)
-     it "can replace a user post" =<<
-       runIO (verifyMakeUserPost True inputValid1 (userPost1, userPost1Id))
-     it "can modify a user post" =<<
-       runIO (verifyMakeUserPost False inputValid2 (userPost2, userPost1Id))
-     it "ensures the subscription and post have the same feed id" =<< runIO verifyFeedIdCheck
-     it "can handle multiple posts" =<<
-       runIO (verifyMakeUserPosts [inputValid1] [Right (userPost1, userPost1Id)])
-     it "returns results and errors" =<<
-       runIO (verifyMakeUserPosts [inputValid1, inputInvalid2] result1)
+  describe "Persistence.Xandar.UserPosts" $ do
+    it "ensures a user post contains a postId and a subscriptionId" $
+      verifyValidation inputInvalid1 (inputInvalid1, invalidErrors)
+    it "can replace a user post" =<<
+      runIO (verifyMakeUserPost True inputValid1 (userPost1, userPost1Id))
+    it "can modify a user post" =<<
+      runIO (verifyMakeUserPost False inputValid2 (userPost2, userPost1Id))
+    it "ensures the subscription and post have the same feed id" =<<
+      runIO verifyFeedIdCheck
+    it "can handle multiple posts" =<<
+      runIO (verifyMakeUserPosts [inputValid1] [Right (userPost1, userPost1Id)])
+    it "returns results and errors" =<<
+      runIO
+        (verifyMakeUserPosts
+           [inputValid1, inputInvalid2]
+           (result1 $ Just inputInvalid2))
 
 verifyValidation :: Record -> (Record, ValidationResult) -> Expectation
 verifyValidation input exp = validateRecord userPostDefinition input `shouldBe` exp
@@ -50,7 +54,7 @@ verifyFeedIdCheck
   => m Expectation
 verifyFeedIdCheck = do
   actual <- mkUserPost True (Just sub2, Just post) (Nothing, inputValid1)
-  return $ actual `shouldBe` result2
+  return $ actual `shouldBe` result2 (Just inputValid1)
 
 verifyMakeUserPosts
   :: (MonadIO m)
@@ -191,33 +195,26 @@ existingPost =
     , mkTxtField createdAtLabel "2016-09-27T04:39:31.460Z"
     ]
 
-result1 :: [Either ApiError (RecordData Field, RecordId)]
-result1 =
+result1 :: Maybe Record -> [Either ApiError (RecordData Field, RecordId)]
+result1 input =
   [ Right (userPost1, userPost1Id)
   , Left
       ApiError
-      { apiErrorStatus =
-        Status
-        { statusCode = 400
-        , statusMessage = "Bad Request"
-        }
-      , apiErrorMessage =
-        "Post not found. Original input: {\"read\":true,\"post\":{\"author\":\"unknown\"},\"postId\":\"56d7d88bc788cb1d6eb919c1\",\"title\":\"Feed title\",\"subscriptionId\":\"56d7de07c788cb1d6eb91a82\",\"tags\":[\"haskell\",\"javascript\"]}"
+      { apiErrorInput = input
+      , apiErrorStatus =
+          Status {statusCode = 400, statusMessage = "Bad Request"}
+      , apiErrorMessage = "Post not found."
       }
   ]
 
-result2 :: Either ApiError b
-result2 =
+result2 :: Maybe Record -> Either ApiError b
+result2 input =
   Left
-    ApiError
-    { apiErrorStatus =
-      Status
-      { statusCode = 400
-      , statusMessage = "Bad Request"
-      }
-    , apiErrorMessage =
-      "Post belongs to a different subscription. Original input: {\"read\":true,\"post\":{\"author\":\"unknown\"},\"userId\":\"to be overwritten\",\"feedId\":\"to be overwritten\",\"postId\":\"56d7d88bc788cb1d6eb919a1\",\"title\":\"Feed title\",\"subscriptionId\":\"56d7de07c788cb1d6eb91a82\",\"tags\":[\"haskell\",\"javascript\"]}"
-    }
+    (ApiError
+     { apiErrorInput = input
+     , apiErrorStatus = Status {statusCode = 400, statusMessage = "Bad Request"}
+     , apiErrorMessage = "Post belongs to a different subscription."
+     })
 
 userPost1Id :: RecordId
 userPost1Id = "56d7de07c788cb1d6eb91a82-56d7d88bc788cb1d6eb919a1"

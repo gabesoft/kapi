@@ -94,7 +94,7 @@ instance Monoid (RecordData Field) where
 -- ^
 -- Representation of an API error
 data ApiError = ApiError
-  { apiErorrInput :: Maybe Record -- ^ the original input that caused this error
+  { apiErrorInput :: Maybe Record -- ^ the original input that caused this error
   , apiErrorStatus :: Status -- ^ the HTTP status
   , apiErrorMessage :: LBS.ByteString -- ^ the error message
   } deriving (Eq, Show, Generic)
@@ -190,7 +190,7 @@ itemsToApiResults (ApiItems2 es as) = ApiItems (Fail <$> es) (Succ <$> as)
 type ApiResults2 = ApiItems2 [ApiError] [Record]
 
 instance Eq2 ApiItems2 where
-  liftEq2 eq1 eq2 (ApiItems2 e1 a1) (ApiItems2 e2 a2) = eq1 e1 e2 && eq2 a1 a2
+  liftEq2 eq1' eq2' (ApiItems2 e1 a1) (ApiItems2 e2 a2) = eq1' e1 e2 && eq2' a1 a2
 
 instance (Eq e) =>
          Eq1 (ApiItems2 e) where

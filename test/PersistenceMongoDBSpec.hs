@@ -107,7 +107,7 @@ verifyDocumentToRecord def document exp =
 
 recDef :: RecordDefinition
 recDef =
-  RecordDefinition "test-collection" $
+  RecordDefinition "test-collection" mempty $
   Map.fromList
     [ mkOptDef' "optional"
     , mkOptDef "optionalWithDefault" (Just 1 :: Maybe Int)

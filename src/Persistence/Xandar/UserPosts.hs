@@ -12,6 +12,7 @@ module Persistence.Xandar.UserPosts
   , indexDocumentsOld
   , insertUserPosts
   , mkUserPostId
+  , mkUserPost
   , mkUserPosts
   ) where
 

@@ -297,7 +297,7 @@ queryToDoc' xs
 convertIds :: RecordDefinition -> Document -> Document
 convertIds def doc = foldr mapId doc (idLabel : getIdLabels def)
   where
-    mapId label acc = maybe acc (processField acc) (getField label $ Record doc)
+    mapId name acc = maybe acc (processField acc) (getField name $ Record doc)
     processField d f = getDocument $ setField (process f) (Record d)
     process (k := v) = k := mapValue v
     mapValue (String t) = fromMaybe (String t) (recIdToObjId t)

@@ -14,7 +14,7 @@ import Types.Common
 -- definitions
 def1 :: RecordDefinition
 def1 =
-  RecordDefinition mempty $
+  RecordDefinition mempty mempty $
   Map.fromList
     [ mkOptDef "admin" (Just False)
     , mkReqDef "disabled" (Just False)
@@ -23,7 +23,7 @@ def1 =
 
 def2 :: RecordDefinition
 def2 =
-  RecordDefinition mempty $
+  RecordDefinition mempty mempty $
   Map.fromList
     [ mkReqDef "admin" (Just False)
     , mkOptDef "disabled" (Just False)
