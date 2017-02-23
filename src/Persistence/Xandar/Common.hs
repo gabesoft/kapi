@@ -15,7 +15,8 @@ import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.Monoid ((<>))
 import Database.Bloodhound (EsError(..), SearchResult(..))
-import Database.MongoDB (Database, Pipe, Failure, Index(..))
+import Database.MongoDB
+       (Database, Collection, Pipe, Failure, Index(..))
 import Persistence.Common
 import qualified Persistence.ElasticSearch as E
 import Persistence.Facade (validate)
@@ -47,6 +48,9 @@ subscriptionDefinition =
     , mkOptDef "unreadCount" (Just 0 :: Maybe Int)
     ]
 
+subscriptionCollection :: Collection
+subscriptionCollection = recordCollection subscriptionDefinition
+
 userIndices :: [Index]
 userIndices =
   [ Index
@@ -58,6 +62,9 @@ userIndices =
     , iExpireAfterSeconds = Nothing
     }
   ]
+
+userCollection :: Collection
+userCollection = recordCollection userDefinition
 
 userDefinition :: RecordDefinition
 userDefinition =
@@ -82,6 +89,9 @@ feedIndices =
     , iExpireAfterSeconds = Nothing
     }
   ]
+
+feedCollection :: Collection
+feedCollection = recordCollection feedDefinition
 
 feedDefinition :: RecordDefinition
 feedDefinition =
@@ -127,6 +137,9 @@ postIndices =
     }
   ]
 
+postCollection :: Collection
+postCollection = recordCollection postDefinition
+
 postDefinition :: RecordDefinition
 postDefinition =
   RecordDefinition "posts" "posts" $
@@ -145,6 +158,9 @@ postDefinition =
     , mkOptDef' "summary"
     , mkOptDef' "title"
     ]
+
+userPostCollection :: Collection
+userPostCollection = recordCollection userPostDefinition
 
 userPostDefinition :: RecordDefinition
 userPostDefinition =
@@ -226,22 +242,26 @@ getRecordsById def ids = M.dbFind def (M.idsQuery ids) [] [] 0 0
 
 -- ^
 -- Make a make a map with the ids as keys and records as values
+-- TODO: remove (already in facade)
 mkIdIndexedMap :: [Record] -> Map.Map RecordId Record
 mkIdIndexedMap = mkRecordMap idLabel
 
 -- ^
 -- Merge an existing and an updated record according to the 'replace' flag
+-- TODO: remove or move to facade
 mergeRecords' :: Bool -> Record -> Record -> Record
 mergeRecords' True = replaceRecords [createdAtLabel, updatedAtLabel, idLabel]
 mergeRecords' False = mergeRecords
 
 -- ^
 -- Make a make a map keyed by the specified field and having records as values
+-- TODO: remove
 mkRecordMap :: Label -> [Record] -> Map.Map RecordId Record
 mkRecordMap label xs = Map.fromList (addId <$> xs)
   where
     addId r = (getValue' label r, r)
 
+-- TODO: remove
 lookup'
   :: Eq a
   => a -> [(a, c)] -> c

@@ -4,7 +4,8 @@
 -- ^
 -- Persistence functionality for user-posts
 module Persistence.Xandar.UserPosts
-  ( esInsert
+  ( createUserPosts
+  , esInsert
   , esInsertMulti
   , esModify
   , esModifyMulti
@@ -13,9 +14,11 @@ module Persistence.Xandar.UserPosts
   , indexDocuments
   , indexDocumentsOld
   , insertUserPosts
-  , mkUserPostId
   , mkUserPost
+  , mkUserPostId
   , mkUserPosts
+  , modifyUserPosts
+  , replaceUserPosts
   ) where
 
 import Control.Monad.Except
@@ -46,6 +49,7 @@ import Types.Common
 
 -- ^
 -- Insert new user posts or replace existing ones
+-- TODO: remove and rename others to insertUserPosts and updateUserPosts
 insertUserPosts
   :: Bool
   -> [Record]
@@ -137,6 +141,8 @@ indexDocumentsOld input mapping server index = do
     refreshIndex _ = E.refreshIndex
     printLog _ = liftIO $ print $ trace "Insert user posts" (length input)
 
+-- TODO: determine whether to split off replace and modify methods vs update
+--       and implement in facade and subscriptions as well
 replaceUserPosts
   :: (MonadIO m)
   => [Record] -> [Record] -> ApiItems2T [ApiError] m [(Record, RecordId)]
@@ -225,6 +231,7 @@ postBelongsToSub sub post =
 
 -- ^
 -- Construct user post documents
+-- TODO: remove
 mkUserPosts
   :: (MonadIO m)
   => Bool
@@ -244,6 +251,7 @@ mkUserPosts replace (subs, posts) (existing, input) = mapM mkRecord input
 -- ^
 -- Given a subscription, post, input data, and possibly an
 -- existing user-post create a user-post ready to be indexed
+-- TODO: remove
 mkUserPost
   :: (MonadIO m)
   => Bool
@@ -330,6 +338,7 @@ mkUserPostId subId' postId' = subId' <> "-" <> postId'
 
 -- ^
 -- Get multiple posts by id
+-- TODO: remove
 getPostsById
   :: (MonadBaseControl IO m, MonadIO m)
   => [RecordId] -> Database -> Pipe -> m (Either Failure [Record])
@@ -337,6 +346,7 @@ getPostsById = getRecordsById postDefinition
 
 -- ^
 -- Get multiple subscriptions by id
+-- TODO: remove
 getSubsById
   :: (MonadBaseControl IO m, MonadIO m)
   => [RecordId] -> Database -> Pipe -> m (Either Failure [Record])
@@ -373,7 +383,7 @@ validateUserPostTuple :: (Record, RecordId)
 validateUserPostTuple (r, rid) =
   first (flip (,) rid) $ validateRecord userPostDefinition r
 
--- TODO: consolidate with Facade
+-- TODO: consolidate all validate methods with Facade
 validateMulti'
   :: (Monad m)
   => (a -> Record)

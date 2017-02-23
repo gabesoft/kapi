@@ -25,12 +25,13 @@ module Persistence.Facade
   , validateMulti
   ) where
 
+import qualified Data.ByteString.Lazy.Char8 as LBS
 import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.Trans.Control
 import Data.Aeson (encode)
 import Data.Bifunctor
-import Data.Bson (Label)
+import Data.Bson (Label, (=:))
 import Data.Either
 import qualified Data.Map.Strict as Map
 import Data.Maybe
@@ -91,11 +92,20 @@ getExistingMulti
   => RecordDefinition -> [RecordId] -> ApiItems2T [ApiError] m [Record]
 getExistingMulti def ids = do
   records <- runDbMany (dbAction DB.dbGetById def ids)
-  let msg =
-        "Record not found in " ++
-        T.unpack (recordCollectionName def) ++ " collection"
-  let results = maybe (Left $ mkApiError404' msg) Right <$> records
-  ApiItems2T . return $ eitherToItems results
+  let tuples = zip records ids
+  let result (record, rid) = maybe (Left $ mk404Err def rid) Right record
+  ApiItems2T . return $ eitherToItems (result <$> tuples)
+
+-- ^
+-- Make a 404 error to be returned when attempting to construct an invalid user post
+-- TODO: consolidate error message with same from 'getExistingMulti'
+-- TODO: consolidate with other errors
+mk404Err :: RecordDefinition -> RecordId -> ApiError
+mk404Err def rid =
+  ApiError (Just $ Record [ idLabel =: rid ]) status400 $
+  LBS.pack $
+  "Record not found in " ++
+  T.unpack (recordCollectionName def) ++ " collection."
 
 -- ^
 -- TODO: rename

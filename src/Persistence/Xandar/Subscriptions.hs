@@ -7,6 +7,7 @@ module Persistence.Xandar.Subscriptions where
 
 import Control.Applicative ((<|>))
 import Control.Monad.Except
+import Control.Monad.Reader
 import Control.Monad.Trans.Control
 import Data.Bifunctor
 import Data.Bson hiding (lookup, label)
@@ -22,19 +23,41 @@ import Database.MongoDB (Database, Pipe, Failure)
 import Debug.Trace
 import Persistence.Common
 import qualified Persistence.ElasticSearch as E
-import Persistence.Facade (validate, validateId)
+import Persistence.Facade as F
 import qualified Persistence.MongoDB as M
 import Persistence.Xandar.Common
 import Persistence.Xandar.UserPosts
-       (insertUserPosts, mkUserPostId, indexDocumentsOld)
+       (insertUserPosts, mkUserPostId, indexDocuments, indexDocumentsOld,
+        createUserPosts)
 import qualified Persistence.Xandar.UserPosts as U
 import Types.Common
 
-userPostMapping = recordCollection userPostDefinition
+-- TODO: rename to insertSubscriptions after removing others
+-- TODO: left here - test
+dbInsertSubscriptions
+  :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
+  => [Record] -> ApiItems2T [ApiError] m [Record]
+dbInsertSubscriptions input = do
+  valid <- validateMulti subscriptionDefinition input
+  feeds <- getExistingMulti feedDefinition (feedId <$> valid)
+  saved <- dbInsertMulti subscriptionDefinition (mkSubscriptions feeds valid)
+  posts <- toMulti (getPostsBySub $ filter isEnabled saved)
+  userPosts <-
+    createUserPosts
+      (saved, posts)
+      (createUserPost (mkRecordMap "feedId" saved) <$> posts)
+  _ <- toMulti (indexDocuments userPosts)
+  return saved
 
-getSingleSubscription = undefined
-
-getMultipleSubscriptions = undefined
+createUserPost :: Map.Map RecordId Record -> Record -> Record
+createUserPost subMap post =
+  Record
+    [ "subscriptionId" =: getIdValue' getSub
+    , "postId" =: getIdValue' post
+    , "read" =: True
+    ]
+  where
+    getSub = fromJust $ Map.lookup (feedId post) subMap
 
 -- ^
 -- Insert multiple subscriptions and index related posts
@@ -47,7 +70,7 @@ insertSubscriptions input (dbName, pipe) (server, index) = do
   let valid = rights validated
   feeds <- runDbOld (getFeedsById $ feedId <$> valid) dbName pipe
   saved <- mapM save (mkSubscriptions feeds valid)
-  posts <- runDbOld (getPostsBySub $ filter isEnabled saved) dbName pipe
+  posts <- runDbOld (getPostsBySubOld $ filter isEnabled saved) dbName pipe
   _ <-
     insertUserPosts -- TODO: use custom index method since we have all data necessary
       True
@@ -75,7 +98,7 @@ updateSubscriptions replace input (dbName, pipe) (server, index) = do
   saved <- mapM save (rights validated2)
   _ <- insertUserPosts' existing saved (dbName, pipe) (server, index)
   let disabledIds = getIdValue' <$> filter (not . isEnabled) saved
-  deletePosts disabledIds server index userPostMapping
+  deletePosts disabledIds server index userPostCollection
   return $
     mkApiItems
       (Fail <$> lefts validated1 <> lefts records <> lefts validated2)
@@ -95,7 +118,7 @@ insertUserPosts'
   -> ExceptT ApiError IO [ApiItem ApiError Record]
 insertUserPosts' eSubs nSubs (dbName, pipe) (server, index) = do
   let mapping = recordCollection userPostDefinition
-  posts <- runDbOld (getPostsBySub $ filter isEnabled nSubs) dbName pipe
+  posts <- runDbOld (getPostsBySubOld $ filter isEnabled nSubs) dbName pipe
   let userPostIds = getUserPostIds (mkFeedIndexedMap nSubs) posts
   existing <- runEsAndExtractOld (E.getByIds userPostIds) mapping server index
   results <- mkUserPosts'' (eSubs, nSubs, posts) existing
@@ -164,9 +187,8 @@ mkUserPosts' eSubs nSubs = fmap mkUserPost
 
 -- ^
 -- Make user posts for new subscriptions
-mkUserPosts
-  :: Functor f
-  => [Record] -> f Record -> f (RecordData Field)
+-- TODO: remove
+mkUserPosts :: [Record] -> [Record] -> [Record]
 mkUserPosts subs = fmap mkUserPost
   where
     subMap = mkRecordMap "feedId" subs
@@ -194,7 +216,7 @@ deleteSubscription
   => RecordId -> (Database, Pipe) -> (Text, Text) -> ExceptT ApiError m ()
 deleteSubscription subId (dbName, pipe) (server, index) = do
   _ <- getExistingSub subId dbName pipe
-  deletePosts [subId] server index userPostMapping
+  deletePosts [subId] server index userPostCollection
 
 -- TODO: consolidate with Handlers.Common#getExisting
 getExistingSub
@@ -231,10 +253,21 @@ mkSubscriptions feeds = fmap mkSub
 -- ^
 -- Get all posts related to all input subscriptions. The records
 -- returned will only contain the id and the feedId fields.
-getPostsBySub
+-- TODO: remove
+getPostsBySubOld
   :: (MonadBaseControl IO m, MonadIO m)
   => [Record] -> Database -> Pipe -> m (Either Failure [Record])
-getPostsBySub subs = M.dbFind postDefinition query [] [] 0 0
+getPostsBySubOld subs = M.dbFind postDefinition query [] [] 0 0
+  where
+    query = M.idsQuery' "feedId" (feedId <$> subs)
+
+-- ^
+-- Get all posts related to all input subscriptions. The records
+-- returned will only contain the id and the feedId fields.
+getPostsBySub
+  :: (MonadReader ApiConfig m, MonadBaseControl IO m, MonadIO m)
+  => [Record] -> ExceptT ApiError m [Record]
+getPostsBySub subs = runDb $ M.dbFind postDefinition query [] [] 0 0
   where
     query = M.idsQuery' "feedId" (feedId <$> subs)
 
