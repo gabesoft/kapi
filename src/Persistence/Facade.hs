@@ -11,6 +11,7 @@ module Persistence.Facade
   , dbPipe
   , getExisting
   , getExistingMulti
+  , mergeFromMap
   , runDb
   , runEs
   , runEsAndExtract
@@ -77,15 +78,20 @@ dbUpdateMulti
 dbUpdateMulti replace def input = do
   valid1 <- validateDbIdMulti input
   existing <- getExistingMulti def $ getIdValue' <$> valid1
-  let merged = merge (mkIdIndexedMap valid1) <$> existing
+  let merged = mergeFromMap replace (mkIdIndexedMap valid1) <$> existing
   valid2 <- validateMulti def merged
   let records = populateDefaults def <$> valid2
   savedIds <- runDbMany (dbAction DB.dbUpdate def records)
   saved <- runDbMany (dbAction DB.dbGetById def savedIds)
   return (fromJust <$> saved)
+
+-- ^
+-- Merge a new record from the given map with the specified existing record
+mergeFromMap :: Bool -> Map.Map RecordId Record -> Record -> Record
+mergeFromMap replace newMap existing = mergeRecords' replace existing new
   where
-    get record = fromJust . Map.lookup (getIdValue' record)
-    merge rMap existing = mergeRecords' replace existing (get existing rMap)
+    get r = fromJust . Map.lookup (getIdValue' r)
+    new = get existing newMap
 
 getExistingMulti
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
@@ -109,7 +115,7 @@ mk404Err def rid =
 
 -- ^
 -- TODO: rename
--- ApiItems2T to ExceptT
+-- Run an action that could result in a single failure
 toSingle
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
   => ([a] -> ApiItems2T [e] m [b]) -> a -> ExceptT e m b
@@ -120,7 +126,7 @@ toSingle action input =
 
 -- ^
 -- TODO: rename
--- ExceptT to ApiItems2T
+-- Run an action that could result in multiple failures
 toMulti
   :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
   => ExceptT a (ApiItems2T [a] m) [t] -> ApiItems2T [a] m [t]
@@ -130,20 +136,7 @@ toMulti action = do
     either (flip ApiItems2 [] . (: [])) (ApiItems2 []) results
 
 -- ^
--- Run multiple MongoDB actions and return all results
-dbAction
-  :: (Monad m)
-  => (RecordDefinition -> b -> Database -> Pipe -> m (Either Failure e))
-  -> RecordDefinition
-  -> [b]
-  -> Database
-  -> Pipe
-  -> m [Either Failure e]
-dbAction singleAction def rs dbName pipe =
-  mapM (\r -> singleAction def r dbName pipe) rs
-
--- ^
--- Run a MongoDB action that handle multiple records
+-- Run a MongoDB action that could result in multiple errors
 runDbMany
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
   => (Database -> Pipe -> m [Either Failure a]) -> ApiItems2T [ApiError] m [a]
@@ -153,7 +146,7 @@ runDbMany action = do
   ApiItems2T . return $ ApiItems2 (lefts items) (rights items)
 
 -- ^
--- Run a MongoDB action that handles a single record
+-- Run a MongoDB action that could result in a single error
 runDb
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
   => (Database -> Pipe -> m (Either Failure a)) -> ExceptT ApiError m a
@@ -171,7 +164,7 @@ runDb' action = do
   lift $ action (confGetDb app conf) pipe
 
 -- ^
--- Run an Elastic-Search action
+-- Run an elastic-search action
 runEs
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
   => (Text -> Text -> IO (Either EsError a)) -> ExceptT ApiError m a
@@ -181,11 +174,26 @@ runEs action = do
   results <- liftIO $ action (esServer conf) (confGetEsIndex app conf)
   ExceptT (return $ first ES.esToApiError results)
 
+-- ^
+-- Run a search action and extract the results
 runEsAndExtract
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
   => (Text -> Text -> IO (Either EsError (SearchResult Record)))
   -> ExceptT ApiError m [Record]
 runEsAndExtract = fmap (ES.extractRecords []) . runEs
+
+-- ^
+-- Run multiple MongoDB actions and return all results
+dbAction
+  :: (Monad m)
+  => (RecordDefinition -> b -> Database -> Pipe -> m (Either Failure e))
+  -> RecordDefinition
+  -> [b]
+  -> Database
+  -> Pipe
+  -> m [Either Failure e]
+dbAction singleAction def rs dbName pipe =
+  mapM (\r -> singleAction def r dbName pipe) rs
 
 -- ^
 -- Ensure that a record is valid according to its definition

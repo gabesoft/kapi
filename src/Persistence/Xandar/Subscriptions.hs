@@ -27,7 +27,7 @@ import Persistence.Facade as F
 import qualified Persistence.MongoDB as M
 import Persistence.Xandar.Common
 import Persistence.Xandar.UserPosts
-       (insertUserPosts, mkUserPostId, indexDocuments, indexDocumentsOld,
+       (insertUserPosts, mkUserPostId, indexDocuments, indexDocuments', indexDocumentsOld,
         createUserPosts)
 import qualified Persistence.Xandar.UserPosts as U
 import Types.Common
@@ -41,13 +41,33 @@ dbInsertSubscriptions input = do
   valid <- validateMulti subscriptionDefinition input
   feeds <- getExistingMulti feedDefinition (feedId <$> valid)
   saved <- dbInsertMulti subscriptionDefinition (mkSubscriptions feeds valid)
-  posts <- toMulti (getPostsBySub $ filter isEnabled saved)
+  _ <- indexPostsOnCreate (filter isEnabled saved)
+  return saved
+
+indexPostsOnCreate
+  :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
+  => [Record] -> ApiItems2T [ApiError] m (Either ApiError Text)
+indexPostsOnCreate subs = do
+  posts <- toMulti (getPostsBySub subs)
   userPosts <-
     createUserPosts
-      (saved, posts)
-      (createUserPost (mkRecordMap "feedId" saved) <$> posts)
-  _ <- toMulti (indexDocuments userPosts)
+      (subs, posts)
+      (createUserPost (mkRecordMap "feedId" subs) <$> posts)
+  runExceptT (indexDocuments' userPosts)
+
+dbUpdateSubscriptions replace input = do
+  valid1 <- validateDbIdMulti input
+  existing <- getExistingMulti subscriptionDefinition (getIdValue' <$> valid1)
+  let merged = mergeFromMap replace (mkIdIndexedMap valid1) <$> existing
+  valid2 <- validateMulti subscriptionDefinition merged
+  saved <- dbInsertMulti subscriptionDefinition valid2
+  _ <- deletePostsOnUpdate (filter isDisabled saved)
+  _ <- indexPostsOnUpdate (filter isEnabled saved)
   return saved
+
+deletePostsOnUpdate subs = undefined
+
+indexPostsOnUpdate subs = undefined
 
 createUserPost :: Map.Map RecordId Record -> Record -> Record
 createUserPost subMap post =
@@ -58,28 +78,6 @@ createUserPost subMap post =
     ]
   where
     getSub = fromJust $ Map.lookup (feedId post) subMap
-
--- ^
--- Insert multiple subscriptions and index related posts
-insertSubscriptions :: [Record]
-                    -> (Database, Pipe)
-                    -> (Text, Text)
-                    -> ExceptT ApiError IO ApiResults
-insertSubscriptions input (dbName, pipe) (server, index) = do
-  let validated = validateSubscription <$> input
-  let valid = rights validated
-  feeds <- runDbOld (getFeedsById $ feedId <$> valid) dbName pipe
-  saved <- mapM save (mkSubscriptions feeds valid)
-  posts <- runDbOld (getPostsBySubOld $ filter isEnabled saved) dbName pipe
-  _ <-
-    insertUserPosts -- TODO: use custom index method since we have all data necessary
-      True
-      (mkUserPosts saved posts)
-      (dbName, pipe)
-      (server, index)
-  return $ mkApiItems (Fail <$> lefts validated) (Succ <$> saved)
-  where
-    save r = saveDb M.dbInsert r dbName pipe
 
 -- ^
 -- Update multiple subscriptions and index related posts
@@ -109,6 +107,28 @@ updateSubscriptions replace input (dbName, pipe) (server, index) = do
     mkRecord existingMap r = mkRecord' (get existingMap r) r
     mkRecord' Nothing _ = Left mkApiError404
     mkRecord' (Just e) r = Right $ mergeRecords' replace e r
+
+-- ^
+-- Insert multiple subscriptions and index related posts
+insertSubscriptions :: [Record]
+                    -> (Database, Pipe)
+                    -> (Text, Text)
+                    -> ExceptT ApiError IO ApiResults
+insertSubscriptions input (dbName, pipe) (server, index) = do
+  let validated = validateSubscription <$> input
+  let valid = rights validated
+  feeds <- runDbOld (getFeedsById $ feedId <$> valid) dbName pipe
+  saved <- mapM save (mkSubscriptions feeds valid)
+  posts <- runDbOld (getPostsBySubOld $ filter isEnabled saved) dbName pipe
+  _ <-
+    insertUserPosts -- TODO: use custom index method since we have all data necessary
+      True
+      (mkUserPosts saved posts)
+      (dbName, pipe)
+      (server, index)
+  return $ mkApiItems (Fail <$> lefts validated) (Succ <$> saved)
+  where
+    save r = saveDb M.dbInsert r dbName pipe
 
 insertUserPosts'
   :: [Record]
@@ -306,6 +326,10 @@ feedId :: Record -> RecordId
 feedId = getValue' "feedId"
 
 -- ^
+-- Return true if a subscription is disabled
+isDisabled :: Record -> Bool
+isDisabled = isValueOn "disabled"
+-- ^
 -- Return true if a subscription is enabled
 isEnabled :: Record -> Bool
-isEnabled = not . isValueOn "disabled"
+isEnabled = not . isEnabled

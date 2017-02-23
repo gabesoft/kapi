@@ -12,6 +12,7 @@ module Persistence.Xandar.UserPosts
   , esReplace
   , esReplaceMulti
   , indexDocuments
+  , indexDocuments'
   , indexDocumentsOld
   , insertUserPosts
   , mkUserPost
@@ -116,14 +117,22 @@ esUpdateMulti update input = do
   valid2 <- validateMulti' fst validateUserPostTuple records
   toMulti (indexDocuments valid2)
 
+-- ^
+-- Index multiple documents and re-query them
 indexDocuments
   :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
   => [(Record, RecordId)] -> ExceptT ApiError m [Record]
-indexDocuments input = do
-  let mapping = recordCollection userPostDefinition
-  _ <- runEs (E.indexDocuments input mapping)
-  _ <- runEs E.refreshIndex
-  runEsAndExtract (E.getByIds (snd <$> input) mapping)
+indexDocuments input =
+  indexDocuments' input >>
+  runEsAndExtract (E.getByIds (snd <$> input) userPostCollection)
+
+-- ^
+-- Index multiple documents
+indexDocuments'
+  :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
+  => [(Record, RecordId)] -> ExceptT ApiError m Text
+indexDocuments' input =
+  runEs (E.indexDocuments input userPostCollection) <* runEs E.refreshIndex
 
 -- ^
 -- Index multiple documents and re-query them
