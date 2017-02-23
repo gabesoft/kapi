@@ -93,6 +93,7 @@ instance Monoid (RecordData Field) where
 
 -- ^
 -- Representation of an API error
+-- TODO: apiErrorInput should be generic
 data ApiError = ApiError
   { apiErrorInput :: Maybe Record -- ^ the original input that caused this error
   , apiErrorStatus :: Status -- ^ the HTTP status
@@ -102,7 +103,7 @@ data ApiError = ApiError
 instance ToJSON ApiError where
   toJSON (ApiError Nothing _ msg) = object ["message" .= LBS.unpack msg]
   toJSON (ApiError (Just r) _ msg) =
-    object ["message" .= LBS.unpack msg, "record" .= toJSON r]
+    object ["message" .= LBS.unpack msg, "input" .= toJSON r]
 
 -- ^
 -- The result of a record validation

@@ -29,7 +29,8 @@ main = do
   let dev = fromMaybe False $ (== "development") <$> env
   let env = withEnv dev "development mode" "production mode"
   putStrLn ("Server started on port " ++ show port ++ " in " ++ env)
-  XA.appInit (conf {appName = "xandar"}) >> runApp dev conf XA.app
+  let xandarConf = conf {appName = "xandar"}
+  XA.appInit xandarConf >> runApp dev xandarConf XA.app
 
 runApp :: Bool -> ApiConfig -> (ApiConfig -> Application) -> IO ()
 runApp dev conf app = do
