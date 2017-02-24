@@ -27,13 +27,13 @@ import Persistence.Facade as F
 import qualified Persistence.MongoDB as M
 import Persistence.Xandar.Common
 import Persistence.Xandar.UserPosts
-       (insertUserPosts, mkUserPostId, indexDocuments, indexDocuments', indexDocumentsOld,
-        createUserPosts)
+       (insertUserPosts, mkUserPostId, mkUserPostId', indexUserPosts,
+        indexUserPosts', indexDocumentsOld, createUserPosts,
+        createUserPost, modifyUserPost)
 import qualified Persistence.Xandar.UserPosts as U
 import Types.Common
 
 -- TODO: rename to insertSubscriptions after removing others
--- TODO: left here - test
 dbInsertSubscriptions
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
   => [Record] -> ApiItems2T [ApiError] m [Record]
@@ -44,40 +44,88 @@ dbInsertSubscriptions input = do
   _ <- indexPostsOnCreate (filter isEnabled saved)
   return saved
 
-indexPostsOnCreate
-  :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
-  => [Record] -> ApiItems2T [ApiError] m (Either ApiError Text)
-indexPostsOnCreate subs = do
-  posts <- toMulti (getPostsBySub subs)
-  userPosts <-
-    createUserPosts
-      (subs, posts)
-      (createUserPost (mkRecordMap "feedId" subs) <$> posts)
-  runExceptT (indexDocuments' userPosts)
-
 dbUpdateSubscriptions replace input = do
   valid1 <- validateDbIdMulti input
   existing <- getExistingMulti subscriptionDefinition (getIdValue' <$> valid1)
   let merged = mergeFromMap replace (mkIdIndexedMap valid1) <$> existing
   valid2 <- validateMulti subscriptionDefinition merged
   saved <- dbInsertMulti subscriptionDefinition valid2
-  _ <- deletePostsOnUpdate (filter isDisabled saved)
-  _ <- indexPostsOnUpdate (filter isEnabled saved)
+  _ <- runExceptT $ deletePosts (filter isDisabled saved)
+  _ <- indexPostsOnUpdate existing (filter isEnabled saved)
   return saved
 
-deletePostsOnUpdate subs = undefined
+indexPostsOnCreate
+  :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
+  => [Record] -> ApiItems2T [ApiError] m ()
+indexPostsOnCreate subs = do
+  posts <- toMulti (getPostsBySub subs)
+  userPosts <-
+    createUserPosts
+      (subs, posts)
+      (mkUserPostOnCreate (mkFeedIndexedMap subs) <$> posts)
+  void $ runExceptT (indexUserPosts' userPosts)
 
-indexPostsOnUpdate subs = undefined
+indexPostsOnUpdate oldSubs newSubs = do
+  posts <- toMulti (getPostsBySub newSubs)
+  existing <- toMulti (getUserPostsBySubs newSubs)
+  userPosts <- mkUserPostsOnUpdate oldSubs newSubs existing posts
+  void $ runExceptT (indexUserPosts' userPosts)
 
-createUserPost :: Map.Map RecordId Record -> Record -> Record
-createUserPost subMap post =
-  Record
-    [ "subscriptionId" =: getIdValue' getSub
-    , "postId" =: getIdValue' post
-    , "read" =: True
-    ]
+-- TODO: consolidate with updateUserPosts & createUserPosts
+mkUserPostsOnUpdate oldSubs newSubs existing posts = do
+  records <- mapM (mkUserPostOnUpdate oldSubMap newSubMap existingMap) posts
+  ApiItems2T . return $ eitherToItems records
   where
-    getSub = fromJust $ Map.lookup (feedId post) subMap
+    oldSubMap = mkFeedIndexedMap oldSubs
+    newSubMap = mkFeedIndexedMap newSubs
+    existingMap = mkIdIndexedMap existing
+
+mkUserPostOnUpdate oldSubMap newSubMap oldMap post =
+  case old of
+    Nothing -> createUserPost (Just newSub, Just post) record
+    Just o -> modifyUserPost (Just o) record
+  where
+    getSub = fromJust . Map.lookup (feedId post)
+    oldSub = getSub oldSubMap
+    newSub = getSub newSubMap
+    rId = mkUserPostId (getIdValue' newSub) (getIdValue' post)
+    old = Map.lookup rId oldMap
+    record =
+      addTags oldSub newSub old $
+      addRead oldSub newSub (isNothing old) $ mkBaseUserPost newSub post
+
+addTags :: Record -> Record -> Maybe Record -> Record -> Record
+addTags oldSub newSub existing = setTags compute
+  where
+    tags = Set.fromList $ maybe [] getTags existing
+    getTags :: Record -> [Text]
+    getTags = fromMaybe [] . getValue "tags"
+    setTags = setValue "tags"
+    oldTags = Set.fromList (getTags oldSub)
+    newTags = Set.fromList (getTags newSub)
+    compute = Set.toList $ (tags \\ oldTags) <> newTags
+
+-- ^
+-- Populate the read field based on whether the new subscription
+-- has just been enabled or this is a new user-post
+addRead oldSub newSub isNew record
+  | old /= new = setRead True record
+  | isNew = setRead True record
+  | otherwise = record
+  where old = isEnabled oldSub
+        new = isEnabled newSub
+
+setRead :: Val a => a -> Record -> Record
+setRead = setValue "read"
+
+mkUserPostOnCreate :: Map.Map RecordId Record -> Record -> Record
+mkUserPostOnCreate subMap post = setRead True (mkBaseUserPost sub post)
+  where
+    sub = fromJust $ Map.lookup (feedId post) subMap
+
+mkBaseUserPost :: Record -> Record -> RecordData Field
+mkBaseUserPost sub post =
+  Record ["subscriptionId" =: getIdValue' sub, "postId" =: getIdValue' post]
 
 -- ^
 -- Update multiple subscriptions and index related posts
@@ -96,7 +144,7 @@ updateSubscriptions replace input (dbName, pipe) (server, index) = do
   saved <- mapM save (rights validated2)
   _ <- insertUserPosts' existing saved (dbName, pipe) (server, index)
   let disabledIds = getIdValue' <$> filter (not . isEnabled) saved
-  deletePosts disabledIds server index userPostCollection
+  deletePostsOld disabledIds server index userPostCollection
   return $
     mkApiItems
       (Fail <$> lefts validated1 <> lefts records <> lefts validated2)
@@ -145,6 +193,24 @@ insertUserPosts' eSubs nSubs (dbName, pipe) (server, index) = do
   created <- indexDocumentsOld (rights results) mapping server index
   return $ (Succ <$> created) <> (Fail <$> lefts results)
 
+-- TODO: handle other cases
+addTagsOld :: Record -> Maybe Record -> Maybe Record -> Record -> Record
+addTagsOld _ Nothing _ r = r
+addTagsOld _ _ Nothing r = r
+addTagsOld nSub (Just eSub) (Just existing) r = setTags (computeTagsOld eTags nTags $ getTags existing) r
+  where
+    getTags :: Record -> [Text]
+    getTags = fromMaybe [] . getValue "tags"
+    setTags = setValue "tags"
+    eTags = getTags eSub
+    nTags = getTags nSub
+
+computeTagsOld :: Ord a => [a] -> [a] -> [a] -> [a]
+computeTagsOld eTags nTags tags = Set.toList $ (tSet \\ eSet) <> nSet
+  where eSet = Set.fromList eTags
+        nSet = Set.fromList nTags
+        tSet = Set.fromList tags
+
 mkUserPosts''
   :: (MonadIO m)
   => ([Record], [Record], [Record])
@@ -160,28 +226,10 @@ mkUserPosts'' (eSubs, nSubs, posts) existing = do
     records = mkUserPosts' eSubs nSubs posts
     setTags (r, rid) =
       flip (,) rid $
-      addTags (getSub' r nSubMap) (getSub r eSubMap) (getExisting rid) r
+      addTagsOld (getSub' r nSubMap) (getSub r eSubMap) (getExisting rid) r
     getSub' r = fromJust . getSub r
     getSub r = Map.lookup (getValue' "feedId" r)
     getExisting rid = Map.lookup rid existingMap
-
--- TODO: handle other cases
-addTags :: Record -> Maybe Record -> Maybe Record -> Record -> Record
-addTags _ Nothing _ r = r
-addTags _ _ Nothing r = r
-addTags nSub (Just eSub) (Just existing) r = setTags (computeTags eTags nTags $ getTags existing) r
-  where
-    getTags :: Record -> [Text]
-    getTags = fromMaybe [] . getValue "tags"
-    setTags = setValue "tags"
-    eTags = getTags eSub
-    nTags = getTags nSub
-
-computeTags :: Ord a => [a] -> [a] -> [a] -> [a]
-computeTags eTags nTags tags = Set.toList $ (tSet \\ eSet) <> nSet
-  where eSet = Set.fromList eTags
-        nSet = Set.fromList nTags
-        tSet = Set.fromList tags
 
 -- ^
 -- Make user posts for existing subscriptions
@@ -229,29 +277,58 @@ getUserPostIds subMap = fmap mkId
     getSubId post = getIdValue' $ fromJust $ Map.lookup (feedId post) subMap
     mkId post = mkUserPostId (getSubId post) (getIdValue' post)
 
+getUserPostsBySubs
+  :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
+  => [Record] -> ExceptT ApiError m [Record]
+getUserPostsBySubs subs = do
+  search <- ExceptT . return $ mkSearchBySubs subs
+  runEsAndExtract (E.searchDocuments search userPostCollection)
+
 -- ^
 -- Delete the subscription the given id and its related user-posts
 deleteSubscription
   :: (MonadBaseControl IO m, MonadIO m)
   => RecordId -> (Database, Pipe) -> (Text, Text) -> ExceptT ApiError m ()
 deleteSubscription subId (dbName, pipe) (server, index) = do
-  _ <- getExistingSub subId dbName pipe
-  deletePosts [subId] server index userPostCollection
+  _ <- getExistingSubOld subId dbName pipe
+  deletePostsOld [subId] server index userPostCollection
 
 -- TODO: consolidate with Handlers.Common#getExisting
-getExistingSub
+-- TODO: remove
+getExistingSubOld
   :: (MonadIO m, MonadBaseControl IO m)
   => RecordId -> Database -> Pipe -> ExceptT ApiError m Record
-getExistingSub subId dbName pipe = do
+getExistingSubOld subId dbName pipe = do
   sub <- runDbOld (M.dbGetById subscriptionDefinition subId) dbName pipe
   ExceptT . return $ maybe (Left mkApiError404) Right sub
 
 -- ^
+-- Remove all user-posts associated with the given subscriptions
+-- from the search index
+deletePosts ::
+  (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m) =>
+  [Record] -> ExceptT ApiError m ()
+deletePosts subs = do
+  search <- ExceptT (return $ mkSearchBySubs subs)
+  void . runEs $ E.deleteByQuery search userPostCollection
+
+-- ^
+-- Create a query that would return the user-posts associated with
+-- all specified subscriptions
+mkSearchBySubs :: [Record] -> Either ApiError B.Search
+mkSearchBySubs [] = Right E.zeroResultsSearch
+mkSearchBySubs subs = first E.esToApiError $ E.mkSearchAll (Just filter') [] []
+  where
+    subIds = getIdValue' <$> subs
+    filter' = FilterRelOp In "subscriptionId" (TermList $ TermId <$> subIds)
+
+-- ^
 -- Delete the user-posts related to the input subscriptions from the search index
-deletePosts
+-- TODO: remove
+deletePostsOld
   :: MonadIO m
   => [Text] -> Text -> Text -> Text -> ExceptT ApiError m ()
-deletePosts subIds server index mappingName = do
+deletePostsOld subIds server index mappingName = do
   search <- ExceptT (return search')
   runEsOld (E.deleteByQuery search) mappingName server index >>= printLog
   where

@@ -17,11 +17,13 @@ module Persistence.ElasticSearch
   , indexDocuments
   , mkIdsSearch
   , mkSearch
+  , mkSearchAll
   , putMapping
   , putMappingFromFile
   , refreshIndex
   , searchDocuments
   , validateRecordHasId
+  , zeroResultsSearch
   ) where
 
 import Control.Applicative
@@ -229,6 +231,10 @@ mkIdsSearch mappingName ids =
     query = IdsQuery (MappingName mappingName) (DocId <$> ids)
 
 -- ^
+-- Create a search that will return no results
+zeroResultsSearch = mkSearch' (Just zeroResults) Nothing Nothing [] 0 0
+
+-- ^
 -- Create a search object
 mkSearch
   :: Maybe FilterExpr
@@ -243,6 +249,10 @@ mkSearch expr sort fields' start limit = first mkError $ liftA search query
     sort' = mToMaybe $ exprToSort <$> catMaybes (mkSortExpr <$> sort)
     search q = mkSearch' q Nothing sort' (FieldName <$> fields') start limit
     mkError = mkEsError 400
+
+-- ^
+-- Create a search that will return all results (no pagination)
+mkSearchAll e s f = mkSearch e s f 0 maxSize
 
 mkSearch' :: Maybe Query
           -> Maybe Filter
@@ -292,8 +302,7 @@ exprToQuery = toQuery
     mkMatchQuery' (ColumnName c x) (TermStr v) =
       Right . QueryMatchQuery $ (mkMatchQuery c v $ hasSpace v) (mkBoost x)
     mkMatchQuery' _ t = Left $ "Unexpected " ++ show t ++ ". Expected a string."
-    mkInQuery (ColumnName c _) (TermList []) =
-      Right $ IdsQuery (MappingName mempty) []
+    mkInQuery (ColumnName c _) (TermList []) = Right zeroResults
     mkInQuery (ColumnName c _) (TermList (y:ys)) =
       Right $ TermsQuery c (termToText <$> y :| ys)
     mkInQuery _ t = Left $ "Unexpected " ++ show t ++ ". Expected a list."
@@ -324,6 +333,8 @@ exprToQuery = toQuery
       Left $ "Unexpected " ++ show t ++ ". Expected a number or date."
     hasSpace = isJust . T.find isSpace
     compose = liftA2 . mkCompositeQuery
+
+zeroResults = IdsQuery (MappingName mempty) []
 
 mkRangeDouble :: FilterRelationalOperator -> Double -> RangeValue
 mkRangeDouble GreaterThan = RangeDoubleGt . B.GreaterThan

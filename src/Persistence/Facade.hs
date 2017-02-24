@@ -68,8 +68,8 @@ dbInsertMulti
 dbInsertMulti def input = do
   valid <- validateMulti def input
   let records = populateDefaults def <$> valid
-  savedIds <- runDbMany (dbAction DB.dbInsert def records)
-  saved <- runDbMany (dbAction DB.dbGetById def savedIds)
+  savedIds <- runDbMulti (dbAction DB.dbInsert def records)
+  saved <- runDbMulti (dbAction DB.dbGetById def savedIds)
   return (fromJust <$> saved)
 
 dbUpdateMulti
@@ -81,8 +81,8 @@ dbUpdateMulti replace def input = do
   let merged = mergeFromMap replace (mkIdIndexedMap valid1) <$> existing
   valid2 <- validateMulti def merged
   let records = populateDefaults def <$> valid2
-  savedIds <- runDbMany (dbAction DB.dbUpdate def records)
-  saved <- runDbMany (dbAction DB.dbGetById def savedIds)
+  savedIds <- runDbMulti (dbAction DB.dbUpdate def records)
+  saved <- runDbMulti (dbAction DB.dbGetById def savedIds)
   return (fromJust <$> saved)
 
 -- ^
@@ -97,7 +97,7 @@ getExistingMulti
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
   => RecordDefinition -> [RecordId] -> ApiItems2T [ApiError] m [Record]
 getExistingMulti def ids = do
-  records <- runDbMany (dbAction DB.dbGetById def ids)
+  records <- runDbMulti (dbAction DB.dbGetById def ids)
   let tuples = zip records ids
   let result (record, rid) = maybe (Left $ mk404Err def rid) Right record
   ApiItems2T . return $ eitherToItems (result <$> tuples)
@@ -114,7 +114,6 @@ mk404Err def rid =
   T.unpack (recordCollectionName def) ++ " collection."
 
 -- ^
--- TODO: rename
 -- Run an action that could result in a single failure
 toSingle
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
@@ -125,7 +124,6 @@ toSingle action input =
     return $ head (itemsToEither records)
 
 -- ^
--- TODO: rename
 -- Run an action that could result in multiple failures
 toMulti
   :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
@@ -137,10 +135,10 @@ toMulti action = do
 
 -- ^
 -- Run a MongoDB action that could result in multiple errors
-runDbMany
+runDbMulti
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
   => (Database -> Pipe -> m [Either Failure a]) -> ApiItems2T [ApiError] m [a]
-runDbMany action = do
+runDbMulti action = do
   results <- runDb' action
   let items = first DB.dbToApiError <$> results
   ApiItems2T . return $ ApiItems2 (lefts items) (rights items)

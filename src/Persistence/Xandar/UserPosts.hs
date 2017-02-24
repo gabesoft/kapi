@@ -4,21 +4,25 @@
 -- ^
 -- Persistence functionality for user-posts
 module Persistence.Xandar.UserPosts
-  ( createUserPosts
+  ( createUserPost
+  , createUserPosts
   , esInsert
   , esInsertMulti
   , esModify
   , esModifyMulti
   , esReplace
   , esReplaceMulti
-  , indexDocuments
-  , indexDocuments'
+  , indexUserPosts
+  , indexUserPosts'
   , indexDocumentsOld
   , insertUserPosts
   , mkUserPost
   , mkUserPostId
+  , mkUserPostId'
   , mkUserPosts
+  , modifyUserPost
   , modifyUserPosts
+  , replaceUserPost
   , replaceUserPosts
   ) where
 
@@ -103,7 +107,7 @@ esInsertMulti input = do
   subs <- getExistingMulti subscriptionDefinition (subId <$> valid)
   posts <- getExistingMulti postDefinition (postId <$> valid)
   records <- createUserPosts (subs, posts) valid
-  toMulti (indexDocuments records)
+  toMulti (indexUserPosts records)
 
 esUpdateMulti
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
@@ -115,23 +119,23 @@ esUpdateMulti update input = do
   existing <- toMulti (getUserPosts $ getIdValue' <$> valid1)
   records <- update existing valid1
   valid2 <- validateMulti' fst validateUserPostTuple records
-  toMulti (indexDocuments valid2)
+  toMulti (indexUserPosts valid2)
 
 -- ^
 -- Index multiple documents and re-query them
-indexDocuments
+indexUserPosts
   :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
   => [(Record, RecordId)] -> ExceptT ApiError m [Record]
-indexDocuments input =
-  indexDocuments' input >>
+indexUserPosts input =
+  indexUserPosts' input >>
   runEsAndExtract (E.getByIds (snd <$> input) userPostCollection)
 
 -- ^
 -- Index multiple documents
-indexDocuments'
+indexUserPosts'
   :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
   => [(Record, RecordId)] -> ExceptT ApiError m Text
-indexDocuments' input =
+indexUserPosts' input =
   runEs (E.indexDocuments input userPostCollection) <* runEs E.refreshIndex
 
 -- ^
