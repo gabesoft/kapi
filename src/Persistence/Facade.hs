@@ -6,33 +6,35 @@
 module Persistence.Facade
   ( dbInsert
   , dbInsertMulti
-  , dbUpdate
-  , dbUpdateMulti
+  , dbModify
+  , dbModifyMulti
   , dbPipe
+  , dbReplace
+  , dbReplaceMulti
   , getExisting
   , getExistingMulti
   , mergeFromMap
+  , mkIdIndexedMap
+  , mkRecordMap
+  , runAction
   , runDb
   , runEs
   , runEsAndExtract
   , toMulti
   , toSingle
-  , validate
-  , validate'
-  , validateId
-  , validateId'
   , validateDbIdMulti
   , validateEsIdMulti
   , validateMulti
+  , validateMulti'
   ) where
 
-import qualified Data.ByteString.Lazy.Char8 as LBS
 import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.Trans.Control
 import Data.Aeson (encode)
 import Data.Bifunctor
 import Data.Bson (Label, (=:))
+import qualified Data.ByteString.Lazy.Char8 as LBS
 import Data.Either
 import qualified Data.Map.Strict as Map
 import Data.Maybe
@@ -46,21 +48,38 @@ import Persistence.Common
 import qualified Persistence.ElasticSearch as ES
 import qualified Persistence.MongoDB as DB
 import Types.Common
+import Util.Constants
+import Util.Error
 
 dbInsert
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
   => RecordDefinition -> Record -> ExceptT ApiError m Record
 dbInsert = toSingle . dbInsertMulti
 
-dbUpdate
+dbReplace
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
-  => Bool -> RecordDefinition -> Record -> ExceptT ApiError m Record
-dbUpdate replace = toSingle . dbUpdateMulti replace
+  => RecordDefinition -> Record -> ExceptT ApiError m Record
+dbReplace = toSingle . dbReplaceMulti
+
+dbModify
+  :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
+  => RecordDefinition -> Record -> ExceptT ApiError m Record
+dbModify = toSingle . dbModifyMulti
 
 getExisting
   :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
   => RecordDefinition -> RecordId -> ExceptT ApiError m Record
 getExisting = toSingle . getExistingMulti
+
+dbReplaceMulti
+  :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
+  => RecordDefinition -> [Record] -> ApiItems2T [ApiError] m [Record]
+dbReplaceMulti = dbUpdateMulti True
+
+dbModifyMulti
+  :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
+  => RecordDefinition -> [Record] -> ApiItems2T [ApiError] m [Record]
+dbModifyMulti = dbUpdateMulti False
 
 dbInsertMulti
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
@@ -99,19 +118,8 @@ getExistingMulti
 getExistingMulti def ids = do
   records <- runDbMulti (dbAction DB.dbGetById def ids)
   let tuples = zip records ids
-  let result (record, rid) = maybe (Left $ mk404Err def rid) Right record
-  ApiItems2T . return $ eitherToItems (result <$> tuples)
-
--- ^
--- Make a 404 error to be returned when attempting to construct an invalid user post
--- TODO: consolidate error message with same from 'getExistingMulti'
--- TODO: consolidate with other errors
-mk404Err :: RecordDefinition -> RecordId -> ApiError
-mk404Err def rid =
-  ApiError (Just $ Record [ idLabel =: rid ]) status400 $
-  LBS.pack $
-  "Record not found in " ++
-  T.unpack (recordCollectionName def) ++ " collection."
+  let result (record, rid) = maybe (Left $ mk404IdErr def rid) Right record
+  eitherToItemsT (result <$> tuples)
 
 -- ^
 -- Run an action that could result in a single failure
@@ -194,68 +202,49 @@ dbAction singleAction def rs dbName pipe =
   mapM (\r -> singleAction def r dbName pipe) rs
 
 -- ^
--- Ensure that a record is valid according to its definition
-validate :: RecordDefinition -> Record -> Either ApiError Record
-validate def = vResultToEither . validateRecord def
-
--- ^
--- Ensure that a record has a valid id
-validateId :: Record -> Either ApiError Record
-validateId = vResultToEither . DB.validateRecordHasId
-
--- ^
--- Ensure that a record is valid according to its definition
-validate'
+-- Run an action over a list of inputs and return all
+-- results and errors
+runAction
   :: Monad m
-  => RecordDefinition -> Record -> ExceptT ApiError m Record
-validate' def = ExceptT . return . validate def
-
--- ^
--- Ensure that a record has a valid id
-validateId'
-  :: Monad m
-  => Record -> ExceptT ApiError m Record
-validateId' = ExceptT . return . validateId
+  => (a -> m (Either e b)) -> [a] -> ApiItems2T [e] m [b]
+runAction f input = lift (mapM f input) >>= eitherToItemsT
 
 -- ^
 -- Validate multiple records against their definition
 validateMulti
-  :: (Monad m)
+  :: Monad m
   => RecordDefinition -> [Record] -> ApiItems2T [ApiError] m [Record]
-validateMulti def = validateMulti' (validateRecord def)
+validateMulti def = validateMulti' id (validateRecord def)
 
 -- ^
 -- Ensure that all records specified have a valid id
 validateDbIdMulti
-  :: (Monad m)
+  :: Monad m
   => [Record] -> ApiItems2T [ApiError] m [Record]
-validateDbIdMulti = validateMulti' DB.validateRecordHasId
+validateDbIdMulti = validateMulti' id DB.validateRecordHasId
 
 -- ^
 -- Ensure that all records specified have a valid id
 validateEsIdMulti
-  :: (Monad m)
+  :: Monad m
   => [Record] -> ApiItems2T [ApiError] m [Record]
-validateEsIdMulti = validateMulti' ES.validateRecordHasId
+validateEsIdMulti = validateMulti' id ES.validateRecordHasId
 
 validateMulti'
   :: (Monad m)
-  => (a -> (Record, ValidationResult))
+  => (a -> Record)
+  -> (a -> (a, ValidationResult))
   -> [a]
-  -> ApiItems2T [ApiError] m [Record]
-validateMulti' v records =
-  ApiItems2T . return . concatItems $ (vResultToItems . v) <$> records
+  -> ApiItems2T [ApiError] m [a]
+validateMulti' f v records =
+  ApiItems2T . return . concatItems $ (vResultToItems f . v) <$> records
 
--- ^
--- Convert the result of a validation to 'Either'
-vResultToEither :: (Record, ValidationResult) -> Either ApiError Record
-vResultToEither (a, ValidationErrors []) = Right a
-vResultToEither (a, err) = Left (ApiError (Just a) status400 (encode err))
-
-vResultToItems :: (Record, ValidationResult) -> ApiResults2
-vResultToItems (a, ValidationErrors []) = ApiItems2 [] [a]
-vResultToItems (a, err) =
-  ApiItems2 [ApiError (Just a) status400 (encode err)] []
+vResultToItems :: (a -> Record)
+               -> (a, ValidationResult)
+               -> ApiItems2 [ApiError] [a]
+vResultToItems _ (a, ValidationErrors []) = ApiItems2 [] [a]
+vResultToItems f (a, err) =
+  ApiItems2 [ApiError (Just $ f a) status400 (encode err)] []
 
 -- ^
 -- Create a MongoDB connection pipe

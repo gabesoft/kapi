@@ -57,6 +57,7 @@ import Network.HTTP.Client
 import Network.HTTP.Types.Status
 import Persistence.Common
 import Types.Common
+import Util.Constants
 
 -- ^
 -- Default settings for creating an index on a single node instance
@@ -216,11 +217,6 @@ searchDocuments search mappingName server index = do
   where
     toErr msg = mkEsError 500 ("Failed to decode search results " ++ msg)
     toResult body = first toErr (A.eitherDecode $ textToBytes body)
-
--- ^
--- Create an 'EsError' with the given HTTP code and message
-mkEsError :: Int -> String -> EsError
-mkEsError code = EsError code . T.pack
 
 -- ^
 -- Create a search object for finding records by id
@@ -459,3 +455,8 @@ validateRecordHasId :: Record -> (Record, ValidationResult)
 validateRecordHasId r = (r, ValidationErrors $ catMaybes [valField])
   where
     valField = validateField False idDefinition r idLabel
+
+-- ^
+-- Create an 'EsError' with the given HTTP code and message
+mkEsError :: Int -> String -> EsError
+mkEsError code = EsError code . T.pack

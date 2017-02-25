@@ -44,6 +44,8 @@ import Parsers.Filter (parse)
 import Persistence.Common
 import Text.Read (readMaybe)
 import Types.Common
+import Util.Constants
+import Util.Error
 
 -- ^
 -- Create a database connection
@@ -78,9 +80,10 @@ dbInsert def record dbName pipe =
   do input <- mkInDocument def True record
      saved <- dbAccess (action input) dbName pipe
      let maybeId = objIdToRecId saved
-     return $ maybe (error "Unexpected missing document") Right maybeId
+     return $ maybe (Left writeError) Right maybeId
   where
     action = insert (recordCollection def)
+    writeError = WriteFailure 0 "Unexpected missing document"
 
 -- ^
 -- Save an existing record into the database
@@ -339,6 +342,6 @@ termToField NotContains (ColumnName _ _) _ = Left "~contains: expected a string 
 -- ^
 -- Convert a MongoDB 'Failure' into an 'ApiError'
 dbToApiError :: Failure -> ApiError
-dbToApiError (WriteFailure _ msg) = mkApiError status400 msg
-dbToApiError (QueryFailure _ msg) = mkApiError status400 msg
-dbToApiError err = mkApiError status500 (show err)
+dbToApiError (WriteFailure _ msg) = mk400Err' msg
+dbToApiError (QueryFailure _ msg) = mk400Err' msg
+dbToApiError err = mk500Err' (show err)

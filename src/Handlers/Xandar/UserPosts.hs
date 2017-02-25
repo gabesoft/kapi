@@ -13,12 +13,13 @@ import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.Trans.Control
 import Data.Bifunctor
+import Data.Bson ((=:))
 import Data.Text (Text)
 import Database.Bloodhound (Search, EsError)
 import Handlers.Xandar.Common
        (throwApiError, mkPagination, splitLabels, mkGetMultipleResult,
         mkCreateMultipleResult, mkApiResponse, getCreateLink,
-        mkGetSingleResult, mkCreateSingleResult, runSingle, runMulti)
+        mkGetSingleResult, mkCreateSingleResult, runSingle, updateSingle, runMulti)
 import qualified Handlers.Xandar.Common as C
 import Parsers.Filter (parse)
 import Persistence.Common
@@ -26,10 +27,11 @@ import Persistence.ElasticSearch
 import Persistence.Facade (runEs, dbPipe)
 import Persistence.Xandar.Common (userPostDefinition)
 import Persistence.Xandar.UserPosts
-       (insertUserPosts, esInsert, esInsertMulti, esReplace,
-        esReplaceMulti, esModify, esModifyMulti)
+       (esInsert, esInsertMulti, esReplace, esReplaceMulti, esModify,
+        esModifyMulti)
 import Servant
 import Types.Common
+import Util.Error
 
 -- ^
 -- Elastic-search mapping name
@@ -116,12 +118,12 @@ createMultiple getLink input =
 -- ^
 -- Update (replace) a single record
 replaceSingle :: Text -> Record -> Api Record
-replaceSingle uid input = runSingle (esReplace $ setIdValue uid input) return
+replaceSingle = updateSingle esReplace
 
 -- ^
 -- Update (modify) a single record
 modifySingle :: Text -> Record -> Api Record
-modifySingle uid input = runSingle (esModify $ setIdValue uid input) return
+modifySingle = updateSingle esModify
 
 -- ^
 -- Update (replace) multiple records
@@ -158,4 +160,4 @@ prepareSearch include query sortFields start limit = expr >>= toSearch
     expr :: Either ApiError (Maybe FilterExpr)
     expr = sequence $ first toErr . parse <$> query
     toSearch e = first esToApiError $ mkSearch e sortFields include start limit
-    toErr msg = mkApiError400 ("Invalid query: " ++ msg)
+    toErr msg = mk400Err "Invalid query" $ Record ["query" =: msg]

@@ -24,12 +24,11 @@ import Database.MongoDB (Database, Index, Pipe, Failure)
 import Network.HTTP.Types.Status
 import Persistence.Common
 import Persistence.Facade
-       (runDb, dbInsert, dbInsertMulti, dbUpdate, dbUpdateMulti,
-        getExisting, dbPipe)
 import qualified Persistence.MongoDB as DB
 import Servant
 import Servant.Utils.Enter (Enter)
 import Types.Common
+import Util.Error
 
 -- ^
 -- Create an application that provides CRUD functionality for a record type
@@ -87,7 +86,7 @@ getMultiple' def include query sort page perPage = do
   where
     sort' = DB.mkSortFields (splitLabels sort)
     include' = DB.mkIncludeFields (splitLabels include)
-    getQuery = first mkApiError400 (DB.queryToDoc def $ fromMaybe mempty query)
+    getQuery = first mk400Err' (DB.queryToDoc def $ fromMaybe mempty query)
 
 -- ^
 -- Delete a single record
@@ -130,22 +129,22 @@ createMultiple def getLink input =
 -- ^
 -- Update (replace) a single record
 replaceSingle :: RecordDefinition -> Text -> Record -> Api Record
-replaceSingle def = updateSingle def True
+replaceSingle def = updateSingle (dbReplace def)
 
 -- ^
 -- Update (modify) a single record
 modifySingle :: RecordDefinition -> Text -> Record -> Api Record
-modifySingle def = updateSingle def False
+modifySingle def = updateSingle (dbModify def)
 
 -- ^
 -- Update (replace) multiple records
 replaceMultiple :: RecordDefinition -> [Record] -> Api ApiResults
-replaceMultiple = updateMultiple True
+replaceMultiple def = runMulti . dbReplaceMulti def
 
 -- ^
 -- Update (modify) multiple records
 modifyMultiple :: RecordDefinition -> [Record] -> Api ApiResults
-modifyMultiple = updateMultiple False
+modifyMultiple def = runMulti . dbModifyMulti def
 
 -- ^
 -- Handle an options request for a single record endpoint
@@ -159,17 +158,6 @@ optionsMultiple :: Api (Headers '[ Header "Access-Control-Allow-Methods" String]
 optionsMultiple = return $ addHeader "GET, POST, PATCH, PUT" NoContent
 
 -- ^
--- Modify or replace a single record
-updateSingle :: RecordDefinition -> Bool -> Text -> Record -> Api Record
-updateSingle def replace uid input =
-  runSingle (dbUpdate replace def $ setIdValue uid input) return
-
--- ^
--- Modify or replace multiple records
-updateMultiple :: Bool -> RecordDefinition -> [Record] -> Api ApiResults
-updateMultiple replace def = runMulti . dbUpdateMulti replace def
-
--- ^
 -- Add database indices
 addDbIndices :: [Index] -> ApiConfig -> IO ()
 addDbIndices indices conf = do
@@ -178,8 +166,7 @@ addDbIndices indices conf = do
   mapM_ (\idx -> DB.dbAddIndex idx (confGetDb app conf) pipe) indices
 
 -- ^
--- Run an action that handles a single record
--- TODO: rename to runExceptAction
+-- Run an action that could result in a single error
 runSingle
   :: MonadError ServantErr m
   => ExceptT ApiError m a -> (a -> m b) -> m b
@@ -188,14 +175,19 @@ runSingle action f = do
   either throwApiError f result
 
 -- ^
--- Run an action that handles multiple records
--- TODO: rename to runApiItemsAction
+-- Run an action that could result in multiple errors
+-- TODO: remove after consolidating ApiItems2T and ApiItems
 runMulti
   :: Monad m
   => ApiItems2T [ApiError] m [Record] -> m ApiResults
-runMulti action = do
-  results <- runApiItems2T $ action
-  return $ itemsToApiResults results
+runMulti action = itemsToApiResults <$> runApiItems2T action
+
+-- ^
+-- Modify or replace a single record
+updateSingle
+  :: MonadError ServantErr m
+  => (Record -> ExceptT ApiError m b) -> RecordId -> Record -> m b
+updateSingle f rid input = runSingle (f $ setIdValue rid input) return
 
 -- ^
 -- Prepare an API response

@@ -19,15 +19,7 @@ import Data.Time (getCurrentTime)
 import Database.MongoDB (Database)
 import Network.HTTP.Types.Status
 import Types.Common
-
-createdAtLabel :: Label
-createdAtLabel = "createdAt"
-
-updatedAtLabel :: Label
-updatedAtLabel = "updatedAt"
-
-idLabel :: Label
-idLabel = "_id"
+import Util.Constants
 
 -- ^
 -- Extract the record fields
@@ -476,27 +468,6 @@ mkSortExpr name
     getName xs
       | T.head xs == '+' || T.head xs == '-' = T.tail xs
       | otherwise = xs
-
--- ^
--- Create an 'ApiError'
--- TODO: Add the original input field
-mkApiError :: Status -> String -> ApiError
-mkApiError status msg = ApiError Nothing status (LBS.pack msg)
-
--- ^
--- Create an 'ApiError' with an HTTP status of 400
-mkApiError400 :: String -> ApiError
-mkApiError400 = mkApiError status400
-
--- ^
--- Create an 'ApiError' with an HTTP status of 404
-mkApiError404 :: ApiError
-mkApiError404 = mkApiError status404 mempty
-
--- ^
--- Create an 'ApiError' with an HTTP status of 404 and a message
-mkApiError404' :: String -> ApiError
-mkApiError404' = mkApiError status404
 
 -- ^
 -- A record definition that contains only a required id field

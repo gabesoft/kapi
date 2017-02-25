@@ -14,12 +14,8 @@ module Persistence.Xandar.UserPosts
   , esReplaceMulti
   , indexUserPosts
   , indexUserPosts'
-  , indexDocumentsOld
-  , insertUserPosts
-  , mkUserPost
   , mkUserPostId
   , mkUserPostId'
-  , mkUserPosts
   , modifyUserPost
   , modifyUserPosts
   , replaceUserPost
@@ -46,33 +42,11 @@ import Network.HTTP.Types
 import Persistence.Common
 import qualified Persistence.ElasticSearch as E
 import Persistence.Facade
-       (validate, validateId, validateMulti, validateEsIdMulti,
-        getExistingMulti, runEs, runEsAndExtract, toSingle, toMulti)
 import qualified Persistence.MongoDB as M
 import Persistence.Xandar.Common
 import Types.Common
-
--- ^
--- Insert new user posts or replace existing ones
--- TODO: remove and rename others to insertUserPosts and updateUserPosts
-insertUserPosts
-  :: Bool
-  -> [Record]
-  -> (Database, Pipe)
-  -> (Text, Text)
-  -> ExceptT ApiError IO ApiResults
-insertUserPosts replace input (dbName, pipe) (server, index) = do
-  let mapping = recordCollection userPostDefinition
-  let validated = validateUserPost <$> input -- TODO for update this should not fail on post id missing
-  let valid = rights validated
-  let invalid = lefts validated
-  let userPostIds = mkUserPostId' <$> valid
-  existing <- runEsAndExtractOld (E.getByIds userPostIds) mapping server index
-  subs <- runDbOld (getSubsById $ subId <$> valid) dbName pipe
-  posts <- runDbOld (getPostsById $ postId <$> valid) dbName pipe
-  results <- mkUserPosts replace (subs, posts) (existing, valid)
-  created <- indexDocumentsOld (rights results) mapping server index
-  return $ mkApiItems (Fail <$> lefts results <> invalid) (Succ <$> created)
+import Util.Constants
+import Util.Error
 
 esInsert
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
@@ -103,10 +77,10 @@ esInsertMulti
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
   => [Record] -> ApiItems2T [ApiError] m [Record]
 esInsertMulti input = do
-  valid <- validateMulti userPostDefinition input
+  valid <- validateUserPosts input
   subs <- getExistingMulti subscriptionDefinition (subId <$> valid)
   posts <- getExistingMulti postDefinition (postId <$> valid)
-  records <- createUserPosts (subs, posts) valid
+  records <- createUserPosts subs posts valid
   toMulti (indexUserPosts records)
 
 esUpdateMulti
@@ -118,7 +92,7 @@ esUpdateMulti update input = do
   valid1 <- validateEsIdMulti input
   existing <- toMulti (getUserPosts $ getIdValue' <$> valid1)
   records <- update existing valid1
-  valid2 <- validateMulti' fst validateUserPostTuple records
+  valid2 <- validateMulti' fst validateRecordTuple records
   toMulti (indexUserPosts valid2)
 
 -- ^
@@ -138,24 +112,6 @@ indexUserPosts'
 indexUserPosts' input =
   runEs (E.indexDocuments input userPostCollection) <* runEs E.refreshIndex
 
--- ^
--- Index multiple documents and re-query them
-indexDocumentsOld :: [(Record, RecordId)]
-                  -> Text
-                  -> Text
-                  -> Text
-                  -> ExceptT ApiError IO [Record]
-indexDocumentsOld [] _ _ _ = return []
-indexDocumentsOld input mapping server index = do
-  _ <- runEsOld (E.indexDocuments input) mapping server index >>= printLog
-  _ <- runEsOld refreshIndex mapping server index
-  runEsAndExtractOld (E.getByIds $ snd <$> input) mapping server index
-  where
-    refreshIndex _ = E.refreshIndex
-    printLog _ = liftIO $ print $ trace "Insert user posts" (length input)
-
--- TODO: determine whether to split off replace and modify methods vs update
---       and implement in facade and subscriptions as well
 replaceUserPosts
   :: (MonadIO m)
   => [Record] -> [Record] -> ApiItems2T [ApiError] m [(Record, RecordId)]
@@ -166,37 +122,40 @@ modifyUserPosts
   => [Record] -> [Record] -> ApiItems2T [ApiError] m [(Record, RecordId)]
 modifyUserPosts = updateUserPosts modifyUserPost
 
-updateUserPosts f existing input = do
-  records <- mapM mkRecord input
-  ApiItems2T . return $ eitherToItems records
+updateUserPosts
+  :: Monad m
+  => (Maybe Record -> Record -> m (Either e a))
+  -> [Record]
+  -> [Record]
+  -> ApiItems2T [e] m [a]
+updateUserPosts f existing = runAction mkRecord
   where
     mkRecord r = f (get r) r
     get r = Map.lookup (getIdValue' r) recordMap
     recordMap = mkIdIndexedMap existing
 
 createUserPosts
-  :: (MonadIO m)
-  => ([Record], [Record])
+  :: MonadIO m
+  => [Record]
+  -> [Record]
   -> [Record]
   -> ApiItems2T [ApiError] m [(Record, RecordId)]
-createUserPosts (subs, posts) input = do
-  records <- mapM mkRecord input
-  ApiItems2T . return $ eitherToItems records
+createUserPosts subs posts = runAction mkRecord
   where
-    mkRecord r = createUserPost (get subMap subId r, get postMap postId r) r
+    mkRecord r = createUserPost (get subMap subId r) (get postMap postId r) r
     get m fid r = Map.lookup (fid r) m
     subMap = mkIdIndexedMap subs
     postMap = mkIdIndexedMap posts
 
 createUserPost
-  :: (MonadIO m)
-  => (Maybe Record, Maybe Record)
+  :: MonadIO m
+  => Maybe Record
+  -> Maybe Record
   -> Record
   -> m (Either ApiError (Record, RecordId))
-createUserPost (_, Nothing) r = return . Left $ mk404Err postDefinition r
-createUserPost (Nothing, _) r =
-  return . Left $ mk404Err subscriptionDefinition r
-createUserPost (Just sub, Just post) input
+createUserPost _ Nothing r = return . Left $ mk404Err postDefinition r
+createUserPost Nothing _ r = return . Left $ mk404Err subscriptionDefinition r
+createUserPost (Just sub) (Just post) input
   | not (postBelongsToSub sub post) =
     return . Left $ mk400Err "Post does not belong to subscription." input
   | otherwise = Right <$> mkUserPostTuple Nothing recId record
@@ -242,57 +201,6 @@ postBelongsToSub :: Record -> Record -> Bool
 postBelongsToSub sub post =
   getValue' "feedId" sub == (getValue' "feedId" post :: RecordId)
 
--- ^
--- Construct user post documents
--- TODO: remove
-mkUserPosts
-  :: (MonadIO m)
-  => Bool
-  -> ([Record], [Record])
-  -> ([Record], [Record])
-  -> m [Either ApiError (Record, RecordId)]
-mkUserPosts replace (subs, posts) (existing, input) = mapM mkRecord input
-  where
-    mkRecord r = mkUserPost replace (getSubPost r) (findExisting r, r)
-    getSubPost r = (get subMap subId r, get postMap postId r)
-    findExisting = get existingMap mkUserPostId'
-    get m fid r = Map.lookup (fid r) m
-    existingMap = mkIdIndexedMap existing
-    subMap = mkIdIndexedMap subs
-    postMap = mkIdIndexedMap posts
-
--- ^
--- Given a subscription, post, input data, and possibly an
--- existing user-post create a user-post ready to be indexed
--- TODO: remove
-mkUserPost
-  :: (MonadIO m)
-  => Bool
-  -> (Maybe Record, Maybe Record)
-  -> (Maybe Record, Record)
-  -> m (Either ApiError (Record, RecordId))
-mkUserPost _ (Nothing, Nothing) (_, r) =
-  return . Left $ mk400Err "Subscription and post not found." r
-mkUserPost _ (Nothing, _) (_, r) =
-  return . Left $ mk400Err "Subscription not found." r
-mkUserPost _ (_, Nothing) (_, r) = return . Left $ mk404Err postDefinition r
-mkUserPost replace (Just sub, Just post) (existing, input)
-  | getValue' "feedId" sub /= (getValue' "feedId" post :: RecordId) =
-    return . Left $ mk400Err "Post belongs to a different subscription." input
-  | otherwise = Right . flip (,) recId <$> addTimestamp existing record
-  where
-    (recId, ids) = getIds sub post
-    record = mergeRecords (mkRecord replace existing) input'
-    sub' = includeFields ["title", "notes", "tags"] sub
-    base = foldr (uncurry setValue) (mergeRecords sub' $ mkPost post) ids
-    mkRecord _ Nothing = base
-    mkRecord True _ = base
-    mkRecord False (Just e) = excludeFields [idLabel] e
-    input' =
-      excludeFields
-        ["post", "userId", "feedId", createdAtLabel, updatedAtLabel, idLabel]
-        input
-
 getUserPosts
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
   => [RecordId] -> ExceptT ApiError m [Record]
@@ -337,6 +245,7 @@ getIds sub post = (recId, output)
     subId' = lookup' "subscriptionId" output
     postId' = lookup' "postId" output
     recId = mkUserPostId subId' postId'
+    lookup' name = fromJust . lookup name
 
 -- ^
 -- Generate an id for a user post
@@ -350,22 +259,6 @@ mkUserPostId :: RecordId -> RecordId -> RecordId
 mkUserPostId subId' postId' = subId' <> "-" <> postId'
 
 -- ^
--- Get multiple posts by id
--- TODO: remove
-getPostsById
-  :: (MonadBaseControl IO m, MonadIO m)
-  => [RecordId] -> Database -> Pipe -> m (Either Failure [Record])
-getPostsById = getRecordsById postDefinition
-
--- ^
--- Get multiple subscriptions by id
--- TODO: remove
-getSubsById
-  :: (MonadBaseControl IO m, MonadIO m)
-  => [RecordId] -> Database -> Pipe -> m (Either Failure [Record])
-getSubsById = getRecordsById subscriptionDefinition
-
--- ^
 -- Get the subscription id of a user-post
 subId :: Record -> RecordId
 subId = getValue' "subscriptionId"
@@ -375,40 +268,7 @@ subId = getValue' "subscriptionId"
 postId :: Record -> RecordId
 postId = getValue' "postId"
 
--- ^
--- Make a 400 error to be returned when attempting to construct an invalid user post
-mk400Err :: String -> Record -> ApiError
-mk400Err msg record = ApiError (Just record) status400 (LBS.pack msg)
-
--- ^
--- Make a 404 error to be returned when attempting to construct an invalid user post
--- TODO: consolidate error message with same from 'getExistingMulti'
--- TODO: consolidate with other errors
-mk404Err :: RecordDefinition -> Record -> ApiError
-mk404Err def record =
-  ApiError (Just record) status400 $
-  LBS.pack $
-  "Record not found in " ++
-  T.unpack (recordCollectionName def) ++ " collection."
-
-validateUserPostTuple :: (Record, RecordId)
-                      -> ((Record, RecordId), ValidationResult)
-validateUserPostTuple (r, rid) =
+validateRecordTuple :: (Record, RecordId)
+                    -> ((Record, RecordId), ValidationResult)
+validateRecordTuple (r, rid) =
   first (flip (,) rid) $ validateRecord userPostDefinition r
-
--- TODO: consolidate all validate methods with Facade
-validateMulti'
-  :: (Monad m)
-  => (a -> Record)
-  -> (a -> (a, ValidationResult))
-  -> [a]
-  -> ApiItems2T [ApiError] m [a]
-validateMulti' f v records =
-  ApiItems2T . return . concatItems $ (vResultToItems f . v) <$> records
-
-vResultToItems :: (a -> Record)
-               -> (a, ValidationResult)
-               -> ApiItems2 [ApiError] [a]
-vResultToItems _ (a, ValidationErrors []) = ApiItems2 [] [a]
-vResultToItems f (a, err) =
-  ApiItems2 [ApiError (Just $ f a) status400 (A.encode err)] []

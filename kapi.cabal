@@ -32,6 +32,8 @@ library
                      , Persistence.Xandar.Subscriptions
                      , Persistence.Xandar.UserPosts
                      , Types.Common
+                     , Util.Constants
+                     , Util.Error
   build-depends:       base >= 4.7 && < 5
                      , base-compat >= 0.9
                      , aeson >= 1.0.2

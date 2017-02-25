@@ -178,6 +178,9 @@ data ApiItems2 e a = ApiItems2
 concatItems :: [ApiItems2 [e] [a]] -> ApiItems2 [e] [a]
 concatItems = foldr (<>) mempty
 
+eitherToItemsT :: Monad m => [Either e a] -> ApiItems2T [e] m [a]
+eitherToItemsT = ApiItems2T . return . eitherToItems
+
 eitherToItems :: [Either a b] -> ApiItems2 [a] [b]
 eitherToItems xs = uncurry ApiItems2 (partitionEithers xs)
 
