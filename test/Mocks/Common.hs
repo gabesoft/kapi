@@ -9,6 +9,7 @@ import qualified Data.Map.Strict as Map
 import Persistence.Common
 import TestHelper
 import Types.Common
+import Util.Constants
 
 -- ^
 -- definitions

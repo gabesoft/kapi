@@ -3,7 +3,14 @@
 
 -- ^
 -- Persistence functions for feed subscriptions
-module Persistence.Xandar.Subscriptions where
+module Persistence.Xandar.Subscriptions
+  ( insertSubscription
+  , insertSubscriptions
+  , modifySubscription
+  , modifySubscriptions
+  , replaceSubscription
+  , replaceSubscriptions
+  ) where
 
 import Control.Applicative ((<|>))
 import Control.Monad.Except
@@ -168,8 +175,9 @@ addTags oldSub newSub existing = setTags compute
 addRead oldSub newSub isNew record
   | (old /= new) || isNew = setRead True record
   | otherwise = record
-  where old = isEnabled oldSub
-        new = isEnabled newSub
+  where
+    old = isEnabled oldSub
+    new = isEnabled newSub
 
 -- ^
 -- Create subscription records for all given feeds
@@ -197,9 +205,9 @@ dbGetPostsBySub subs = runDb $ M.dbFind postDefinition query [] [] 0 0
 -- ^
 -- Remove all user-posts associated with the given subscriptions
 -- from the search index
-esDeleteUserPosts ::
-  (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m) =>
-  [Record] -> ExceptT ApiError m ()
+esDeleteUserPosts
+  :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
+  => [Record] -> ExceptT ApiError m ()
 esDeleteUserPosts subs = do
   search <- ExceptT (return $ mkSearchBySubs subs)
   void . runEs $ E.deleteByQuery search userPostCollection
@@ -235,6 +243,7 @@ feedId = getValue' "feedId"
 -- Return true if a subscription is disabled
 isDisabled :: Record -> Bool
 isDisabled = isValueOn "disabled"
+
 -- ^
 -- Return true if a subscription is enabled
 isEnabled :: Record -> Bool

@@ -12,11 +12,19 @@ import Data.Time.ISO8601
 import Persistence.Common
 import Types.Common
 
-replaceDate :: Label -> Record -> Record
-replaceDate name = modField name set
+dateReplacement :: Text
+dateReplacement = "2016-09-27T04:39:31.460Z"
+
+replaceUTCDate :: Label -> Record -> Record
+replaceUTCDate name = modField name setTime
   where
-    set :: Maybe UTCTime -> Maybe Text
-    set field = const "12345" <$> field
+    setTime :: Maybe UTCTime -> Maybe UTCTime
+    setTime field = const (date dateReplacement) <$> field
+
+replaceTextDate name = modField name setText
+  where
+    setText :: Maybe Text -> Maybe Text
+    setText field = const dateReplacement <$> field
 
 mkId :: RecordId -> Value
 mkId v = ObjId (read $ unpack v)

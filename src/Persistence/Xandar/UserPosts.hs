@@ -22,6 +22,7 @@ module Persistence.Xandar.UserPosts
   , replaceUserPosts
   ) where
 
+import Control.Applicative ((<|>))
 import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.Trans.Control
@@ -35,6 +36,7 @@ import Data.Maybe
 import Data.Monoid ((<>))
 import Data.Text (Text)
 import qualified Data.Text as T
+import Data.Time (UTCTime)
 import Database.Bloodhound (EsError(..), SearchResult(..))
 import Database.MongoDB (Database, Pipe, Failure)
 import Debug.Trace
@@ -172,24 +174,28 @@ createUserPost (Just sub) (Just post) input
 replaceUserPost
   :: MonadIO m
   => Maybe Record -> Record -> m (Either ApiError (Record, RecordId))
-replaceUserPost Nothing r = return . Left $ mk404Err userPostDefinition r
-replaceUserPost (Just existing) input =
-  Right <$>
-  mkUserPostTuple
-    (Just existing)
-    (getIdValue' existing)
-    (excludeFields [idLabel] $ replaceRecords [createdAtLabel] existing input)
+replaceUserPost = updateUserPost (replaceRecords keepFieldsOnUpdate)
 
 modifyUserPost
   :: MonadIO m
   => Maybe Record -> Record -> m (Either ApiError (Record, RecordId))
-modifyUserPost Nothing r = return . Left $ mk404Err userPostDefinition r
-modifyUserPost (Just existing) input =
+modifyUserPost = updateUserPost mergeRecords
+
+updateUserPost
+  :: MonadIO m
+  => (Record -> Record -> Record)
+  -> Maybe Record
+  -> Record
+  -> m (Either ApiError (Record, RecordId))
+updateUserPost _ Nothing r = return . Left $ mk404Err userPostDefinition r
+updateUserPost f (Just existing) input =
   Right <$>
   mkUserPostTuple
     (Just existing)
     (getIdValue' existing)
-    (excludeFields [idLabel] $ mergeRecords existing input)
+    (excludeFields [idLabel] $ f existing record)
+  where
+    record = excludeFields keepFieldsOnUpdate input
 
 mkUserPostTuple
   :: MonadIO m
@@ -220,10 +226,15 @@ mkPost input = Record ["post" =: getDocument post]
 addTimestamp
   :: (MonadIO m)
   => Maybe Record -> Record -> m Record
-addTimestamp existing new = mergeDates new existingDate
+addTimestamp existing new =
+  case existingUTCDate of
+    Nothing -> mergeDates new existingTextDate
+    Just _ -> mergeDates new existingUTCDate
   where
-    existingDate :: Maybe Text
-    existingDate = existing >>= getValue createdAtLabel
+    existingTextDate :: Maybe Text
+    existingTextDate = existing >>= getValue createdAtLabel
+    existingUTCDate :: Maybe UTCTime
+    existingUTCDate = existing >>= getValue createdAtLabel
     mergeDates r Nothing = setTimestamp True r
     mergeDates r (Just createdAt) = do
       record <- setTimestamp False r
@@ -272,3 +283,6 @@ validateRecordTuple :: (Record, RecordId)
                     -> ((Record, RecordId), ValidationResult)
 validateRecordTuple (r, rid) =
   first (flip (,) rid) $ validateRecord userPostDefinition r
+
+keepFieldsOnUpdate :: [Text]
+keepFieldsOnUpdate = ["feedId", "userId", "postId", "subscriptionId"]

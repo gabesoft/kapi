@@ -17,6 +17,7 @@ import Test.Hspec
 import Test.Hspec.Core.Spec
 import TestHelper
 import Types.Common
+import Util.Constants
 
 main :: IO ()
 main =
@@ -85,11 +86,11 @@ verifyMkInDocument
 verifyMkInDocument r exp = do
   doc <- mkInDocument recDef (not $ hasField "_id" r) r
   return $
-    (replaceDate createdAtLabel . replaceDate updatedAtLabel) (Record doc) `shouldBe` exp
+    (replaceUTCDate createdAtLabel . replaceUTCDate updatedAtLabel) (Record doc) `shouldBe` exp
 
 verifyMkOutDocument :: Document -> Record -> Expectation
 verifyMkOutDocument doc exp =
-  replaceDate createdAtLabel (mkOutRecord recDef doc) `shouldBe` exp
+  replaceUTCDate createdAtLabel (mkOutRecord recDef doc) `shouldBe` exp
 
 verifyMkSortField :: Text -> Field -> Expectation
 verifyMkSortField name exp = mkSortField name `shouldBe` Just exp
@@ -180,7 +181,8 @@ res1 :: ValidationResult
 res1 = ValidationErrors [mkRecId "Field is required"]
 
 res2 :: RecordData Field
-res2 = Record [mkStrField "email" "a@e.com", mkStrField updatedAtLabel "12345"]
+res2 =
+  Record [mkStrField "email" "a@e.com", updatedAtLabel =: date dateReplacement]
 
 res3 :: RecordData Field
 res3 = Record [mkRecId sampleId1]
@@ -190,15 +192,15 @@ res4 =
   Record
     [ mkStrField "email" "a@e.com"
     , mkObjId sampleId1
-    , mkStrField updatedAtLabel "12345"
+    , updatedAtLabel =: date dateReplacement
     ]
 
 res5 :: RecordData Field
 res5 =
   Record
     [ mkStrField "email" "a@e.com"
-    , mkStrField createdAtLabel "12345"
-    , mkStrField updatedAtLabel "12345"
+    , createdAtLabel =: date dateReplacement
+    , updatedAtLabel =: date dateReplacement
     ]
 
 res6 :: Document
