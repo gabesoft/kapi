@@ -22,22 +22,27 @@ main =
       it "can merge simple records" $ verifyMerge rec1 rec2 mergeRes1
       it "can merge nested records 1" $ verifyMerge rec3 rec4 mergeRes2
       it "can merge nested records 2" $ verifyMerge rec4 rec5 rec5
+      it "can merge nested records 3" $ verifyMerge rec12 rec3 mergeRes3
 
     describe "replace" $ do
-      it "can replace simple records" $
+      it "simple records" $
         verifyReplace ["x", "y", "e.r"] rec10 rec11 replaceRes1
+      it "simple records keep inner object" $
+        verifyReplace ["x", "y", "e"] rec10 rec11 replaceRes2
 
     describe "exclude" $ do
-      it "can exclude simple fields" $
+      it "simple fields" $
         verifyExclude rec1 excludeRes1 ["email", "y"]
-      it "can exclude nested fields" $
+      it "nested fields" $
         verifyExclude rec3 excludeRes4 ["email", "nested.guid", "nested.none"]
+      it "nested object" $
+        verifyExclude rec3 excludeRes5 ["email", "nested"]
 
     describe "include" $ do
-      it "can include simple fields" $ verifyInclude rec1 excludeRes1 ["_id"]
-      it "can include nested fields" $
-        verifyInclude rec3 excludeRes2 ["nested._id", "nested.name"]
-      it "includes all if fields are empty" $ verifyInclude rec3 rec3 []
+      it "simple fields" $ verifyInclude rec1 excludeRes1 ["_id"]
+      it "nested object" $ verifyInclude rec3 excludeRes3 ["nested"]
+      it "nested fields" $ verifyInclude rec3 excludeRes2 ["nested._id", "nested.name"]
+      it "includes nothing if fields are empty" $ verifyInclude rec3 emptyRecord []
       it "does not include the id if not in the list" $
         verifyInclude rec4 includeRes1 ["nested.guid"]
 
@@ -158,16 +163,16 @@ main =
       it "computes pagination" $ verifyPagination 4 3 15 pgeRes1
 
 verifyMerge :: Record -> Record -> Record -> Expectation
-verifyMerge r1 r2 exp = mergeRecords r1 r2 `shouldBe` exp
+verifyMerge r1 r2 exp = mergeRecords r1 r2 `shouldMatchRecord` exp
 
 verifyReplace :: [Label] -> Record -> Record -> Record -> Expectation
-verifyReplace labels r1 r2 exp = replaceRecords labels r1 r2 `shouldBe` exp
+verifyReplace preserve r1 r2 exp = replaceRecords preserve r1 r2 `shouldMatchRecord` exp
 
 verifyExclude :: Record -> Record -> [Label] -> Expectation
-verifyExclude r exp labels = excludeFields labels r `shouldBe` exp
+verifyExclude r exp labels = excludeFields labels r `shouldMatchRecord` exp
 
 verifyInclude :: Record -> Record -> [Label] -> Expectation
-verifyInclude r exp labels = includeFields labels r `shouldBe` exp
+verifyInclude r exp labels = includeFields labels r `shouldMatchRecord` exp
 
 verifyGetField :: Record -> Label -> Maybe Field -> Expectation
 verifyGetField r name exp = getField name r `shouldBe` exp

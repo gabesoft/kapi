@@ -166,20 +166,7 @@ createUserPost (Just sub) (Just post) input
     record = mergeRecords base input'
     sub' = includeFields ["title", "notes", "tags"] sub
     base = foldr (uncurry setValue) (mergeRecords sub' $ mkPost post) ids
-    input' =
-      excludeFields
-        ["post", "userId", "feedId", createdAtLabel, updatedAtLabel, idLabel]
-        input
-
-replaceUserPost
-  :: MonadIO m
-  => Maybe Record -> Record -> m (Either ApiError (Record, RecordId))
-replaceUserPost = updateUserPost (replaceRecords keepFieldsOnUpdate)
-
-modifyUserPost
-  :: MonadIO m
-  => Maybe Record -> Record -> m (Either ApiError (Record, RecordId))
-modifyUserPost = updateUserPost mergeRecords
+    input' = excludeFields skipFieldsOnCreate input
 
 updateUserPost
   :: MonadIO m
@@ -195,7 +182,17 @@ updateUserPost f (Just existing) input =
     (getIdValue' existing)
     (excludeFields [idLabel] $ f existing record)
   where
-    record = excludeFields keepFieldsOnUpdate input
+    record = excludeFields skipFieldsOnUpdate input
+
+replaceUserPost
+  :: MonadIO m
+  => Maybe Record -> Record -> m (Either ApiError (Record, RecordId))
+replaceUserPost = updateUserPost (replaceRecords skipFieldsOnUpdate)
+
+modifyUserPost
+  :: MonadIO m
+  => Maybe Record -> Record -> m (Either ApiError (Record, RecordId))
+modifyUserPost = updateUserPost mergeRecords
 
 mkUserPostTuple
   :: MonadIO m
@@ -284,5 +281,9 @@ validateRecordTuple :: (Record, RecordId)
 validateRecordTuple (r, rid) =
   first (flip (,) rid) $ validateRecord userPostDefinition r
 
-keepFieldsOnUpdate :: [Text]
-keepFieldsOnUpdate = ["feedId", "userId", "postId", "subscriptionId"]
+skipFieldsOnUpdate :: [Label]
+skipFieldsOnUpdate = ["post", "feedId", "userId", "postId", "subscriptionId"]
+
+skipFieldsOnCreate :: [Label]
+skipFieldsOnCreate =
+  ["post", "userId", "feedId", createdAtLabel, updatedAtLabel, idLabel]

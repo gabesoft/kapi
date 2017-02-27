@@ -139,6 +139,15 @@ rec11 =
   where
     f = mkStrField
 
+rec12 :: Record
+rec12 =
+  Record
+    [ mkStrField "_id" "584e58195984185eb8000006"
+    , mkStrField "email" "tree@leaf.com"
+    , mkStrField "x" "1"
+    , "nested" =: ([] :: Document)
+    ]
+
 -- ^
 -- Delete field results
 delRes1 :: Record
@@ -205,7 +214,17 @@ excludeRes1 = Record [mkStrField "_id" "584e58195984185eb8000005"]
 
 excludeRes2 :: Record
 excludeRes2 =
-  Record ["nested" =: [mkStrField "_id" "1234", mkStrField "name" "Alfred"]]
+  Record ["nested" =: [mkStrField "name" "Alfred", mkStrField "_id" "1234"]]
+
+excludeRes3 :: Record
+excludeRes3 =
+  Record
+    [ "nested" =:
+      [ mkStrField "_id" "1234"
+      , mkStrField "guid" "4f24d46e-cd4d-11e6-b6c7-0800276ab015"
+      , mkStrField "name" "Alfred"
+      ]
+    ]
 
 excludeRes4 :: Record
 excludeRes4 =
@@ -213,6 +232,9 @@ excludeRes4 =
     [ mkStrField "_id" "584e58195984185eb8000007"
     , "nested" =: [mkStrField "_id" "1234", mkStrField "name" "Alfred"]
     ]
+
+excludeRes5 :: Record
+excludeRes5 = Record [mkStrField "_id" "584e58195984185eb8000007"]
 
 -- ^
 -- Include field results
@@ -242,6 +264,19 @@ mergeRes2 =
       , mkStrField "guid" "a01c793c-58d2-49d6-aba9-4012e8d6ace5"
       , mkStrField "name" "Alfred"
       , mkStrField "alias" "Mambo"
+      ]
+    ]
+
+mergeRes3 :: Record
+mergeRes3 =
+  Record
+    [ mkStrField "_id" "584e58195984185eb8000007"
+    , mkStrField "email" "bamboo@leaf.com"
+    , mkStrField "x" "1"
+    , "nested" =:
+      [ mkStrField "_id" "1234"
+      , mkStrField "guid" "4f24d46e-cd4d-11e6-b6c7-0800276ab015"
+      , mkStrField "name" "Alfred"
       ]
     ]
 
@@ -279,9 +314,23 @@ replaceRes1 =
     , f "b" "p"
     , f "c" "q"
     , "e" =: [f "p" "x", f "r" "3"]
-    , f "x" "5"
-    , f "y" "6"
     , f "w" "10"
+    , f "y" "6"
+    , f "x" "5"
+    ]
+  where
+    f = mkStrField
+
+replaceRes2 :: Record
+replaceRes2 =
+  Record
+    [ f "a" "1"
+    , f "b" "p"
+    , f "c" "q"
+    , f "w" "10"
+    , "e" =: [f "p" "1", f "q" "2", f "r" "3"]
+    , f "y" "6"
+    , f "x" "5"
     ]
   where
     f = mkStrField

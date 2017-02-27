@@ -4,8 +4,11 @@
 -- ^
 -- Persistence functions for feed subscriptions
 module Persistence.Xandar.Subscriptions
-  ( insertSubscription
+  ( addRead
+  , addTags
+  , insertSubscription
   , insertSubscriptions
+  , mkSubscriptions
   , modifySubscription
   , modifySubscriptions
   , replaceSubscription
@@ -189,8 +192,7 @@ mkSubscriptions feeds = fmap mkSub
     getFeed r = Map.lookup (feedId r) feedMap
     getTitle :: Record -> Maybe Record -> Text
     getTitle r f =
-      fromJust $
-      getValue "title" r <|> (f >>= getValue "title") <|> Just "Untitled"
+      fromMaybe "Untitled" $ getValue "title" r <|> (f >>= getValue "title")
 
 -- ^
 -- Get the posts related to all input subscriptions. The records

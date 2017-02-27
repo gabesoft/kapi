@@ -7,12 +7,14 @@ module Persistence.Common where
 import Control.Monad (join, (>=>))
 import Control.Monad.IO.Class
 import Data.Aeson as AESON
+import Data.Bifunctor
 import Data.Bson as BSON
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import Data.Digest.Pure.SHA
 import Data.List (find, findIndex, foldl, inits, nub, (\\))
 import qualified Data.Map.Strict as Map
 import Data.Maybe
+import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time (getCurrentTime)
@@ -307,19 +309,18 @@ mergeRecords (Record d1) (Record d2) = Record $ foldl add d1 d2
 -- ^
 -- Replace one record with another keeping some fields unmodified
 replaceRecords :: [Label] -> Record -> Record -> Record
-replaceRecords preserveLabels r1 r2 = exclude' (mergeRecords r1 r2')
-  where
-    r2' = excludeFields preserveLabels r2
-    keep name = elem name (getLabels' r2) || elem name preserveLabels
-    exclude' r = excludeFields (filter (not . keep) (getLabels' r)) r
+replaceRecords preserveFields r1 r2 =
+  mergeRecords
+    (excludeFields preserveFields r2)
+    (includeFields preserveFields r1)
 
 -- ^
 -- Exclude all specified fields from a record
 excludeFields :: [Label] -> Record -> Record
-excludeFields labels (Record d) =
-  Record $ foldl remove d (splitAtDot <$> labels)
+excludeFields keys (Record d) =
+  Record $ foldl remove d (splitAtDot <$> keys)
   where
-    remove _ [] = error "no field name specified"
+    remove _ [] = error "exclude: no field name specified"
     remove doc [name] = filter (\(k := _) -> k /= name) doc
     remove doc (name:ns) = withField name doc id (process ns)
     process ns (xs, y, ys) _ = xs ++ [removeNested y ns] ++ ys
@@ -328,15 +329,20 @@ excludeFields labels (Record d) =
       | otherwise = k := v
 
 -- ^
--- Include only the specified fields and the id in a record
+-- Return a record containing only the specified fields
 includeFields :: [Label] -> Record -> Record
-includeFields [] record = record
-includeFields labels record = excludeFields (getLabels' record \\ include') record
+includeFields keys (Record doc) = Record fields
   where
-    sep = "."
-    split = filter (not . null) . inits . T.splitOn sep
-    addPrefixes xs acc = acc ++ (T.intercalate sep <$> split xs)
-    include' = foldr addPrefixes [] labels
+    fields = toField . snd <$> Map.toList (Map.fromListWith mergeRecords tuples)
+    tuples = second toRecord <$> mapMaybe add (splitAtDot <$> keys)
+    toRecord = Record . (: [])
+    toField = head . getDocument
+    add [name] = (,) name <$> find (\(k := _) -> k == name) doc
+    add (name:ns) = (,) name <$> withField name doc (const Nothing) (process ns)
+    process ns (_, y, _) _ = addNested y ns
+    addNested f@(k := v) names
+      | valIsDoc v = Just (k := recToDoc (includeFields names (docToRec k f)))
+      | otherwise = Nothing
 
 -- ^
 -- Prepare the labels of the fields to be included in an object
@@ -350,16 +356,6 @@ mkIncludeLabels xs = idLabel : xs
 -- Extract the field names from a record
 getLabels :: Record -> [Label]
 getLabels = fmap label . getDocument
-
--- ^
--- Extract the field names from a record and all of its children
-getLabels' :: Record -> [Label]
-getLabels' (Record d) = foldl add (label <$> d) d
-  where
-    pre k l = T.concat [k, ".", l]
-    add labels f@(k := v)
-      | valIsDoc v = labels ++ (pre k <$> getLabels' (docToRec k f))
-      | otherwise = labels
 
 -- ^
 -- Find the field with @name@ in @doc@ and do a case analysis

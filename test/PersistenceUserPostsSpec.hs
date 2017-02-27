@@ -36,10 +36,8 @@ main =
     describe "createUserPost" $ do
       it "missing post results in an error" =<<
         runIO verifyCreateUserPostMissingPost
-      it "missing subscription results in an error" =<<
-        runIO verifyCreateUserPostMissingSub
-      it "checks that the subscription and post have the same feed id" =<<
-        runIO verifyCreateUserPostMismatch
+      it "missing subscription results in an error" verifyCreateUserPostMissingSub
+      it "checks that the subscription and post have the same feed id" verifyCreateUserPostMismatch
       it "generates the correct id" =<< runIO verifyCreateUserPostId
       it "generates the correct record" =<< runIO verifyCreateUserPostRecord
 
@@ -63,37 +61,34 @@ verifyCreateUserPostMissingPost
   :: MonadIO m
   => m Expectation
 verifyCreateUserPostMissingPost = do
-  actual <- createUserPost (Just sub1) Nothing emptyInput
+  actual <- createUserPost (Just sub1) Nothing emptyRecord
   return $ actual `shouldBe` Left missingPostResult
 
-verifyCreateUserPostMissingSub
-  :: MonadIO m
-  => m Expectation
-verifyCreateUserPostMissingSub = do
-  actual <- createUserPost Nothing (Just post) emptyInput
-  return $ actual `shouldBe` Left missingSubResult
+verifyCreateUserPostMissingSub :: Expectation
+verifyCreateUserPostMissingSub =
+  createUserPost Nothing (Just post) emptyRecord `shouldReturn`
+  Left missingSubResult
 
-verifyCreateUserPostMismatch
-  :: MonadIO m
-  => m Expectation
-verifyCreateUserPostMismatch = do
-  actual <- createUserPost (Just sub2) (Just post) inputValid1
-  return $ actual `shouldBe` result2 (Just inputValid1)
+verifyCreateUserPostMismatch :: Expectation
+verifyCreateUserPostMismatch =
+  createUserPost (Just sub2) (Just post) inputValid1 `shouldReturn`
+  result2 (Just inputValid1)
 
 verifyCreateUserPostId
   :: MonadIO m
   => m Expectation
 verifyCreateUserPostId = do
   actual <- createUserPost (Just sub1) (Just post) inputValid1
-  let rid = getIdValue' sub1 <> "-" <> getIdValue' post
-  return $ snd (fromRight actual) `shouldBe` rid
+  return $ snd (fromRight actual) `shouldBe` userPost1Id
 
 verifyCreateUserPostRecord
   :: MonadIO m
   => m Expectation
 verifyCreateUserPostRecord = do
   actual <- createUserPost (Just sub1) (Just post) inputValid1
-  return $ replaceDates (getRecord actual) `shouldBe` replaceDates userPost1
+  let actualDoc = getDocument $ replaceDates (getRecord actual)
+  let expectedDoc = getDocument $ replaceDates userPost1
+  return $ actualDoc `shouldMatchList` expectedDoc
 
 verifyExcludesId
   :: MonadIO m
@@ -107,7 +102,7 @@ verifyCreatedAt
   :: (Monad m, Show a, Eq a)
   => (Record -> a)
   -> Record
-  -> (Maybe Record -> RecordData Field -> m (Either ApiError (Record, RecordId)))
+  -> (Maybe Record -> Record -> m (Either ApiError (Record, RecordId)))
   -> m Expectation
 verifyCreatedAt getCreatedAt record f = do
   actual <- f (Just record) inputValidWithDates
@@ -116,12 +111,12 @@ verifyCreatedAt getCreatedAt record f = do
   return $ createdAtActual `shouldBe` createdAtExpected
 
 verifyCreatedAtText
-  :: (Maybe Record -> RecordData Field -> IO (Either ApiError (Record, RecordId)))
+  :: (Maybe Record -> Record -> IO (Either ApiError (Record, RecordId)))
   -> IO Expectation
 verifyCreatedAtText = verifyCreatedAt createdAtText userPost2
 
 verifyCreatedAtUTC
-  :: (Maybe Record -> RecordData Field -> IO (Either ApiError (Record, RecordId)))
+  :: (Maybe Record -> Record -> IO (Either ApiError (Record, RecordId)))
   -> IO Expectation
 verifyCreatedAtUTC = verifyCreatedAt createdAtUTC userPost1
 
@@ -131,32 +126,35 @@ createdAtText = getValue' createdAtLabel
 createdAtUTC :: Record -> UTCTime
 createdAtUTC = getValue' createdAtLabel
 
-verifyReplace :: MonadIO m => m Expectation
+verifyReplace
+  :: MonadIO m
+  => m Expectation
 verifyReplace = do
   actual <- replaceUserPost (Just userPost1) inputValidForReplace
-  return $ replaceUpdatedAt (getRecord actual) `shouldBe` resultForReplace
+  return $
+    replaceUpdatedAt (getRecord actual) `shouldMatchRecord` resultForReplace
 
-verifyModify :: MonadIO m => m Expectation
+verifyModify
+  :: MonadIO m
+  => m Expectation
 verifyModify = do
   actual <- modifyUserPost (Just userPost2) inputValidForModify
-  return $ replaceUpdatedAt (getRecord actual) `shouldBe` resultForModify
+  return $
+    replaceUpdatedAt (getRecord actual) `shouldMatchRecord` resultForModify
 
 getRecord :: Either ApiError (Record, RecordId) -> Record
 getRecord = fst . fromRight
 
-emptyInput :: RecordData a
-emptyInput = Record []
-
 missingSubResult :: ApiError
 missingSubResult =
   ApiError
-    (Just emptyInput)
+    (Just emptyRecord)
     status404
     "Record not found in subscriptions collection."
 
 missingPostResult :: ApiError
 missingPostResult =
-  ApiError (Just emptyInput) status404 "Record not found in posts collection."
+  ApiError (Just emptyRecord) status404 "Record not found in posts collection."
 
 replaceDates :: Record -> Record
 replaceDates = replaceUTCDate updatedAtLabel . replaceUTCDate createdAtLabel
@@ -171,7 +169,7 @@ invalidErrors =
     , mkStrField "subscriptionId" "Field is required"
     ]
 
-inputInvalid1 :: RecordData Field
+inputInvalid1 :: Record
 inputInvalid1 =
   Record
     [ "post" =:
@@ -181,7 +179,7 @@ inputInvalid1 =
     , mkStrField "feedId" "57e9f802d5ec56510904c9d9"
     ]
 
-inputInvalid2 :: RecordData Field
+inputInvalid2 :: Record
 inputInvalid2 =
   Record
     [ mkBoolField "read" True
@@ -192,7 +190,7 @@ inputInvalid2 =
     , mkStrListField "tags" ["haskell", "javascript"]
     ]
 
-inputValid1 :: RecordData Field
+inputValid1 :: Record
 inputValid1 =
   Record
     [ mkBoolField "read" True
@@ -205,7 +203,7 @@ inputValid1 =
     , mkStrListField "tags" ["haskell", "javascript"]
     ]
 
-inputValid2 :: RecordData Field
+inputValid2 :: Record
 inputValid2 =
   Record
     [ mkBoolField "read" True
@@ -217,7 +215,7 @@ inputValid2 =
     , mkStrListField "tags" ["haskell", "javascript"]
     ]
 
-inputValidWithDates :: RecordData Field
+inputValidWithDates :: Record
 inputValidWithDates =
   Record
     [ mkBoolField "read" True
@@ -231,7 +229,7 @@ inputValidWithDates =
     , createdAtLabel =: date "2016-01-23T01:21:15.513Z"
     ]
 
-inputValidForReplace :: RecordData Field
+inputValidForReplace :: Record
 inputValidForReplace =
   Record
     [ mkBoolField "read" False
@@ -244,12 +242,22 @@ inputValidForReplace =
     , mkStrListField "tags" ["haskell", "javascript"]
     ]
 
-resultForReplace :: RecordData Field
+resultForReplace :: Record
 resultForReplace =
   Record
     [ mkStrListField "tags" ["haskell", "javascript"]
     , mkStrField "title" "Replaced title"
-    , "post" =: [mkStrField "author" "unknown"]
+    , "post" =:
+      [ mkStrField "author" "Post author"
+      , mkStrField "comments" []
+      , mkStrField "date" "2016-03-01T03:45:00.000Z"
+      , mkStrField "description" "Post description"
+      , mkStrField "guid" "8196e7a1-4fdd-417d-b49b-c74640089314"
+      , mkStrField "link" "http://example.com/feeds/1233.html"
+      , mkStrField "summary" "Post summary"
+      , mkStrField "title" "Post title"
+      , "image" =: [mkStrField "url" "http://example.com/feeds/1233.rss"]
+      ]
     , mkStrField "postId" "56d7d88bc788cb1d6eb919a1"
     , mkStrField "subscriptionId" "56d7de07c788cb1d6eb91a82"
     , mkStrField "userId" "56d7cc3fccee17506699e735"
@@ -259,7 +267,7 @@ resultForReplace =
     , createdAtLabel =: date "2016-09-27T04:39:31.460Z"
     ]
 
-inputValidForModify :: RecordData Field
+inputValidForModify :: Record
 inputValidForModify =
   Record
     [ mkBoolField "read" False
@@ -272,13 +280,13 @@ inputValidForModify =
     , mkStrListField "tags" ["tech"]
     ]
 
-resultForModify :: RecordData Field
+resultForModify :: Record
 resultForModify =
   Record
     [ mkStrListField "tags" ["tech"]
     , mkStrField "title" "Modified title"
     , "post" =:
-      [ mkStrField "author" "Modified post author"
+      [ mkStrField "author" "Existing post author"
       , mkStrField "comments" []
       , mkStrField "date" "2016-03-01T03:45:00.000Z"
       , mkStrField "description" "Existing post description"
@@ -297,7 +305,7 @@ resultForModify =
     , mkTxtField createdAtLabel "2016-09-27T04:39:31.460Z"
     ]
 
-userPost1 :: RecordData Field
+userPost1 :: Record
 userPost1 =
   Record
     [ mkStrListField "tags" ["haskell", "javascript"]
@@ -322,7 +330,7 @@ userPost1 =
     , createdAtLabel =: date "2016-09-27T04:39:31.460Z"
     ]
 
-userPost2 :: RecordData Field
+userPost2 :: Record
 userPost2 =
   Record
     [ mkStrListField "tags" ["haskell", "javascript"]
@@ -347,7 +355,7 @@ userPost2 =
     , mkTxtField createdAtLabel "2016-09-27T04:39:31.460Z"
     ]
 
-existingPost :: RecordData Field
+existingPost :: Record
 existingPost =
   Record
     [ mkStrListField "tags" ["existing-tag", "javascript"]
@@ -373,7 +381,7 @@ existingPost =
     , mkTxtField createdAtLabel "2016-09-27T04:39:31.460Z"
     ]
 
-result1 :: Maybe Record -> [Either ApiError (RecordData Field, RecordId)]
+result1 :: Maybe Record -> [Either ApiError (Record, RecordId)]
 result1 input =
   [ Right (userPost1, userPost1Id)
   , Left
@@ -397,7 +405,7 @@ result2 input =
 userPost1Id :: RecordId
 userPost1Id = "56d7de07c788cb1d6eb91a82-56d7d88bc788cb1d6eb919a1"
 
-sub1 :: RecordData Field
+sub1 :: Record
 sub1 =
   Record
     [ mkStrField "createdAt" "2016-03-03T06:47:35.463Z"
@@ -410,7 +418,7 @@ sub1 =
     , mkStrField "userId" "56d7cc3fccee17506699e735"
     ]
 
-sub2 :: RecordData Field
+sub2 :: Record
 sub2 =
   Record
     [ mkStrField "createdAt" "2016-03-03T06:47:35.463Z"
@@ -423,7 +431,7 @@ sub2 =
     , mkStrField "userId" "56d7cc3fccee17506699e735"
     ]
 
-post :: RecordData Field
+post :: Record
 post =
   Record
     [ mkStrField "author" "Post author"

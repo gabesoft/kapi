@@ -10,10 +10,14 @@ import Data.Text (Text, unpack, pack)
 import Data.Time (UTCTime)
 import Data.Time.ISO8601
 import Persistence.Common
+import Test.Hspec
 import Types.Common
 
 dateReplacement :: Text
 dateReplacement = "2016-09-27T04:39:31.460Z"
+
+emptyRecord :: RecordData a
+emptyRecord = Record []
 
 replaceUTCDate :: Label -> Record -> Record
 replaceUTCDate name = modField name setTime
@@ -25,6 +29,9 @@ replaceTextDate name = modField name setText
   where
     setText :: Maybe Text -> Maybe Text
     setText field = const dateReplacement <$> field
+
+shouldMatchRecord :: Record -> Record -> Expectation
+shouldMatchRecord r1 r2 = getDocument r1 `shouldMatchList` getDocument r2
 
 mkId :: RecordId -> Value
 mkId v = ObjId (read $ unpack v)
