@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 -- ^
@@ -8,12 +9,17 @@ module Util.Error
   , mk404Err
   , mk404IdErr
   , mk500Err'
+  , throwApiError
   ) where
 
+import Control.Monad.Except
+import Data.Aeson (encode)
 import Data.Bson
+import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import qualified Data.Text as T
 import Network.HTTP.Types.Status
+import Servant
 import Types.Common
 import Util.Constants
 
@@ -44,6 +50,30 @@ mk404Err def record =
 -- Create a 404 error containing the id of a not found object
 mk404IdErr :: RecordDefinition -> RecordId -> ApiError
 mk404IdErr def rid = mk404Err def (Record [idLabel =: rid])
+
+-- ^
+-- Convert an 'ApiError' into a 'ServantErr' and throw
+throwApiError
+  :: MonadError ServantErr m
+  => ApiError -> m a
+throwApiError err = throwError (mkServantErr err)
+
+-- ^
+-- Convert an 'ApiError' into a 'ServantErr'
+mkServantErr :: ApiError -> ServantErr
+mkServantErr err =
+  ServantErr
+  { errHTTPCode = statusCode status
+  , errReasonPhrase = BS.unpack (statusMessage status)
+  , errBody = body
+  , errHeaders = []
+  }
+  where
+    status = apiErrorStatus err
+    msg = apiErrorMessage err
+    body
+      | LBS.null msg = mempty
+      | otherwise = encode (Fail err :: ApiItem ApiError ())
 
 -- ^
 -- Create an API error

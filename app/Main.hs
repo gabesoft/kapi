@@ -14,7 +14,7 @@ import Types.Common
 conf =
   ApiConfig
   { apiPort = 8001
-  , appName = mempty
+  , appName = Nothing
   , mongoHost = "127.0.0.1"
   , mongoPort = 27017
   , mongoDbs = Map.fromList [("xandar", "kapi-xandar")]
@@ -29,7 +29,7 @@ main = do
   let dev = fromMaybe False $ (== "development") <$> env
   let env = withEnv dev "development mode" "production mode"
   putStrLn ("Server started on port " ++ show port ++ " in " ++ env)
-  let xandarConf = conf {appName = "xandar"}
+  let xandarConf = conf {appName = Just "xandar"}
   XA.appInit xandarConf >> runApp dev xandarConf XA.app
 
 runApp :: Bool -> ApiConfig -> (ApiConfig -> Application) -> IO ()

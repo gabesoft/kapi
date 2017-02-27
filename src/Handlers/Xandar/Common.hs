@@ -162,8 +162,7 @@ optionsMultiple = return $ addHeader "GET, POST, PATCH, PUT" NoContent
 addDbIndices :: [Index] -> ApiConfig -> IO ()
 addDbIndices indices conf = do
   pipe <- dbPipe conf
-  let app = appName conf
-  mapM_ (\idx -> DB.dbAddIndex idx (confGetDb app conf) pipe) indices
+  mapM_ (\idx -> DB.dbAddIndex idx (confGetDb conf) pipe) indices
 
 -- ^
 -- Run an action that could result in a single error
@@ -176,7 +175,6 @@ runSingle action f = do
 
 -- ^
 -- Run an action that could result in multiple errors
--- TODO: remove after consolidating ApiItemsT and ApiItems
 runMulti
   :: Monad m
   => ApiItemsT [ApiError] m [Record] -> m [ApiResult]
@@ -188,40 +186,6 @@ updateSingle
   :: MonadError ServantErr m
   => (Record -> ExceptT ApiError m b) -> RecordId -> Record -> m b
 updateSingle f rid input = runSingle (f $ setIdValue rid input) return
-
--- ^
--- Prepare an API response
-mkApiResponse
-  :: MonadError ServantErr m
-  => (a -> m b) -> ExceptT ApiError m a -> m b
-mkApiResponse f action = do
-  result <- runExceptT action
-  either throwApiError f result
-
--- ^
--- Convert an 'ApiError' into a 'ServantErr' and throw
-throwApiError
-  :: MonadError ServantErr m
-  => ApiError -> m a
-throwApiError err = throwError (mkServantErr err)
-
--- ^
--- Convert an 'ApiError' into a 'ServantErr'
-mkServantErr :: ApiError -> ServantErr
-mkServantErr err =
-  ServantErr
-  { errHTTPCode = statusCode status
-  , errReasonPhrase = BS.unpack (statusMessage status)
-  , errBody = body
-  , errHeaders = []
-  }
-  where
-    status = apiErrorStatus err
-    msg = apiErrorMessage err
-    body
-      | LBS.null msg = mempty
-      | otherwise = encode (Fail err :: ApiItem ApiError ())
-
 -- ^
 -- Create a result to be returned from a 'getSingle' method
 mkGetSingleResult :: Maybe Text

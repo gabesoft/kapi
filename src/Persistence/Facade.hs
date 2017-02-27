@@ -169,9 +169,8 @@ runDb'
   => (Database -> Pipe -> m b) -> t m b
 runDb' action = do
   conf <- ask
-  let app = appName conf
   pipe <- dbPipe conf
-  lift $ action (confGetDb app conf) pipe
+  lift $ action (confGetDb conf) pipe
 
 -- ^
 -- Run an elastic-search action
@@ -180,8 +179,7 @@ runEs
   => (Text -> Text -> IO (Either EsError a)) -> ExceptT ApiError m a
 runEs action = do
   conf <- ask
-  let app = appName conf
-  results <- liftIO $ action (esServer conf) (confGetEsIndex app conf)
+  results <- liftIO $ action (esServer conf) (confGetEsIndex conf)
   ExceptT (return $ first ES.esToApiError results)
 
 -- ^

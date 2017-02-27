@@ -17,9 +17,9 @@ import Data.Bson ((=:))
 import Data.Text (Text)
 import Database.Bloodhound (Search, EsError)
 import Handlers.Xandar.Common
-       (throwApiError, mkPagination, splitLabels, mkGetMultipleResult,
-        mkCreateMultipleResult, mkApiResponse, getCreateLink,
-        mkGetSingleResult, mkCreateSingleResult, runSingle, updateSingle, runMulti)
+       (mkPagination, splitLabels, mkGetMultipleResult,
+        mkCreateMultipleResult, getCreateLink, mkGetSingleResult,
+        mkCreateSingleResult, runSingle, updateSingle, runMulti)
 import qualified Handlers.Xandar.Common as C
 import Parsers.Filter (parse)
 import Persistence.Common
