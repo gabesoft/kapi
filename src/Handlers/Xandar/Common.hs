@@ -138,12 +138,12 @@ modifySingle def = updateSingle (dbModify def)
 
 -- ^
 -- Update (replace) multiple records
-replaceMultiple :: RecordDefinition -> [Record] -> Api ApiResults
+replaceMultiple :: RecordDefinition -> [Record] -> Api [ApiResult]
 replaceMultiple def = runMulti . dbReplaceMulti def
 
 -- ^
 -- Update (modify) multiple records
-modifyMultiple :: RecordDefinition -> [Record] -> Api ApiResults
+modifyMultiple :: RecordDefinition -> [Record] -> Api [ApiResult]
 modifyMultiple def = runMulti . dbModifyMulti def
 
 -- ^
@@ -176,11 +176,11 @@ runSingle action f = do
 
 -- ^
 -- Run an action that could result in multiple errors
--- TODO: remove after consolidating ApiItems2T and ApiItems
+-- TODO: remove after consolidating ApiItemsT and ApiItems
 runMulti
   :: Monad m
-  => ApiItems2T [ApiError] m [Record] -> m ApiResults
-runMulti action = itemsToApiResults <$> runApiItems2T action
+  => ApiItemsT [ApiError] m [Record] -> m [ApiResult]
+runMulti action = itemsToResults <$> runApiItemsT action
 
 -- ^
 -- Modify or replace a single record
@@ -246,13 +246,12 @@ mkCreateSingleResult getLink record =
 -- Create a result to be returned from a 'createMultiple' method
 mkCreateMultipleResult
   :: (Text -> String)
-  -> ApiResults
+  -> [ApiResult]
   -> Api (Headers '[ Header "Location" String, Header "Link" String] (ApiData ApiResult))
 mkCreateMultipleResult getLink results =
   return . noHeader $
-  addHeader (intercalate ", " $ links records) (Multiple records)
+  addHeader (intercalate ", " $ links results) (Multiple results)
   where
-    records = apiItems results
     links = fmap $ apiItem (const "<>") (mkLink . getCreateLink getLink)
 
 -- ^

@@ -59,19 +59,19 @@ modifySubscription = toSingle modifySubscriptions
 
 modifySubscriptions
   :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
-  => [Record] -> ApiItems2T [ApiError] m [Record]
+  => [Record] -> ApiItemsT [ApiError] m [Record]
 modifySubscriptions = updateSubscriptions False
 
 replaceSubscriptions
   :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
-  => [Record] -> ApiItems2T [ApiError] m [Record]
+  => [Record] -> ApiItemsT [ApiError] m [Record]
 replaceSubscriptions = updateSubscriptions True
 
 -- ^
 -- Create multiple subscriptions
 insertSubscriptions
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
-  => [Record] -> ApiItems2T [ApiError] m [Record]
+  => [Record] -> ApiItemsT [ApiError] m [Record]
 insertSubscriptions input = do
   valid <- validateSubscriptions input
   feeds <- getExistingMulti feedDefinition (feedId <$> valid)
@@ -83,7 +83,7 @@ insertSubscriptions input = do
 -- Update multiple subscriptions
 updateSubscriptions
   :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
-  => Bool -> [Record] -> ApiItems2T [ApiError] m [Record]
+  => Bool -> [Record] -> ApiItemsT [ApiError] m [Record]
 updateSubscriptions replace input = do
   valid1 <- validateDbIdMulti input
   existing <- getExistingMulti subscriptionDefinition (getIdValue' <$> valid1)
@@ -98,7 +98,7 @@ updateSubscriptions replace input = do
 -- Index the user-posts associated with all subscriptions being created
 indexPostsOnCreate
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
-  => [Record] -> ApiItems2T [ApiError] m ()
+  => [Record] -> ApiItemsT [ApiError] m ()
 indexPostsOnCreate subs = do
   posts <- toMulti (dbGetPostsBySub subs)
   userPosts <- mkRecords posts
@@ -111,7 +111,7 @@ indexPostsOnCreate subs = do
 -- Index the user-posts associated with all subscriptions being updated
 indexPostsOnUpdate
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
-  => [Record] -> [Record] -> ApiItems2T [ApiError] m ()
+  => [Record] -> [Record] -> ApiItemsT [ApiError] m ()
 indexPostsOnUpdate oldSubs newSubs = do
   posts <- toMulti (dbGetPostsBySub newSubs)
   existing <- toMulti (esGetUserPostsBySubs newSubs)

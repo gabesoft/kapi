@@ -127,12 +127,12 @@ modifySingle = updateSingle esModify
 
 -- ^
 -- Update (replace) multiple records
-replaceMultiple :: [Record] -> Api ApiResults
+replaceMultiple :: [Record] -> Api [ApiResult]
 replaceMultiple = runMulti . esReplaceMulti
 
 -- ^
 -- Update (modify) multiple records
-modifyMultiple :: [Record] -> Api ApiResults
+modifyMultiple :: [Record] -> Api [ApiResult]
 modifyMultiple = runMulti . esModifyMulti
 
 -- ^

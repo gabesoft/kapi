@@ -67,17 +67,17 @@ esModify = toSingle esModifyMulti
 
 esReplaceMulti
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
-  => [Record] -> ApiItems2T [ApiError] m [Record]
+  => [Record] -> ApiItemsT [ApiError] m [Record]
 esReplaceMulti = esUpdateMulti replaceUserPosts
 
 esModifyMulti
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
-  => [Record] -> ApiItems2T [ApiError] m [Record]
+  => [Record] -> ApiItemsT [ApiError] m [Record]
 esModifyMulti = esUpdateMulti modifyUserPosts
 
 esInsertMulti
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
-  => [Record] -> ApiItems2T [ApiError] m [Record]
+  => [Record] -> ApiItemsT [ApiError] m [Record]
 esInsertMulti input = do
   valid <- validateUserPosts input
   subs <- getExistingMulti subscriptionDefinition (subId <$> valid)
@@ -87,9 +87,9 @@ esInsertMulti input = do
 
 esUpdateMulti
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
-  => ([Record] -> [Record] -> ApiItems2T [ApiError] m [(Record, RecordId)])
+  => ([Record] -> [Record] -> ApiItemsT [ApiError] m [(Record, RecordId)])
   -> [Record]
-  -> ApiItems2T [ApiError] m [Record]
+  -> ApiItemsT [ApiError] m [Record]
 esUpdateMulti update input = do
   valid1 <- validateEsIdMulti input
   existing <- toMulti (getUserPosts $ getIdValue' <$> valid1)
@@ -116,12 +116,12 @@ indexUserPosts' input =
 
 replaceUserPosts
   :: (MonadIO m)
-  => [Record] -> [Record] -> ApiItems2T [ApiError] m [(Record, RecordId)]
+  => [Record] -> [Record] -> ApiItemsT [ApiError] m [(Record, RecordId)]
 replaceUserPosts = updateUserPosts replaceUserPost
 
 modifyUserPosts
   :: (MonadIO m)
-  => [Record] -> [Record] -> ApiItems2T [ApiError] m [(Record, RecordId)]
+  => [Record] -> [Record] -> ApiItemsT [ApiError] m [(Record, RecordId)]
 modifyUserPosts = updateUserPosts modifyUserPost
 
 updateUserPosts
@@ -129,7 +129,7 @@ updateUserPosts
   => (Maybe Record -> Record -> m (Either e a))
   -> [Record]
   -> [Record]
-  -> ApiItems2T [e] m [a]
+  -> ApiItemsT [e] m [a]
 updateUserPosts f existing = runAction mkRecord
   where
     mkRecord r = f (get r) r
@@ -141,7 +141,7 @@ createUserPosts
   => [Record]
   -> [Record]
   -> [Record]
-  -> ApiItems2T [ApiError] m [(Record, RecordId)]
+  -> ApiItemsT [ApiError] m [(Record, RecordId)]
 createUserPosts subs posts = runAction mkRecord
   where
     mkRecord r = createUserPost (get subMap subId r) (get postMap postId r) r

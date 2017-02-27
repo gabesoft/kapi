@@ -178,25 +178,25 @@ userPostCollection = recordCollection userPostDefinition
 
 validateSubscriptions
   :: Monad m
-  => [Record] -> ApiItems2T [ApiError] m [Record]
+  => [Record] -> ApiItemsT [ApiError] m [Record]
 validateSubscriptions = validateMulti subscriptionDefinition
 
 validateUserPosts
   :: Monad m
-  => [Record] -> ApiItems2T [ApiError] m [Record]
+  => [Record] -> ApiItemsT [ApiError] m [Record]
 validateUserPosts = validateMulti userPostDefinition
 
 validateUsers
   :: Monad m
-  => [Record] -> ApiItems2T [ApiError] m [Record]
+  => [Record] -> ApiItemsT [ApiError] m [Record]
 validateUsers = validateMulti userDefinition
 
 validatePosts
   :: Monad m
-  => [Record] -> ApiItems2T [ApiError] m [Record]
+  => [Record] -> ApiItemsT [ApiError] m [Record]
 validatePosts = validateMulti postDefinition
 
 validateFeeds
   :: Monad m
-  => [Record] -> ApiItems2T [ApiError] m [Record]
+  => [Record] -> ApiItemsT [ApiError] m [Record]
 validateFeeds = validateMulti feedDefinition

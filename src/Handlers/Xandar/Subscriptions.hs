@@ -13,7 +13,8 @@ import Control.Monad.Except
 import Control.Monad.Reader
 import Data.Text (Text)
 import Handlers.Xandar.Common
-       (runSingle, runMulti, mkCreateSingleResult, mkCreateMultipleResult, updateSingle)
+       (runSingle, runMulti, mkCreateSingleResult, mkCreateMultipleResult,
+        updateSingle)
 import qualified Handlers.Xandar.Common as C
 import Persistence.Common
 import Persistence.Facade (dbPipe)
@@ -76,12 +77,12 @@ modifySingle = updateSingle modifySubscription
 
 -- ^
 -- Update (replace) multiple records
-replaceMultiple :: [Record] -> Api ApiResults
+replaceMultiple :: [Record] -> Api [ApiResult]
 replaceMultiple = runMulti . replaceSubscriptions
 
 -- ^
 -- Update (modify) multiple records
-modifyMultiple :: [Record] -> Api ApiResults
+modifyMultiple :: [Record] -> Api [ApiResult]
 modifyMultiple = runMulti . modifySubscriptions
 
 -- ^

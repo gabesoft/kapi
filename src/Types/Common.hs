@@ -37,7 +37,7 @@ import Text.Read (readMaybe)
 type Api = ReaderT ApiConfig Handler
 
 -- ^
--- Representation of a record schema
+-- Representation of a record field definition
 data FieldDefinition = FieldDefinition
   { fieldLabel :: Label
   , fieldRequired :: Bool
@@ -45,12 +45,16 @@ data FieldDefinition = FieldDefinition
   , isObjectId :: Bool
   } deriving (Eq, Show)
 
+-- ^
+-- Representation of a record definition
 data RecordDefinition = RecordDefinition
   { recordCollection :: Text
   , recordCollectionName :: Text
   , recordFields :: Map.Map Label FieldDefinition
   } deriving (Eq, Show)
 
+-- ^
+-- Data to be returned from endpoints that return a single or multiple items
 data ApiData a
   = Single a
   | Multiple [a]
@@ -68,7 +72,7 @@ instance FromJSON a =>
   parseJSON _ = fail "Could not parse ApiData"
 
 -- ^
--- Representation for a data item
+-- Representation of a record
 data RecordData a =
   Record [a]
   deriving (Eq, Show)
@@ -77,13 +81,6 @@ type RecordId = Text
 
 type Record = RecordData Field
 
-instance ToJSON (RecordData Field) where
-  toJSON (Record r) = Object (aesonify r)
-
-instance FromJSON (RecordData Field) where
-  parseJSON (Object obj) = return $ Record (bsonify obj)
-  parseJSON _ = fail "Could not parse Record"
-
 instance Functor RecordData where
   fmap f (Record xs) = Record (f <$> xs)
 
@@ -91,13 +88,22 @@ instance Monoid (RecordData Field) where
   mempty = Record mempty
   mappend (Record xs) (Record ys) = Record (BSON.merge ys xs)
 
+instance ToJSON (RecordData Field) where
+  toJSON (Record r) = Object (aesonify r)
+
+instance FromJSON (RecordData Field) where
+  parseJSON (Object obj) = return $ Record (bsonify obj)
+  parseJSON _ = fail "Could not parse Record"
+
 -- ^
 -- Representation of an API error
--- TODO: apiErrorInput should be generic
 data ApiError = ApiError
-  { apiErrorInput :: Maybe Record -- ^ the original input that caused this error
-  , apiErrorStatus :: Status -- ^ the HTTP status
-  , apiErrorMessage :: LBS.ByteString -- ^ the error message
+    -- ^ a potential original input that caused this error
+  { apiErrorInput :: Maybe Record
+    -- ^ the HTTP status (default 500)
+  , apiErrorStatus :: Status
+    -- ^ the error message
+  , apiErrorMessage :: LBS.ByteString
   } deriving (Eq, Show, Generic)
 
 instance ToJSON ApiError where
@@ -106,24 +112,33 @@ instance ToJSON ApiError where
     object ["message" .= LBS.unpack msg, "input" .= toJSON r]
 
 -- ^
--- The result of a record validation
-data ValidationResult =
-  ValidationErrors [Field]
+-- The result of a validation operation
+data ValidationErrors a =
+  ValidationErrors [a]
   deriving (Eq, Show)
 
-instance ToJSON ValidationResult where
-  toJSON (ValidationErrors []) = object []
-  toJSON (ValidationErrors xs) = toJSON (Record xs)
+type ValidationResult = ValidationErrors Field
 
-instance Monoid ValidationResult where
+instance Functor ValidationErrors where
+  fmap f (ValidationErrors xs) = ValidationErrors (f <$> xs)
+
+instance Applicative ValidationErrors where
+  pure = ValidationErrors . pure
+  ValidationErrors fs <*> ValidationErrors es = ValidationErrors (fs <*> es)
+
+instance Monoid (ValidationErrors a) where
   mempty = ValidationErrors mempty
   mappend (ValidationErrors xs) (ValidationErrors ys) =
     ValidationErrors (xs <> ys)
 
+instance ToJSON (RecordData a) =>
+         ToJSON (ValidationErrors a) where
+  toJSON (ValidationErrors []) = object []
+  toJSON (ValidationErrors xs) = toJSON (Record xs)
+
 -- ^
--- Representation for an API item result
--- An item result could be an error or a record
--- TODO: Replace with ApiItems2
+-- Representation of an API item result
+-- which could be a failure or a success
 data ApiItem e a
   = Fail e
   | Succ a
@@ -131,9 +146,13 @@ data ApiItem e a
 
 type ApiResult = ApiItem ApiError Record
 
-toApiItem :: Either e a -> ApiItem e a
-toApiItem (Left e) = Fail e
-toApiItem (Right a) = Succ a
+eitherToApiItem :: Either e a -> ApiItem e a
+eitherToApiItem (Left e) = Fail e
+eitherToApiItem (Right a) = Succ a
+
+itemToEither :: ApiItem e a -> Either e a
+itemToEither (Fail e) = Left e
+itemToEither (Succ a) = Right a
 
 isSuccess :: ApiItem a b -> Bool
 isSuccess (Fail _) = False
@@ -164,232 +183,174 @@ instance ToJSON a =>
   toJSON (Fail e) = object ["error" .= toJSON e]
   toJSON (Succ a) = toJSON a
 
--- TODO: maybe replace ApiItems with this
--- TODO: rename to ApiItem
 -- ^
 -- Result of a computation on multiple data items. The errors
 -- and success results are expected to be lists. In that case
 -- @>>=@ collects all errors.
-data ApiItems2 e a = ApiItems2
-  { fails2 :: e
-  , succs2 :: a
+data ApiItems e a = ApiItems
+  { fails :: e
+  , succs :: a
   } deriving (Eq, Show, Read, Ord)
 
-concatItems :: [ApiItems2 [e] [a]] -> ApiItems2 [e] [a]
+concatItems :: [ApiItems [e] [a]] -> ApiItems [e] [a]
 concatItems = foldr (<>) mempty
 
-eitherToItemsT :: Monad m => [Either e a] -> ApiItems2T [e] m [a]
-eitherToItemsT = ApiItems2T . return . eitherToItems
+eitherToItems :: [Either a b] -> ApiItems [a] [b]
+eitherToItems xs = uncurry ApiItems (partitionEithers xs)
 
-eitherToItems :: [Either a b] -> ApiItems2 [a] [b]
-eitherToItems xs = uncurry ApiItems2 (partitionEithers xs)
+itemsToEither :: ApiItems [e] [a] -> [Either e a]
+itemsToEither (ApiItems es as) = (Right <$> as) <> (Left <$> es)
 
-itemsToEither :: ApiItems2 [e] [a] -> [Either e a]
-itemsToEither (ApiItems2 es as) = (Left <$> es) <> (Right <$> as)
+itemsToResults :: ApiItems [e] [a] -> [ApiItem e a]
+itemsToResults items = eitherToApiItem <$> itemsToEither items
 
--- TODO: remove after rename ApiItems2 -> ApiItems
-itemsToApiResults :: ApiResults2 -> ApiResults
-itemsToApiResults (ApiItems2 es as) = ApiItems (Fail <$> es) (Succ <$> as)
+resultsToItems :: [ApiItem e a] -> ApiItems [e] [a]
+resultsToItems results = eitherToItems $ itemToEither <$> results
 
-type ApiResults2 = ApiItems2 [ApiError] [Record]
+throwApi :: Monoid a => e -> ApiItems e a
+throwApi = flip ApiItems mempty
 
-instance Eq2 ApiItems2 where
-  liftEq2 eq1' eq2' (ApiItems2 e1 a1) (ApiItems2 e2 a2) = eq1' e1 e2 && eq2' a1 a2
+type ApiResults = ApiItems [ApiError] [Record]
 
-instance (Eq e) =>
-         Eq1 (ApiItems2 e) where
+instance Eq2 ApiItems where
+  liftEq2 eq1' eq2' (ApiItems e1 a1) (ApiItems e2 a2) = eq1' e1 e2 && eq2' a1 a2
+
+instance Eq e =>
+         Eq1 (ApiItems e) where
   liftEq = liftEq2 (==)
 
-instance Bifunctor ApiItems2 where
-  bimap f g (ApiItems2 es as) = ApiItems2 (f es) (g as)
+instance Bifunctor ApiItems where
+  bimap f g (ApiItems es as) = ApiItems (f es) (g as)
 
-instance Functor (ApiItems2 e) where
-  fmap f (ApiItems2 es as) = ApiItems2 es (f as)
+instance Functor (ApiItems e) where
+  fmap f (ApiItems es as) = ApiItems es (f as)
 
-instance Foldable (ApiItems2 e) where
-  foldMap f (ApiItems2 _ as) = f as
+instance Foldable (ApiItems e) where
+  foldMap f (ApiItems _ as) = f as
 
-instance Traversable (ApiItems2 e) where
-  traverse f (ApiItems2 es as) = ApiItems2 es <$> f as
+instance Traversable (ApiItems e) where
+  traverse f (ApiItems es as) = ApiItems es <$> f as
 
 instance (Monoid e, Monoid a) =>
-         Monoid (ApiItems2 e a) where
-  mempty = ApiItems2 mempty mempty
-  mappend (ApiItems2 e1 a1) (ApiItems2 e2 a2) = ApiItems2 (e1 <> e2) (a1 <> a2)
+         Monoid (ApiItems e a) where
+  mempty = ApiItems mempty mempty
+  mappend (ApiItems e1 a1) (ApiItems e2 a2) = ApiItems (e1 <> e2) (a1 <> a2)
 
 instance Monoid e =>
-         Applicative (ApiItems2 e) where
-  pure = ApiItems2 mempty
-  ApiItems2 _ f <*> ApiItems2 es as = ApiItems2 es (f as)
+         Applicative (ApiItems e) where
+  pure = ApiItems mempty
+  ApiItems _ f <*> ApiItems es as = ApiItems es (f as)
 
 instance Monoid e =>
-         Monad (ApiItems2 e) where
-  ApiItems2 es as >>= k =
-    let (ApiItems2 e a) = k as
-    in ApiItems2 (es <> e) a
+         Monad (ApiItems e) where
+  ApiItems es as >>= k =
+    let (ApiItems e a) = k as
+    in ApiItems (es <> e) a
 
 instance Monoid e =>
-         MonadFix (ApiItems2 e) where
+         MonadFix (ApiItems e) where
   mfix f =
-    let a = f (succs2 a)
+    let a = f (succs a)
     in a
 
-instance ToJSON ApiResults2 where
-  toJSON (ApiItems2 [] as) = toJSON as
-  toJSON (ApiItems2 [e] []) = toJSON (Fail e :: ApiItem ApiError Record)
-  toJSON (ApiItems2 es as) = toJSON ((Succ <$> as) <> (Fail <$> es))
-
-newtype ApiItems2T e m a =
-  ApiItems2T (m (ApiItems2 e a))
-
-runApiItems2T :: ApiItems2T e m a -> m (ApiItems2 e a)
-runApiItems2T (ApiItems2T m) = m
-
-mapApiItems2T
-  :: (n (ApiItems2 e1 a1) -> m (ApiItems2 e2 a2))
-  -> ApiItems2T e1 n a1
-  -> ApiItems2T e2 m a2
-mapApiItems2T f m = ApiItems2T $ f (runApiItems2T m)
-
 -- ^
--- Error counterpart of 'pure'
-throwApi
-  :: Monoid a
-  => e -> ApiItems2 e a
-throwApi = flip ApiItems2 mempty
+-- Monad transformer variant of 'ApiItems'
+newtype ApiItemsT e m a =
+  ApiItemsT (m (ApiItems e a))
 
--- ^
--- Error counterpart of 'pure'
-throwApiE
-  :: (Monad m, Monoid a)
-  => e -> ApiItems2T e m a
-throwApiE = ApiItems2T . return . throwApi
+type ApiResultsT m = ApiItemsT [ApiError] m [Record]
+
+runApiItemsT :: ApiItemsT e m a -> m (ApiItems e a)
+runApiItemsT (ApiItemsT m) = m
+
+mapApiItemsT
+  :: (n (ApiItems e1 a1) -> m (ApiItems e2 a2))
+  -> ApiItemsT e1 n a1
+  -> ApiItemsT e2 m a2
+mapApiItemsT f m = ApiItemsT $ f (runApiItemsT m)
+
+eitherToItemsT :: Monad m => [Either e a] -> ApiItemsT [e] m [a]
+eitherToItemsT = ApiItemsT . return . eitherToItems
+
+throwApiE :: (Monad m, Monoid a) => e -> ApiItemsT e m a
+throwApiE = ApiItemsT . return . throwApi
 
 instance (Eq e, Eq1 m) =>
-         Eq1 (ApiItems2T e m) where
-  liftEq eq (ApiItems2T a) (ApiItems2T b) = liftEq (liftEq eq) a b
+         Eq1 (ApiItemsT e m) where
+  liftEq eq (ApiItemsT a) (ApiItemsT b) = liftEq (liftEq eq) a b
 
 instance (Eq e, Eq1 m, Eq a) =>
-         Eq (ApiItems2T e m a) where
+         Eq (ApiItemsT e m a) where
   (==) = eq1
 
 instance (Functor m) =>
-         Functor (ApiItems2T e m) where
-  fmap f = ApiItems2T . fmap (fmap f) . runApiItems2T
+         Functor (ApiItemsT e m) where
+  fmap f = ApiItemsT . fmap (fmap f) . runApiItemsT
 
 instance (Foldable m, Functor m) =>
-         Foldable (ApiItems2T e m) where
-  foldMap f (ApiItems2T a) = foldMap f (succs2 <$> a)
+         Foldable (ApiItemsT e m) where
+  foldMap f (ApiItemsT a) = foldMap f (succs <$> a)
 
 instance (Traversable m) =>
-         Traversable (ApiItems2T e m) where
-  traverse f (ApiItems2T a) = ApiItems2T <$> sequenceA (traverse f <$> a)
+         Traversable (ApiItemsT e m) where
+  traverse f (ApiItemsT a) = ApiItemsT <$> sequenceA (traverse f <$> a)
 
 instance (Functor m, Monad m, Monoid e) =>
-         Applicative (ApiItems2T e m) where
-  pure = ApiItems2T . return . pure
-  ApiItems2T f <*> ApiItems2T a =
-    ApiItems2T $ do
+         Applicative (ApiItemsT e m) where
+  pure = ApiItemsT . return . pure
+  ApiItemsT f <*> ApiItemsT a =
+    ApiItemsT $ do
       mf <- f
       ma <- a
       return (mf <*> ma)
 
 instance (Monad m, Monoid e) =>
-         Monad (ApiItems2T e m) where
+         Monad (ApiItemsT e m) where
   m >>= k =
-    ApiItems2T $ do
-      (ApiItems2 es as) <- runApiItems2T m
-      (ApiItems2 me ma) <- runApiItems2T (k as)
-      return (ApiItems2 (es <> me) ma)
+    ApiItemsT $ do
+      (ApiItems es as) <- runApiItemsT m
+      (ApiItems me ma) <- runApiItemsT (k as)
+      return (ApiItems (es <> me) ma)
 
 instance (Monoid e) =>
-         MonadTrans (ApiItems2T e) where
-  lift = ApiItems2T . fmap pure
+         MonadTrans (ApiItemsT e) where
+  lift = ApiItemsT . fmap pure
 
 instance (MonadIO m, Monoid e) =>
-         MonadIO (ApiItems2T e m) where
+         MonadIO (ApiItemsT e m) where
   liftIO = lift . liftIO
 
 instance (Monoid e, MonadReader r m) =>
-         MonadReader r (ApiItems2T e m) where
+         MonadReader r (ApiItemsT e m) where
   ask = lift ask
-  local = mapApiItems2T . local
+  local = mapApiItemsT . local
   reader = lift . reader
 
 instance (Monoid e) =>
-         MonadTransControl (ApiItems2T e) where
-  type StT (ApiItems2T e) a = ApiItems2 e a
-  liftWith f = ApiItems2T $ return <$> f runApiItems2T
-  restoreT = ApiItems2T
+         MonadTransControl (ApiItemsT e) where
+  type StT (ApiItemsT e) a = ApiItems e a
+  liftWith f = ApiItemsT $ return <$> f runApiItemsT
+  restoreT = ApiItemsT
 
 instance (Monoid e) =>
-         MonadBase (ApiItems2 e) (ApiItems2 e) where
+         MonadBase (ApiItems e) (ApiItems e) where
   liftBase = id
 
 instance (Monoid e) =>
-         MonadBaseControl (ApiItems2 e) (ApiItems2 e) where
-  type StM (ApiItems2 e) a = a
+         MonadBaseControl (ApiItems e) (ApiItems e) where
+  type StM (ApiItems e) a = a
   liftBaseWith f = f id
   restoreM = return
 
 instance (Monoid e, MonadBase b m) =>
-         MonadBase b (ApiItems2T e m) where
+         MonadBase b (ApiItemsT e m) where
   liftBase = liftBaseDefault
 
 instance (Monoid e, MonadBaseControl b m) =>
-         MonadBaseControl b (ApiItems2T e m) where
-  type StM (ApiItems2T e m) a = ComposeSt (ApiItems2T e) m a
+         MonadBaseControl b (ApiItemsT e m) where
+  type StM (ApiItemsT e m) a = ComposeSt (ApiItemsT e) m a
   liftBaseWith = defaultLiftBaseWith
   restoreM = defaultRestoreM
-
--- ^
--- A collection of 'ApiItem's
--- TODO: maybe we don't need to maintain two separate lists
--- TODO: replace with ApiItems2
-data ApiItems e a = ApiItems
-  { fails :: [ApiItem e a]
-  , succs :: [ApiItem e a]
-  } deriving (Eq, Show)
-
-type ApiResults = ApiItems ApiError Record
-
-mkApiItems :: [ApiItem e b] -> [ApiItem e b] -> ApiItems e b
-mkApiItems es as = ApiItems (es <> filter isFailure as) (filter isSuccess as)
-
-mkApiItems' :: [ApiItem e b] -> ApiItems e b
-mkApiItems' = mkApiItems []
-
-apiItems :: ApiItems e a -> [ApiItem e a]
-apiItems (ApiItems es as) = as <> es
-
-mapSucc :: ([ApiItem e b] -> [ApiItem e b]) -> ApiItems e b -> ApiItems e b
-mapSucc f (ApiItems es as) = mkApiItems es (f as)
-
-instance Functor (ApiItems e) where
-  fmap f (ApiItems es as) = mkApiItems (fmap f <$> es) (fmap f <$> as)
-
-instance Monoid (ApiItems e a) where
-  mempty = ApiItems [] []
-  mappend (ApiItems e1 a1) (ApiItems e2 a2) = ApiItems (e1 <> e2) (a1 <> a2)
-
-instance Applicative (ApiItems e) where
-  pure a = ApiItems [] [Succ a]
-  ApiItems _ fs <*> ApiItems es as =
-    mkApiItems
-      (concatMap (\f -> fmap (f <*>) es) fs)
-      (concatMap (\f -> fmap (f <*>) as) fs)
-
-instance Monad (ApiItems e) where
-  (ApiItems es as) >>= k =
-    let es' = foldr (<>) mempty (f <$> es)
-        as' = foldr (<>) mempty (f <$> as)
-        f (Fail e) = ApiItems [Fail e] []
-        f (Succ a) = k a
-    in es' <> as'
-
-instance ToJSON a =>
-         ToJSON (ApiItems ApiError a) where
-  toJSON (ApiItems es as) = toJSON (as <> es)
 
 -- ^
 -- Application name

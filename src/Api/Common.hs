@@ -43,10 +43,10 @@ type GenericApi =
   :<|> ReqBody '[JSON] (ApiData Record) :> PostCreated '[JSON] (Headers '[Header "Location" String, Header "Link" String] (ApiData ApiResult))
   -- update (replace)
   :<|> Capture "id" Text :> ReqBody '[JSON] Record :> Put '[JSON] Record
-  :<|> ReqBody '[JSON] [Record] :> Put '[JSON] ApiResults
+  :<|> ReqBody '[JSON] [Record] :> Put '[JSON] [ApiResult]
   -- update (modify)
   :<|> Capture "id" Text :> ReqBody '[JSON] Record :> Patch '[JSON] Record
-  :<|> ReqBody '[JSON] [Record] :> Patch '[JSON] ApiResults
+  :<|> ReqBody '[JSON] [Record] :> Patch '[JSON] [ApiResult]
   -- options
   :<|> Capture "id" Text :> OptionsNoContent '[JSON] (Headers '[Header "Access-Control-Allow-Methods" String] NoContent)
   :<|> OptionsNoContent '[JSON] (Headers '[Header "Access-Control-Allow-Methods" String] NoContent)
