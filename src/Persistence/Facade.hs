@@ -4,15 +4,18 @@
 -- ^
 -- Facade that provides consistent access to persistence functionality
 module Persistence.Facade
-  ( dbInsert
+  ( dbDelete
+  , dbDeleteMulti
+  , dbInsert
   , dbInsertMulti
   , dbModify
   , dbModifyMulti
   , dbPipe
   , dbReplace
   , dbReplaceMulti
+  , dbUpdateMulti
   , getExisting
-  , getExistingMulti
+  , dbGetExistingMulti
   , mergeFromMap
   , mkIdIndexedMap
   , mkRecordMap
@@ -66,10 +69,15 @@ dbModify
   => RecordDefinition -> Record -> ExceptT ApiError m Record
 dbModify = toSingle . dbModifyMulti
 
+dbDelete
+  :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
+  => RecordDefinition -> RecordId -> ExceptT ApiError m Record
+dbDelete = toSingle . dbDeleteMulti
+
 getExisting
   :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
   => RecordDefinition -> RecordId -> ExceptT ApiError m Record
-getExisting = toSingle . getExistingMulti
+getExisting = toSingle . dbGetExistingMulti
 
 dbReplaceMulti
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
@@ -86,6 +94,7 @@ dbModifyMulti = dbUpdateMulti False
 dbInsertMulti
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
   => RecordDefinition -> [Record] -> ApiResultsT m
+dbInsertMulti _ [] = return []
 dbInsertMulti def input = do
   valid <- validateMulti def input
   let records = populateDefaults def <$> valid
@@ -98,15 +107,26 @@ dbInsertMulti def input = do
 dbUpdateMulti
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
   => Bool -> RecordDefinition -> [Record] -> ApiResultsT m
+dbUpdateMulti _ _ [] = return []
 dbUpdateMulti replace def input = do
   valid1 <- validateDbIdMulti input
-  existing <- getExistingMulti def $ getIdValue' <$> valid1
+  existing <- dbGetExistingMulti def $ getIdValue' <$> valid1
   let merged = mergeFromMap replace (mkIdIndexedMap valid1) <$> existing
   valid2 <- validateMulti def merged
   let records = populateDefaults def <$> valid2
   savedIds <- runDbMulti (dbAction DB.dbUpdate def records)
   saved <- runDbMulti (dbAction DB.dbGetById def savedIds)
   return (fromJust <$> saved)
+
+-- ^
+-- Delete multiple records
+dbDeleteMulti
+  :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
+  => RecordDefinition -> [RecordId] -> ApiItemsT [ApiError] m [Record]
+dbDeleteMulti def ids = do
+  existing <- dbGetExistingMulti def ids
+  _ <- runDbMulti (dbAction DB.dbDeleteById def ids)
+  return existing
 
 -- ^
 -- Merge a new record from the given map with the specified existing record
@@ -116,17 +136,20 @@ mergeFromMap replace newMap existing = mergeRecords' replace existing new
     get r = fromJust . Map.lookup (getIdValue' r)
     new = get existing newMap
 
-getExistingMulti
+-- ^
+-- Get multiple records by id
+dbGetExistingMulti
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
   => RecordDefinition -> [RecordId] -> ApiResultsT m
-getExistingMulti def ids = do
+dbGetExistingMulti def ids = do
   records <- runDbMulti (dbAction DB.dbGetById def ids)
   let tuples = zip records ids
   let result (record, rid) = maybe (Left $ mk404IdErr def rid) Right record
   eitherToItemsT (result <$> tuples)
 
 -- ^
--- Run an action that could result in a single failure
+-- Convert an action that could result in multiple errors
+-- into one that could result in a single error
 toSingle
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
   => ([a] -> ApiItemsT [e] m [b]) -> a -> ExceptT e m b
@@ -136,7 +159,8 @@ toSingle action input =
     return $ head (itemsToEither records)
 
 -- ^
--- Run an action that could result in multiple failures
+-- Convert an action that could result in a single error
+-- into one that could result in multiple errors
 toMulti
   :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
   => ExceptT a (ApiItemsT [a] m) [t] -> ApiItemsT [a] m [t]
@@ -170,7 +194,7 @@ runDb'
 runDb' action = do
   conf <- ask
   pipe <- dbPipe conf
-  lift $ action (confGetDb conf) pipe
+  lift $ action (confGetDbName conf) pipe
 
 -- ^
 -- Run an elastic-search action

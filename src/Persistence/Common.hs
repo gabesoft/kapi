@@ -72,33 +72,30 @@ mkOptDef
 mkOptDef name = mkFieldDef name False False
 
 -- ^
--- Get the MongoDB database name for an app name
+-- Get the MongoDB database name for an application
 -- from a configuration object
-confGetDb :: ApiConfig -> Database
-confGetDb = confWithAppMap mongoDbs
+confGetDbName :: ApiConfig -> Database
+confGetDbName = confWithAppMap mongoDbs
 
 -- ^
--- Get the elastic-search index name for an app name
+-- Get the elastic-search index name for an application
 -- from a configuration object
 confGetEsIndex :: ApiConfig -> Text
 confGetEsIndex = confWithAppMap esIndices
 
 confWithAppMap
-  :: Show t
-  => (ApiConfig -> Map.Map AppName t) -> ApiConfig -> t
+  :: Show a
+  => (ApiConfig -> Map.Map AppName a) -> ApiConfig -> a
 confWithAppMap f conf = confWithAppName get conf
   where
+    cmap = f conf
     get name =
       fromMaybe
-        (error $
-         "Key " ++ T.unpack name ++ " not found in map " ++ show (f conf))
-        (Map.lookup name (f conf))
+        (error $ "Key " ++ T.unpack name ++ " not found in map " ++ show cmap)
+        (Map.lookup name cmap)
 
-confWithAppName :: (AppName -> t) -> ApiConfig -> t
-confWithAppName f conf =
-  case appName conf of
-    Nothing -> error "AppName not found in config"
-    Just name -> f name
+confWithAppName :: (AppName -> a) -> ApiConfig -> a
+confWithAppName f = maybe (error "AppName not found in config") f . appName
 
 -- ^
 -- Validate a record against it's definition

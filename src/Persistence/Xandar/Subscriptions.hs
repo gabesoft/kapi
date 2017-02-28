@@ -6,6 +6,8 @@
 module Persistence.Xandar.Subscriptions
   ( addRead
   , addTags
+  , deleteSubscription
+  , deleteSubscriptions
   , insertSubscription
   , insertSubscriptions
   , mkSubscriptions
@@ -37,8 +39,8 @@ import Persistence.Facade as F
 import qualified Persistence.MongoDB as M
 import Persistence.Xandar.Common
 import Persistence.Xandar.UserPosts
-       (mkUserPostId, mkUserPostId', indexUserPosts, indexUserPosts',
-        createUserPosts, createUserPost, modifyUserPost)
+       (mkUserPostId, mkUserPostId', indexUserPosts', createUserPosts,
+        createUserPost, modifyUserPost)
 import qualified Persistence.Xandar.UserPosts as U
 import Types.Common
 
@@ -57,6 +59,11 @@ modifySubscription
   => Record -> ExceptT ApiError m Record
 modifySubscription = toSingle modifySubscriptions
 
+deleteSubscription
+  :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
+  => RecordId -> ExceptT ApiError m Record
+deleteSubscription = toSingle deleteSubscriptions
+
 modifySubscriptions
   :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
   => [Record] -> ApiItemsT [ApiError] m [Record]
@@ -74,7 +81,7 @@ insertSubscriptions
   => [Record] -> ApiItemsT [ApiError] m [Record]
 insertSubscriptions input = do
   valid <- validateSubscriptions input
-  feeds <- getExistingMulti feedDefinition (feedId <$> valid)
+  feeds <- dbGetExistingMulti feedDefinition (feedId <$> valid)
   saved <- dbInsertMulti subscriptionDefinition (mkSubscriptions feeds valid)
   _ <- indexPostsOnCreate (filter isEnabled saved)
   return saved
@@ -86,13 +93,23 @@ updateSubscriptions
   => Bool -> [Record] -> ApiItemsT [ApiError] m [Record]
 updateSubscriptions replace input = do
   valid1 <- validateDbIdMulti input
-  existing <- getExistingMulti subscriptionDefinition (getIdValue' <$> valid1)
+  existing <- dbGetExistingMulti subscriptionDefinition (getIdValue' <$> valid1)
   let merged = mergeFromMap replace (mkIdIndexedMap valid1) <$> existing
   valid2 <- validateSubscriptions merged
-  saved <- dbInsertMulti subscriptionDefinition valid2
+  saved <- dbUpdateMulti replace subscriptionDefinition valid2
   _ <- runExceptT $ esDeleteUserPosts (filter isDisabled saved)
   _ <- indexPostsOnUpdate existing (filter isEnabled saved)
   return saved
+
+-- ^
+-- Delete multiple subscriptions by id
+deleteSubscriptions
+  :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
+  => [RecordId] -> ApiItemsT [ApiError] m [Record]
+deleteSubscriptions ids = do
+  deleted <- dbDeleteMulti subscriptionDefinition ids
+  _ <- runExceptT $ esDeleteUserPosts deleted
+  return deleted
 
 -- ^
 -- Index the user-posts associated with all subscriptions being created
@@ -200,6 +217,7 @@ mkSubscriptions feeds = fmap mkSub
 dbGetPostsBySub
   :: (MonadReader ApiConfig m, MonadBaseControl IO m, MonadIO m)
   => [Record] -> ExceptT ApiError m [Record]
+dbGetPostsBySub [] = return []
 dbGetPostsBySub subs = runDb $ M.dbFind postDefinition query [] [] 0 0
   where
     query = M.idsQuery' "feedId" (feedId <$> subs)
@@ -210,6 +228,7 @@ dbGetPostsBySub subs = runDb $ M.dbFind postDefinition query [] [] 0 0
 esDeleteUserPosts
   :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
   => [Record] -> ExceptT ApiError m ()
+esDeleteUserPosts [] = return ()
 esDeleteUserPosts subs = do
   search <- ExceptT (return $ mkSearchBySubs subs)
   void . runEs $ E.deleteByQuery search userPostCollection
@@ -217,6 +236,7 @@ esDeleteUserPosts subs = do
 esGetUserPostsBySubs
   :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
   => [Record] -> ExceptT ApiError m [Record]
+esGetUserPostsBySubs [] = return []
 esGetUserPostsBySubs subs = do
   search <- ExceptT . return $ mkSearchBySubs subs
   runEsAndExtract (E.searchDocuments search userPostCollection)
@@ -249,7 +269,7 @@ isDisabled = isValueOn "disabled"
 -- ^
 -- Return true if a subscription is enabled
 isEnabled :: Record -> Bool
-isEnabled = not . isEnabled
+isEnabled = not . isDisabled
 
 -- ^
 -- Set the value of the read field

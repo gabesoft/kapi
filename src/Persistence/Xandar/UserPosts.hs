@@ -6,6 +6,8 @@
 module Persistence.Xandar.UserPosts
   ( createUserPost
   , createUserPosts
+  , esDelete
+  , esDeleteMulti
   , esInsert
   , esInsertMulti
   , esModify
@@ -22,6 +24,7 @@ module Persistence.Xandar.UserPosts
   , replaceUserPosts
   ) where
 
+import qualified Data.Set as Set
 import Control.Applicative ((<|>))
 import Control.Monad.Except
 import Control.Monad.Reader
@@ -65,6 +68,11 @@ esModify
   => Record -> ExceptT ApiError m Record
 esModify = toSingle esModifyMulti
 
+esDelete
+  :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
+  => RecordId -> ExceptT ApiError m Record
+esDelete = toSingle esDeleteMulti
+
 esReplaceMulti
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
   => [Record] -> ApiItemsT [ApiError] m [Record]
@@ -80,10 +88,10 @@ esInsertMulti
   => [Record] -> ApiItemsT [ApiError] m [Record]
 esInsertMulti input = do
   valid <- validateUserPosts input
-  subs <- getExistingMulti subscriptionDefinition (subId <$> valid)
-  posts <- getExistingMulti postDefinition (postId <$> valid)
+  subs <- dbGetExistingMulti subscriptionDefinition (subId <$> valid)
+  posts <- dbGetExistingMulti postDefinition (postId <$> valid)
   records <- createUserPosts subs posts valid
-  toMulti (indexUserPosts records)
+  indexUserPosts records
 
 esUpdateMulti
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
@@ -95,22 +103,43 @@ esUpdateMulti update input = do
   existing <- toMulti (getUserPosts $ getIdValue' <$> valid1)
   records <- update existing valid1
   valid2 <- validateMulti' fst validateRecordTuple records
-  toMulti (indexUserPosts valid2)
+  indexUserPosts valid2
+
+-- ^
+-- Delete multiple records by id
+esDeleteMulti ids = do
+  existing <- esGetExistingMulti ids
+  runExceptT $ runEs (E.deleteByIds ids userPostCollection)
+  return existing
+
+-- ^
+-- Get multiple records by id
+esGetExistingMulti
+  :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
+  => [RecordId] -> ApiResultsT m
+esGetExistingMulti ids = do
+  existing <- toMulti $ runEsAndExtract (E.getByIds ids userPostCollection)
+  let idSet = Set.fromList ids
+  let result r =
+        if Set.member (getIdValue' r) idSet
+          then Right r
+          else Left (mk404IdErr userPostDefinition $ getIdValue' r)
+  eitherToItemsT (result <$> existing)
 
 -- ^
 -- Index multiple documents and re-query them
 indexUserPosts
   :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
-  => [(Record, RecordId)] -> ExceptT ApiError m [Record]
+  => [(Record, RecordId)] -> ApiResultsT m
 indexUserPosts input =
-  indexUserPosts' input >>
-  runEsAndExtract (E.getByIds (snd <$> input) userPostCollection)
+  runExceptT (indexUserPosts' input) >> esGetExistingMulti (snd <$> input)
 
 -- ^
 -- Index multiple documents
 indexUserPosts'
   :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
   => [(Record, RecordId)] -> ExceptT ApiError m Text
+indexUserPosts' [] = return mempty
 indexUserPosts' input =
   runEs (E.indexDocuments input userPostCollection) <* runEs E.refreshIndex
 

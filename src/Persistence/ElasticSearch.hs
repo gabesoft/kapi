@@ -6,6 +6,7 @@ module Persistence.ElasticSearch
   ( createIndex
   , countDocuments
   , deleteByQuery
+  , deleteByIds
   , deleteDocument
   , deleteDocuments
   , deleteIndex
@@ -15,7 +16,6 @@ module Persistence.ElasticSearch
   , getByIds
   , indexDocument
   , indexDocuments
-  , mkIdsSearch
   , mkSearch
   , mkSearchAll
   , putMapping
@@ -186,6 +186,12 @@ deleteByQuery search mappingName server index = do
       B.scanSearch (IndexName index) (MappingName mappingName) search'
 
 -- ^
+-- Delete multiple documents by id
+deleteByIds :: [Text] -> Text -> Text -> Text -> IO (Either EsError Text)
+deleteByIds ids mappingName =
+  deleteByQuery (mkIdsSearch ids mappingName) mappingName
+
+-- ^
 -- Get documents by id
 getByIds :: [Text]
          -> Text
@@ -193,7 +199,7 @@ getByIds :: [Text]
          -> Text
          -> IO (Either EsError (SearchResult Record))
 getByIds ids mappingName =
-  searchDocuments (mkIdsSearch mappingName ids) mappingName
+  searchDocuments (mkIdsSearch ids mappingName) mappingName
 
 -- ^
 -- Return the number of documents matching a query
@@ -220,8 +226,8 @@ searchDocuments search mappingName server index = do
 
 -- ^
 -- Create a search object for finding records by id
-mkIdsSearch :: Text -> [Text] -> Search
-mkIdsSearch mappingName ids =
+mkIdsSearch :: [Text] -> Text -> Search
+mkIdsSearch ids mappingName =
   mkSearch' (Just query) Nothing Nothing [] 0 (length ids)
   where
     query = IdsQuery (MappingName mappingName) (DocId <$> ids)

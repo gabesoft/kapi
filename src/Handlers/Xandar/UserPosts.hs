@@ -27,8 +27,8 @@ import Persistence.ElasticSearch
 import Persistence.Facade (runEs, dbPipe)
 import Persistence.Xandar.Common (userPostDefinition)
 import Persistence.Xandar.UserPosts
-       (esInsert, esInsertMulti, esReplace, esReplaceMulti, esModify,
-        esModifyMulti)
+       (esDelete, esInsert, esInsertMulti, esReplace, esReplaceMulti,
+        esModify, esModifyMulti)
 import Servant
 import Types.Common
 import Util.Error
@@ -83,10 +83,7 @@ getMultiple' include query sortFields page perPage = do
 -- ^
 -- Delete a single record
 deleteSingle :: Text -> Api NoContent
-deleteSingle uid = verify >> runSingle delete (const $ return NoContent)
-  where
-    verify = getSingle mempty uid
-    delete = runEs $ deleteDocument uid mappingName
+deleteSingle uid = runSingle (esDelete uid) (const $ return NoContent)
 
 -- ^
 -- Create one or more records

@@ -18,12 +18,12 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Database.Bloodhound as B
 import Database.MongoDB (Pipe)
-import Handlers.Xandar.Common (dbPipe)
 import Network.HTTP.Client
 import Network.HTTP.Types.Status
 import Parsers.Filter
 import Persistence.Common
 import Persistence.ElasticSearch
+import Persistence.Facade (dbPipe)
 import Persistence.Xandar.Common
 import Persistence.Xandar.UserPosts
 import TestHelper

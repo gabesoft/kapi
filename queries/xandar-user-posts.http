@@ -36,6 +36,16 @@ GET http://:host/:path?where=(subscriptionId eq 56d7df90c788cb1d6eb92789)&includ
 GET http://:host/:path?where=(subscriptionId eq 58a3fc135984184d4f000002)&include=createdAt,updatedAt,title,subscriptionId,tags
 
 #
+# Find by subscription id 2
+#
+GET http://:host/:path?where=(subscriptionId eq 58b5244e5984182c66000012)&include=createdAt,updatedAt,title,subscriptionId,tags
+
+#
+# Find by feed id
+#
+GET http://:host/:path?where=(feedId eq 56d7ddf8c788cb1d6eb919d8)&include=createdAt,updatedAt,title,subscriptionId,tags
+
+#
 # Count by subscription ids (head)
 #
 HEAD http://:host/:path?where=(subscriptionId in [56d7d89dc788cb1d6eb919b1, 56d7df90c788cb1d6eb92789, 56d7ddf5c788cb1d6eb919d7])&include=title,feedId,subscriptionId,link,tags
@@ -104,6 +114,11 @@ HEAD http://:host/:path/1
 # Delete a single post
 #
 DELETE http://:host/:path/57f422da966d70b95f5e5228-56d7e0c2c788cb1d6eb93217
+
+#
+# Delete a single post
+#
+DELETE http://:host/:path/56d7ddf8c788cb1d6eb919da-56d7ddf8c788cb1d6eb919ed
 
 #
 # Get post by id (existing)

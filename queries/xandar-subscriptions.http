@@ -30,6 +30,11 @@ GET http://:host/:path?per_page=10&where=(disabled eq false)&include=feedId,titl
 GET http://:host/:path?where=(feedId eq 56d7d88bc788cb1d6eb9199c)
 
 #
+# Get a subscription by feed id
+#
+GET http://:host/:path?where=(feedId eq 56d7ddf8c788cb1d6eb919d8)
+
+#
 # Get all subscription for feeds
 #
 GET http://:host/:path?where=(feedId in [56d7defcc788cb1d6eb922c8, 56d7df24c788cb1d6eb92486, 56d7e122c788cb1d6eb93495])
@@ -70,6 +75,11 @@ DELETE http://:host/:path/non-existent
 # Delete an existent subscription
 #
 DELETE http://:host/:path/56d7d89dc788cb1d6eb919b1 
+
+#
+# Delete an existent subscription
+#
+DELETE http://:host/:path/58b5244e5984182c66000012
 
 #
 # Create a single subscription
@@ -166,7 +176,7 @@ Content-Type: :json
       "tech",
       "javascript"
     ],
-    "title": "Ajaxian » Front Page",
+    "title": "Ajaxian Front Page",
     "updatedAt": "2016-03-13T18:23:47.055Z",
     "userId": "56d7cc3fccee17506699e735"
   },

@@ -36,7 +36,7 @@ getMultiple = C.getMultiple mkSubscriptionGetMultipleLink subscriptionDefinition
 -- ^
 -- Delete a single record
 deleteSingle :: Text -> Api NoContent
-deleteSingle = C.deleteSingle subscriptionDefinition
+deleteSingle uid = runSingle (deleteSubscription uid) (const $ return NoContent)
 
 -- ^
 -- Create one or more records

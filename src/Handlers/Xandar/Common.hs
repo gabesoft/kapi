@@ -91,10 +91,7 @@ getMultiple' def include query sort page perPage = do
 -- ^
 -- Delete a single record
 deleteSingle :: RecordDefinition -> Text -> Api NoContent
-deleteSingle def uid = verify >> runSingle delete (const $ return NoContent)
-  where
-    verify = getSingle def mempty uid
-    delete = runDb $ DB.dbDeleteById def uid
+deleteSingle def uid = runSingle (dbDelete def uid) (const $ return NoContent)
 
 -- ^
 -- Create one or more records
@@ -162,7 +159,7 @@ optionsMultiple = return $ addHeader "GET, POST, PATCH, PUT" NoContent
 addDbIndices :: [Index] -> ApiConfig -> IO ()
 addDbIndices indices conf = do
   pipe <- dbPipe conf
-  mapM_ (\idx -> DB.dbAddIndex idx (confGetDb conf) pipe) indices
+  mapM_ (\idx -> DB.dbAddIndex idx (confGetDbName conf) pipe) indices
 
 -- ^
 -- Run an action that could result in a single error
