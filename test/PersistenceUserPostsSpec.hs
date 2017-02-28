@@ -2,9 +2,7 @@
 
 -- ^
 -- Tests for Persistence.Xandar.UserPosts
-module Main
-  ( main
-  ) where
+module Main (main) where
 
 import Control.Monad.IO.Class
 import Data.Bifunctor
@@ -33,7 +31,7 @@ main =
       it "ensures a user post contains a postId and a subscriptionId" $
         verifyValidation inputInvalid1 (inputInvalid1, invalidErrors)
 
-    describe "createUserPost" $ do
+    describe "mkUserPostOnCreate" $ do
       it "missing post results in an error" =<<
         runIO verifyCreateUserPostMissingPost
       it "missing subscription results in an error" verifyCreateUserPostMissingSub
@@ -41,16 +39,16 @@ main =
       it "generates the correct id" =<< runIO verifyCreateUserPostId
       it "generates the correct record" =<< runIO verifyCreateUserPostRecord
 
-    describe "replaceUserPost" $ do
-      it "removes the id field" =<< runIO (verifyExcludesId replaceUserPost)
-      it "keeps the createdAt text value" =<< runIO (verifyCreatedAtText replaceUserPost)
-      it "keeps the createdAt UTC value" =<< runIO (verifyCreatedAtUTC replaceUserPost)
+    describe "mkUserPostOnReplace" $ do
+      it "removes the id field" =<< runIO (verifyExcludesId mkUserPostOnReplace)
+      it "keeps the createdAt text value" =<< runIO (verifyCreatedAtText mkUserPostOnReplace)
+      it "keeps the createdAt UTC value" =<< runIO (verifyCreatedAtUTC mkUserPostOnReplace)
       it "replaces the existing record" =<< runIO verifyReplace
 
-    describe "modifyUserPost" $ do
-      it "removes the id field" =<< runIO (verifyExcludesId modifyUserPost)
-      it "keeps the createdAt text value" =<< runIO (verifyCreatedAtText modifyUserPost)
-      it "keeps the createdAt UTC value" =<< runIO (verifyCreatedAtUTC modifyUserPost)
+    describe "mkUserPostOnModify" $ do
+      it "removes the id field" =<< runIO (verifyExcludesId mkUserPostOnModify)
+      it "keeps the createdAt text value" =<< runIO (verifyCreatedAtText mkUserPostOnModify)
+      it "keeps the createdAt UTC value" =<< runIO (verifyCreatedAtUTC mkUserPostOnModify)
       it "modifies the existing record" =<< runIO verifyModify
 
 verifyValidation :: Record -> (Record, ValidationResult) -> Expectation
@@ -61,31 +59,31 @@ verifyCreateUserPostMissingPost
   :: MonadIO m
   => m Expectation
 verifyCreateUserPostMissingPost = do
-  actual <- createUserPost (Just sub1) Nothing emptyRecord
+  actual <- mkUserPostOnCreate (Just sub1) Nothing emptyRecord
   return $ actual `shouldBe` Left missingPostResult
 
 verifyCreateUserPostMissingSub :: Expectation
 verifyCreateUserPostMissingSub =
-  createUserPost Nothing (Just post) emptyRecord `shouldReturn`
+  mkUserPostOnCreate Nothing (Just post) emptyRecord `shouldReturn`
   Left missingSubResult
 
 verifyCreateUserPostMismatch :: Expectation
 verifyCreateUserPostMismatch =
-  createUserPost (Just sub2) (Just post) inputValid1 `shouldReturn`
+  mkUserPostOnCreate (Just sub2) (Just post) inputValid1 `shouldReturn`
   result2 (Just inputValid1)
 
 verifyCreateUserPostId
   :: MonadIO m
   => m Expectation
 verifyCreateUserPostId = do
-  actual <- createUserPost (Just sub1) (Just post) inputValid1
+  actual <- mkUserPostOnCreate (Just sub1) (Just post) inputValid1
   return $ snd (fromRight actual) `shouldBe` userPost1Id
 
 verifyCreateUserPostRecord
   :: MonadIO m
   => m Expectation
 verifyCreateUserPostRecord = do
-  actual <- createUserPost (Just sub1) (Just post) inputValid1
+  actual <- mkUserPostOnCreate (Just sub1) (Just post) inputValid1
   let actualDoc = getDocument $ replaceDates (getRecord actual)
   let expectedDoc = getDocument $ replaceDates userPost1
   return $ actualDoc `shouldMatchList` expectedDoc
@@ -130,7 +128,7 @@ verifyReplace
   :: MonadIO m
   => m Expectation
 verifyReplace = do
-  actual <- replaceUserPost (Just userPost1) inputValidForReplace
+  actual <- mkUserPostOnReplace (Just userPost1) inputValidForReplace
   return $
     replaceUpdatedAt (getRecord actual) `shouldMatchRecord` resultForReplace
 
@@ -138,7 +136,7 @@ verifyModify
   :: MonadIO m
   => m Expectation
 verifyModify = do
-  actual <- modifyUserPost (Just userPost2) inputValidForModify
+  actual <- mkUserPostOnModify (Just userPost2) inputValidForModify
   return $
     replaceUpdatedAt (getRecord actual) `shouldMatchRecord` resultForModify
 

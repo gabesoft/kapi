@@ -4,27 +4,26 @@
 -- ^
 -- Persistence functionality for user-posts
 module Persistence.Xandar.UserPosts
-  ( createUserPost
-  , createUserPosts
-  , esDelete
-  , esDeleteMulti
-  , esInsert
-  , esInsertMulti
-  , esModify
-  , esModifyMulti
-  , esReplace
-  , esReplaceMulti
+  ( deleteUserPost
+  , deleteUserPosts
   , indexUserPosts
   , indexUserPosts'
+  , insertUserPost
+  , insertUserPosts
   , mkUserPostId
   , mkUserPostId'
+  , mkUserPostOnCreate
+  , mkUserPostOnModify
+  , mkUserPostOnReplace
+  , mkUserPostsOnCreate
+  , mkUserPostsOnModify
+  , mkUserPostsOnReplace
   , modifyUserPost
   , modifyUserPosts
   , replaceUserPost
   , replaceUserPosts
   ) where
 
-import qualified Data.Set as Set
 import Control.Applicative ((<|>))
 import Control.Monad.Except
 import Control.Monad.Reader
@@ -37,6 +36,7 @@ import Data.Either
 import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.Monoid ((<>))
+import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time (UTCTime)
@@ -53,52 +53,52 @@ import Types.Common
 import Util.Constants
 import Util.Error
 
-esInsert
+insertUserPost
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
   => Record -> ExceptT ApiError m Record
-esInsert = toSingle esInsertMulti
+insertUserPost = toSingle insertUserPosts
 
-esReplace
+replaceUserPost
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
   => Record -> ExceptT ApiError m Record
-esReplace = toSingle esReplaceMulti
+replaceUserPost = toSingle replaceUserPosts
 
-esModify
+modifyUserPost
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
   => Record -> ExceptT ApiError m Record
-esModify = toSingle esModifyMulti
+modifyUserPost = toSingle modifyUserPosts
 
-esDelete
+deleteUserPost
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
   => RecordId -> ExceptT ApiError m Record
-esDelete = toSingle esDeleteMulti
+deleteUserPost = toSingle deleteUserPosts
 
-esReplaceMulti
+replaceUserPosts
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
   => [Record] -> ApiItemsT [ApiError] m [Record]
-esReplaceMulti = esUpdateMulti replaceUserPosts
+replaceUserPosts = updateUserPosts mkUserPostsOnReplace
 
-esModifyMulti
+modifyUserPosts
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
   => [Record] -> ApiItemsT [ApiError] m [Record]
-esModifyMulti = esUpdateMulti modifyUserPosts
+modifyUserPosts = updateUserPosts mkUserPostsOnModify
 
-esInsertMulti
+insertUserPosts
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
   => [Record] -> ApiItemsT [ApiError] m [Record]
-esInsertMulti input = do
+insertUserPosts input = do
   valid <- validateUserPosts input
   subs <- dbGetExistingMulti subscriptionDefinition (subId <$> valid)
   posts <- dbGetExistingMulti postDefinition (postId <$> valid)
-  records <- createUserPosts subs posts valid
+  records <- mkUserPostsOnCreate subs posts valid
   indexUserPosts records
 
-esUpdateMulti
+updateUserPosts
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
   => ([Record] -> [Record] -> ApiItemsT [ApiError] m [(Record, RecordId)])
   -> [Record]
   -> ApiItemsT [ApiError] m [Record]
-esUpdateMulti update input = do
+updateUserPosts update input = do
   valid1 <- validateEsIdMulti input
   existing <- toMulti (getUserPosts $ getIdValue' <$> valid1)
   records <- update existing valid1
@@ -107,17 +107,17 @@ esUpdateMulti update input = do
 
 -- ^
 -- Delete multiple records by id
-esDeleteMulti ids = do
-  existing <- esGetExistingMulti ids
+deleteUserPosts ids = do
+  existing <- getExistingUserPosts ids
   runExceptT $ runEs (E.deleteByIds ids userPostCollection)
   return existing
 
 -- ^
 -- Get multiple records by id
-esGetExistingMulti
+getExistingUserPosts
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
   => [RecordId] -> ApiResultsT m
-esGetExistingMulti ids = do
+getExistingUserPosts ids = do
   existing <- toMulti $ runEsAndExtract (E.getByIds ids userPostCollection)
   let idSet = Set.fromList ids
   let result r =
@@ -132,7 +132,7 @@ indexUserPosts
   :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
   => [(Record, RecordId)] -> ApiResultsT m
 indexUserPosts input =
-  runExceptT (indexUserPosts' input) >> esGetExistingMulti (snd <$> input)
+  runExceptT (indexUserPosts' input) >> getExistingUserPosts (snd <$> input)
 
 -- ^
 -- Index multiple documents
@@ -143,50 +143,50 @@ indexUserPosts' [] = return mempty
 indexUserPosts' input =
   runEs (E.indexDocuments input userPostCollection) <* runEs E.refreshIndex
 
-replaceUserPosts
+mkUserPostsOnReplace
   :: (MonadIO m)
   => [Record] -> [Record] -> ApiItemsT [ApiError] m [(Record, RecordId)]
-replaceUserPosts = updateUserPosts replaceUserPost
+mkUserPostsOnReplace = mkUserPostsOnUpdate mkUserPostOnReplace
 
-modifyUserPosts
+mkUserPostsOnModify
   :: (MonadIO m)
   => [Record] -> [Record] -> ApiItemsT [ApiError] m [(Record, RecordId)]
-modifyUserPosts = updateUserPosts modifyUserPost
+mkUserPostsOnModify = mkUserPostsOnUpdate mkUserPostOnModify
 
-updateUserPosts
+mkUserPostsOnUpdate
   :: Monad m
   => (Maybe Record -> Record -> m (Either e a))
   -> [Record]
   -> [Record]
   -> ApiItemsT [e] m [a]
-updateUserPosts f existing = runAction mkRecord
+mkUserPostsOnUpdate f existing = runAction mkRecord
   where
     mkRecord r = f (get r) r
     get r = Map.lookup (getIdValue' r) recordMap
     recordMap = mkIdIndexedMap existing
 
-createUserPosts
+mkUserPostsOnCreate
   :: MonadIO m
   => [Record]
   -> [Record]
   -> [Record]
   -> ApiItemsT [ApiError] m [(Record, RecordId)]
-createUserPosts subs posts = runAction mkRecord
+mkUserPostsOnCreate subs posts = runAction mkRecord
   where
-    mkRecord r = createUserPost (get subMap subId r) (get postMap postId r) r
+    mkRecord r = mkUserPostOnCreate (get subMap subId r) (get postMap postId r) r
     get m fid r = Map.lookup (fid r) m
     subMap = mkIdIndexedMap subs
     postMap = mkIdIndexedMap posts
 
-createUserPost
+mkUserPostOnCreate
   :: MonadIO m
   => Maybe Record
   -> Maybe Record
   -> Record
   -> m (Either ApiError (Record, RecordId))
-createUserPost _ Nothing r = return . Left $ mk404Err postDefinition r
-createUserPost Nothing _ r = return . Left $ mk404Err subscriptionDefinition r
-createUserPost (Just sub) (Just post) input
+mkUserPostOnCreate _ Nothing r = return . Left $ mk404Err postDefinition r
+mkUserPostOnCreate Nothing _ r = return . Left $ mk404Err subscriptionDefinition r
+mkUserPostOnCreate (Just sub) (Just post) input
   | not (postBelongsToSub sub post) =
     return . Left $ mk400Err "Post does not belong to subscription." input
   | otherwise = Right <$> mkUserPostTuple Nothing recId record
@@ -197,14 +197,14 @@ createUserPost (Just sub) (Just post) input
     base = foldr (uncurry setValue) (mergeRecords sub' $ mkPost post) ids
     input' = excludeFields skipFieldsOnCreate input
 
-updateUserPost
+mkUserPostOnUpdate
   :: MonadIO m
   => (Record -> Record -> Record)
   -> Maybe Record
   -> Record
   -> m (Either ApiError (Record, RecordId))
-updateUserPost _ Nothing r = return . Left $ mk404Err userPostDefinition r
-updateUserPost f (Just existing) input =
+mkUserPostOnUpdate _ Nothing r = return . Left $ mk404Err userPostDefinition r
+mkUserPostOnUpdate f (Just existing) input =
   Right <$>
   mkUserPostTuple
     (Just existing)
@@ -213,15 +213,15 @@ updateUserPost f (Just existing) input =
   where
     record = excludeFields skipFieldsOnUpdate input
 
-replaceUserPost
+mkUserPostOnReplace
   :: MonadIO m
   => Maybe Record -> Record -> m (Either ApiError (Record, RecordId))
-replaceUserPost = updateUserPost (replaceRecords skipFieldsOnUpdate)
+mkUserPostOnReplace = mkUserPostOnUpdate (replaceRecords skipFieldsOnUpdate)
 
-modifyUserPost
+mkUserPostOnModify
   :: MonadIO m
   => Maybe Record -> Record -> m (Either ApiError (Record, RecordId))
-modifyUserPost = updateUserPost mergeRecords
+mkUserPostOnModify = mkUserPostOnUpdate mergeRecords
 
 mkUserPostTuple
   :: MonadIO m

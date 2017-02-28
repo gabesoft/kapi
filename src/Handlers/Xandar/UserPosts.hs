@@ -15,20 +15,19 @@ import Control.Monad.Trans.Control
 import Data.Bifunctor
 import Data.Bson ((=:))
 import Data.Text (Text)
-import Database.Bloodhound (Search, EsError)
+import Database.Bloodhound (Search)
 import Handlers.Xandar.Common
        (mkPagination, splitLabels, mkGetMultipleResult,
-        mkCreateMultipleResult, getCreateLink, mkGetSingleResult,
-        mkCreateSingleResult, runSingle, updateSingle, runMulti)
+        mkCreateMultipleResult, mkGetSingleResult, mkCreateSingleResult,
+        runSingle, updateSingle, runMulti)
 import qualified Handlers.Xandar.Common as C
 import Parsers.Filter (parse)
-import Persistence.Common
 import Persistence.ElasticSearch
-import Persistence.Facade (runEs, dbPipe)
+import Persistence.Facade (runEs)
 import Persistence.Xandar.Common (userPostDefinition)
 import Persistence.Xandar.UserPosts
-       (esDelete, esInsert, esInsertMulti, esReplace, esReplaceMulti,
-        esModify, esModifyMulti)
+       (deleteUserPost, insertUserPost, insertUserPosts, replaceUserPost,
+        replaceUserPosts, modifyUserPost, modifyUserPosts)
 import Servant
 import Types.Common
 import Util.Error
@@ -83,7 +82,7 @@ getMultiple' include query sortFields page perPage = do
 -- ^
 -- Delete a single record
 deleteSingle :: Text -> Api NoContent
-deleteSingle uid = runSingle (esDelete uid) (const $ return NoContent)
+deleteSingle uid = runSingle (deleteUserPost uid) (const $ return NoContent)
 
 -- ^
 -- Create one or more records
@@ -101,7 +100,7 @@ createSingle
   -> Record
   -> Api (Headers '[ Header "Location" String, Header "Link" String] (ApiData ApiResult))
 createSingle getLink input =
-  runSingle (esInsert input) (mkCreateSingleResult getLink)
+  runSingle (insertUserPost input) (mkCreateSingleResult getLink)
 
 -- ^
 -- Create multiple records
@@ -110,27 +109,27 @@ createMultiple
   -> [Record]
   -> Api (Headers '[ Header "Location" String, Header "Link" String] (ApiData ApiResult))
 createMultiple getLink input =
-  runMulti (esInsertMulti input) >>= mkCreateMultipleResult getLink
+  runMulti (insertUserPosts input) >>= mkCreateMultipleResult getLink
 
 -- ^
 -- Update (replace) a single record
 replaceSingle :: Text -> Record -> Api Record
-replaceSingle = updateSingle esReplace
+replaceSingle = updateSingle replaceUserPost
 
 -- ^
 -- Update (modify) a single record
 modifySingle :: Text -> Record -> Api Record
-modifySingle = updateSingle esModify
+modifySingle = updateSingle modifyUserPost
 
 -- ^
 -- Update (replace) multiple records
 replaceMultiple :: [Record] -> Api [ApiResult]
-replaceMultiple = runMulti . esReplaceMulti
+replaceMultiple = runMulti . replaceUserPosts
 
 -- ^
 -- Update (modify) multiple records
 modifyMultiple :: [Record] -> Api [ApiResult]
-modifyMultiple = runMulti . esModifyMulti
+modifyMultiple = runMulti . modifyUserPosts
 
 -- ^
 -- Handle an options request for a single record endpoint

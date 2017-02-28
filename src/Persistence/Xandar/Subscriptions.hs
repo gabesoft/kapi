@@ -23,7 +23,6 @@ import Control.Monad.Reader
 import Control.Monad.Trans.Control
 import Data.Bifunctor
 import Data.Bson hiding (lookup, label)
-import Data.Either
 import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.Monoid ((<>))
@@ -31,17 +30,14 @@ import Data.Set ((\\))
 import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Database.Bloodhound as B
-import Database.MongoDB (Database, Pipe, Failure)
-import Debug.Trace
 import Persistence.Common
 import qualified Persistence.ElasticSearch as E
 import Persistence.Facade as F
 import qualified Persistence.MongoDB as M
 import Persistence.Xandar.Common
 import Persistence.Xandar.UserPosts
-       (mkUserPostId, mkUserPostId', indexUserPosts', createUserPosts,
-        createUserPost, modifyUserPost)
-import qualified Persistence.Xandar.UserPosts as U
+       (mkUserPostId, indexUserPosts', mkUserPostsOnCreate,
+        mkUserPostOnCreate, mkUserPostOnModify)
 import Types.Common
 
 insertSubscription
@@ -83,7 +79,7 @@ insertSubscriptions input = do
   valid <- validateSubscriptions input
   feeds <- dbGetExistingMulti feedDefinition (feedId <$> valid)
   saved <- dbInsertMulti subscriptionDefinition (mkSubscriptions feeds valid)
-  _ <- indexPostsOnCreate (filter isEnabled saved)
+  _ <- indexPostsOnSubCreate (filter isEnabled saved)
   return saved
 
 -- ^
@@ -98,7 +94,7 @@ updateSubscriptions replace input = do
   valid2 <- validateSubscriptions merged
   saved <- dbUpdateMulti replace subscriptionDefinition valid2
   _ <- runExceptT $ esDeleteUserPosts (filter isDisabled saved)
-  _ <- indexPostsOnUpdate existing (filter isEnabled saved)
+  _ <- indexPostsOnSubUpdate existing (filter isEnabled saved)
   return saved
 
 -- ^
@@ -113,46 +109,46 @@ deleteSubscriptions ids = do
 
 -- ^
 -- Index the user-posts associated with all subscriptions being created
-indexPostsOnCreate
+indexPostsOnSubCreate
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
   => [Record] -> ApiItemsT [ApiError] m ()
-indexPostsOnCreate subs = do
+indexPostsOnSubCreate subs = do
   posts <- toMulti (dbGetPostsBySub subs)
   userPosts <- mkRecords posts
   void $ runExceptT (indexUserPosts' userPosts)
   where
-    mkRecords posts = createUserPosts subs posts (mkRecord <$> posts)
-    mkRecord = mkUserPostOnCreate (mkFeedIndexedMap subs)
+    mkRecords posts = mkUserPostsOnCreate subs posts (mkRecord <$> posts)
+    mkRecord = mkUserPostOnSubCreate (mkFeedIndexedMap subs)
 
 -- ^
 -- Index the user-posts associated with all subscriptions being updated
-indexPostsOnUpdate
+indexPostsOnSubUpdate
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
   => [Record] -> [Record] -> ApiItemsT [ApiError] m ()
-indexPostsOnUpdate oldSubs newSubs = do
+indexPostsOnSubUpdate oldSubs newSubs = do
   posts <- toMulti (dbGetPostsBySub newSubs)
   existing <- toMulti (esGetUserPostsBySubs newSubs)
   userPosts <- mkRecords existing posts
   void $ runExceptT (indexUserPosts' userPosts)
   where
     mkRecords existing = runAction (mkRecord $ mkIdIndexedMap existing)
-    mkRecord = mkUserPostOnUpdate oldSubMap newSubMap
+    mkRecord = mkUserPostOnSubUpdate oldSubMap newSubMap
     oldSubMap = mkFeedIndexedMap oldSubs
     newSubMap = mkFeedIndexedMap newSubs
 
 -- ^
 -- Make a user-post record to be indexed when updating a subscription
-mkUserPostOnUpdate
+mkUserPostOnSubUpdate
   :: MonadIO m
   => Map.Map RecordId Record
   -> Map.Map RecordId Record
   -> Map.Map RecordId Record
   -> Record
   -> m (Either ApiError (Record, RecordId))
-mkUserPostOnUpdate oldSubMap newSubMap oldMap post =
+mkUserPostOnSubUpdate oldSubMap newSubMap oldMap post =
   case old of
-    Nothing -> createUserPost (Just newSub) (Just post) record
-    Just o -> modifyUserPost (Just o) record
+    Nothing -> mkUserPostOnCreate (Just newSub) (Just post) record
+    Just o -> mkUserPostOnModify (Just o) record
   where
     getSub = fromJust . Map.lookup (feedId post)
     oldSub = getSub oldSubMap
@@ -165,8 +161,8 @@ mkUserPostOnUpdate oldSubMap newSubMap oldMap post =
 
 -- ^
 -- Make a user-post record to be indexed when creating a subscription
-mkUserPostOnCreate :: Map.Map RecordId Record -> Record -> Record
-mkUserPostOnCreate subMap post = setRead True (mkBaseUserPost sub post)
+mkUserPostOnSubCreate :: Map.Map RecordId Record -> Record -> Record
+mkUserPostOnSubCreate subMap post = setRead True (mkBaseUserPost sub post)
   where
     sub = fromJust $ Map.lookup (feedId post) subMap
 
@@ -192,6 +188,7 @@ addTags oldSub newSub existing = setTags compute
 -- ^
 -- Populate the read field of a user-post based on whether
 -- a subscription has just been enabled or this is a new record
+addRead :: Record -> Record -> Bool -> Record -> Record
 addRead oldSub newSub isNew record
   | (old /= new) || isNew = setRead True record
   | otherwise = record
