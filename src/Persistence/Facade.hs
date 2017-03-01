@@ -6,6 +6,8 @@
 module Persistence.Facade
   ( dbDelete
   , dbDeleteMulti
+  , dbGetExisting
+  , dbGetExistingMulti
   , dbInsert
   , dbInsertMulti
   , dbModify
@@ -14,8 +16,8 @@ module Persistence.Facade
   , dbReplace
   , dbReplaceMulti
   , dbUpdateMulti
-  , getExisting
-  , dbGetExistingMulti
+  , esGetExisting
+  , esGetExistingMulti
   , mergeFromMap
   , mkIdIndexedMap
   , mkRecordMap
@@ -42,6 +44,7 @@ import Data.Either
 import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.Monoid ((<>))
+import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Bloodhound.Types (EsError, SearchResult)
@@ -74,10 +77,15 @@ dbDelete
   => RecordDefinition -> RecordId -> ExceptT ApiError m Record
 dbDelete = toSingle . dbDeleteMulti
 
-getExisting
+dbGetExisting
   :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
   => RecordDefinition -> RecordId -> ExceptT ApiError m Record
-getExisting = toSingle . dbGetExistingMulti
+dbGetExisting = toSingle . dbGetExistingMulti
+
+esGetExisting
+  :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
+  => RecordDefinition -> RecordId -> ExceptT ApiError m Record
+esGetExisting = toSingle . esGetExistingMulti
 
 dbReplaceMulti
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
@@ -146,6 +154,20 @@ dbGetExistingMulti def ids = do
   let tuples = zip records ids
   let result (record, rid) = maybe (Left $ mk404IdErr def rid) Right record
   eitherToItemsT (result <$> tuples)
+
+-- ^
+-- Get multiple records by id
+esGetExistingMulti
+  :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
+  => RecordDefinition -> [RecordId] -> ApiResultsT m
+esGetExistingMulti def ids = do
+  existing <- toMulti $ runEsAndExtract (ES.getByIds ids $ recordCollection def)
+  let idSet = Set.fromList ids
+  let result r =
+        if Set.member (getIdValue' r) idSet
+          then Right r
+          else Left (mk404IdErr def $ getIdValue' r)
+  eitherToItemsT (result <$> existing)
 
 -- ^
 -- Convert an action that could result in multiple errors

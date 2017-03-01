@@ -117,14 +117,7 @@ deleteUserPosts ids = do
 getExistingUserPosts
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
   => [RecordId] -> ApiResultsT m
-getExistingUserPosts ids = do
-  existing <- toMulti $ runEsAndExtract (E.getByIds ids userPostCollection)
-  let idSet = Set.fromList ids
-  let result r =
-        if Set.member (getIdValue' r) idSet
-          then Right r
-          else Left (mk404IdErr userPostDefinition $ getIdValue' r)
-  eitherToItemsT (result <$> existing)
+getExistingUserPosts = esGetExistingMulti userPostDefinition
 
 -- ^
 -- Index multiple documents and re-query them
@@ -293,7 +286,7 @@ mkUserPostId' record =
 -- ^
 -- Generate an id given a subscription id and a post id
 mkUserPostId :: RecordId -> RecordId -> RecordId
-mkUserPostId subId' postId' = subId' <> "-" <> postId'
+mkUserPostId subId' postId' = postId' <> "-" <> subId'
 
 -- ^
 -- Get the subscription id of a user-post

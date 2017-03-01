@@ -5,6 +5,7 @@
 -- GHCI setup for elastic-search
 module Test.ElasticSearchSetup where
 
+import Data.List.NonEmpty
 import Control.Applicative
 import Control.Monad.Catch
 import Control.Monad.Except
@@ -23,11 +24,12 @@ import Network.HTTP.Types.Status
 import Parsers.Filter
 import Persistence.Common
 import Persistence.ElasticSearch
-import Persistence.Facade (dbPipe)
+import Persistence.Facade
 import Persistence.Xandar.Common
 import Persistence.Xandar.UserPosts
 import TestHelper
 import Types.Common
+import Util.Constants
 
 mongoDbHost = "127.0.0.1"
 mongoDbPort = 27017
@@ -90,6 +92,39 @@ scanSearch input = B.withBH defaultManagerSettings (B.Server eServer) scanSearch
     scanSearch =
       B.scanSearch (B.IndexName eIndex) (B.MappingName eMapping) search'
 
+subIds :: [Text]
+subIds =
+  [ "56e60f7d1432afe539337b7e"
+  , "56e5c9cb1432afe53933789e"
+  , "56d7e167c788cb1d6eb935f3"
+  , "56e5cc021432afe539337994"
+  , "56d7de19c788cb1d6eb91b22"
+  , "56d7e1b2c788cb1d6eb9396a"
+  , "56d7e064c788cb1d6eb92ea2"
+  , "5792e720ed521f1f1704877f"
+  ]
+
+subCountsSearch :: [Text] -> B.Search
+subCountsSearch ids =
+  B.Search
+    (Just $ B.QueryBoolQuery boolQuery)
+    Nothing
+    Nothing
+    (Just termsAgg)
+    Nothing
+    False
+    (B.From 0)
+    (B.Size 0)
+    B.SearchTypeCount
+    Nothing
+    Nothing
+  where
+    boolQuery = B.mkBoolQuery [readQuery, idsQuery] [] []
+    readQuery = B.TermQuery (B.Term "read" "false") Nothing
+    idsQuery = B.TermsQuery "subscriptionId" (fromList ids)
+    termsAgg = B.mkAggregations "unreadCountsPerSub" agg
+    agg = B.TermsAgg $ B.mkTermsAggregation "subscriptionId"
+
 input1 :: RecordData Field
 input1 =
   Record
@@ -99,13 +134,13 @@ input1 =
     , mkBoolField "read" True
     ]
 
-getDbData :: [Record] -> ExceptT ApiError IO ([Record], [Record], [Text], [Text])
-getDbData input = do
-  pipe <- dbPipe sampleConf
-  let subIds = vals "subscriptionId" input
-  let postIds = vals "postId" input
-  subs <- runDb (getSubsById subIds) mongoDbName pipe
-  posts <- runDb (getPostsById postIds) mongoDbName pipe
-  return (subs, posts, subIds, postIds)
-  where
-    vals label = catMaybes . fmap (getValue label)
+-- getDbData :: [Record] -> ExceptT ApiError IO ([Record], [Record], [Text], [Text])
+-- getDbData input = do
+--   pipe <- dbPipe sampleConf
+--   let subIds = vals "subscriptionId" input
+--   let postIds = vals "postId" input
+--   subs <- runDb (getSubsById subIds) mongoDbName pipe
+--   posts <- runDb (getPostsById postIds) mongoDbName pipe
+--   return (subs, posts, subIds, postIds)
+--   where
+--     vals label = catMaybes . fmap (getValue label)

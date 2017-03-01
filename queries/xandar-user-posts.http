@@ -91,6 +91,21 @@ GET http://:host/:path?where=(tags eq ['haskell','emacs'])
 GET http://:host/:path?where=(read eq false)&per_page=5&page=1&include=title,post.title,post.guid,createdAt&sort=-createdAt
 
 #
+# Find all unread 2
+#
+GET http://:host/:path?where=(read eq true)&per_page=30&page=1&include=subscriptionId,read
+
+#
+# Count unread by sub 1
+#
+HEAD http://:host/:path?where=(read eq false and subscriptionId eq 56e60f7d1432afe539337b7e)
+
+#
+# Count unread by sub 2
+#
+HEAD http://:host/:path?where=(read eq false and subscriptionId eq 56e5c9cb1432afe53933789e)
+
+#
 # Find by feed title
 #
 GET http://:host/:path?where=(post.title contains 'activity')&per_page=3&page=1

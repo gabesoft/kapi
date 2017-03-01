@@ -70,6 +70,14 @@ replaceSubscriptions
   => [Record] -> ApiItemsT [ApiError] m [Record]
 replaceSubscriptions = updateSubscriptions True
 
+getSubscriptions
+  :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
+  => [Field] -> [Field] -> [Field] -> Int -> Int -> ExceptT ApiError m [Record]
+getSubscriptions query sort include start limit = do
+  results <- runDb $ M.dbFind subscriptionDefinition query sort include start limit
+  -- TODO: populate unread counts
+  return results
+
 -- ^
 -- Create multiple subscriptions
 insertSubscriptions
@@ -93,7 +101,7 @@ updateSubscriptions replace input = do
   let merged = mergeFromMap replace (mkIdIndexedMap valid1) <$> existing
   valid2 <- validateSubscriptions merged
   saved <- dbUpdateMulti replace subscriptionDefinition valid2
-  _ <- runExceptT $ esDeleteUserPosts (filter isDisabled saved)
+  _ <- runExceptT $ esDeleteUserPostsBySub (filter isDisabled saved)
   _ <- indexPostsOnSubUpdate existing (filter isEnabled saved)
   return saved
 
@@ -104,7 +112,7 @@ deleteSubscriptions
   => [RecordId] -> ApiItemsT [ApiError] m [Record]
 deleteSubscriptions ids = do
   deleted <- dbDeleteMulti subscriptionDefinition ids
-  _ <- runExceptT $ esDeleteUserPosts deleted
+  _ <- runExceptT $ esDeleteUserPostsBySub deleted
   return deleted
 
 -- ^
@@ -127,7 +135,7 @@ indexPostsOnSubUpdate
   => [Record] -> [Record] -> ApiItemsT [ApiError] m ()
 indexPostsOnSubUpdate oldSubs newSubs = do
   posts <- toMulti (dbGetPostsBySub newSubs)
-  existing <- toMulti (esGetUserPostsBySubs newSubs)
+  existing <- toMulti (esGetUserPostsBySub newSubs)
   userPosts <- mkRecords existing posts
   void $ runExceptT (indexUserPosts' userPosts)
   where
@@ -222,28 +230,28 @@ dbGetPostsBySub subs = runDb $ M.dbFind postDefinition query [] [] 0 0
 -- ^
 -- Remove all user-posts associated with the given subscriptions
 -- from the search index
-esDeleteUserPosts
+esDeleteUserPostsBySub
   :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
   => [Record] -> ExceptT ApiError m ()
-esDeleteUserPosts [] = return ()
-esDeleteUserPosts subs = do
-  search <- ExceptT (return $ mkSearchBySubs subs)
+esDeleteUserPostsBySub [] = return ()
+esDeleteUserPostsBySub subs = do
+  search <- ExceptT (return $ mkSearchBySub subs)
   void . runEs $ E.deleteByQuery search userPostCollection
 
-esGetUserPostsBySubs
+esGetUserPostsBySub
   :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
   => [Record] -> ExceptT ApiError m [Record]
-esGetUserPostsBySubs [] = return []
-esGetUserPostsBySubs subs = do
-  search <- ExceptT . return $ mkSearchBySubs subs
+esGetUserPostsBySub [] = return []
+esGetUserPostsBySub subs = do
+  search <- ExceptT . return $ mkSearchBySub subs
   runEsAndExtract (E.searchDocuments search userPostCollection)
 
 -- ^
 -- Create a query that would return the user-posts associated with
 -- all specified subscriptions
-mkSearchBySubs :: [Record] -> Either ApiError B.Search
-mkSearchBySubs [] = Right E.zeroResultsSearch
-mkSearchBySubs subs = first E.esToApiError $ E.mkSearchAll (Just filter') [] []
+mkSearchBySub :: [Record] -> Either ApiError B.Search
+mkSearchBySub [] = Right E.zeroResultsSearch
+mkSearchBySub subs = first E.esToApiError $ E.mkSearchAll (Just filter') [] []
   where
     subIds = getIdValue' <$> subs
     filter' = FilterRelOp In "subscriptionId" (TermList $ TermId <$> subIds)

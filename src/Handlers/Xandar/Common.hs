@@ -52,7 +52,7 @@ getSingle
   -> Text
   -> Api (Headers '[ Header "ETag" String] Record)
 getSingle def etag uid =
-  runSingle (getExisting def uid) return >>= mkGetSingleResult etag
+  runSingle (dbGetExisting def uid) return >>= mkGetSingleResult etag
 
 -- ^
 -- Get multiple records

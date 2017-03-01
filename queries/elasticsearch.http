@@ -299,3 +299,47 @@ GET http://:host/:index1/_search
     "post.guid"
   ]
 }
+
+#
+# Perform an aggregate search
+#
+GET http://:host/:index1/_search
+{
+  "aggregations": {
+    "unreadCountsPerSub": {
+      "terms": {
+        "field": "subscriptionId"
+      }
+    }
+  },
+  "size": 0,
+  "from": 0,
+  "query": {
+    "bool": {
+      "must": [
+        {
+          "term": {
+            "read": {
+              "value": "false"
+            }
+          }
+        },
+        {
+          "terms": {
+            "subscriptionId": [
+              "56e60f7d1432afe539337b7e",
+              "56e5c9cb1432afe53933789e",
+              "56d7e167c788cb1d6eb935f3",
+              "56e5cc021432afe539337994",
+              "56d7de19c788cb1d6eb91b22",
+              "56d7e1b2c788cb1d6eb9396a",
+              "56d7e064c788cb1d6eb92ea2",
+              "5792e720ed521f1f1704877f"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "track_scores": false
+}
