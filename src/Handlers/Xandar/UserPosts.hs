@@ -47,12 +47,11 @@ getSingle etag uid = runSingle (runEs $ getByIds [uid] mappingName) respond
 -- ^
 -- Get multiple records
 getMultiple :: ApiGetMultipleLink -> ServerT GetMultiple Api
-getMultiple getLink include query sortFields page perPage =
-  runSingle getRecords (return . respond)
+getMultiple getLink include query sort page perPage =
+  runSingle getRecords (return . mkResult)
   where
-    getRecords = getMultiple' include query sortFields page perPage
-    mkUrl page' = getLink include query sortFields (Just page') perPage
-    respond = uncurry (mkGetMultipleResult mkUrl)
+    getRecords = getMultiple' include query sort page perPage
+    mkResult = mkGetMultipleResult getLink include query sort perPage
 
 -- ^
 -- Helper for `getMultiple`

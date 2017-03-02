@@ -35,14 +35,12 @@ getSingle etag sid = runSingle (getSubscription sid) return >>= mkGetSingleResul
 -- Get multiple records
 getMultiple :: ServerT GetMultiple Api
 getMultiple include query sort page perPage =
-  runSingle getRecords (return . respond)
+  runSingle getRecords (return . mkResult)
   where
-    -- TODO: consolidate with Handlers.Common
     getLink = mkSubscriptionGetMultipleLink
-    getRecords = getMultiple' getSubscriptions def include query sort page perPage
     def = subscriptionDefinition
-    respond = uncurry (mkGetMultipleResult mkUrl)
-    mkUrl page' = getLink include query sort (Just page') perPage
+    getRecords = getMultiple' getSubscriptions def include query sort page perPage
+    mkResult = mkGetMultipleResult getLink include query sort perPage
 
 -- ^
 -- Delete a single record

@@ -59,11 +59,10 @@ getSingle def etag uid =
 -- Get multiple records
 getMultiple :: ApiGetMultipleLink -> RecordDefinition -> ServerT GetMultiple Api
 getMultiple getLink def include query sort page perPage =
-  runSingle getRecords (return . respond)
+  runSingle getRecords (return . mkResult)
   where
     getRecords = getMultiple' find def include query sort page perPage
-    mkUrl page' = getLink include query sort (Just page') perPage
-    respond = uncurry (mkGetMultipleResult mkUrl)
+    mkResult = mkGetMultipleResult getLink include query sort perPage
     find q s fields start = runDb . DB.dbFind def q s fields start
 
 -- ^
@@ -197,6 +196,31 @@ mkGetSingleResult etag record = maybe (return res) (checkEtag sha res) etag
     res = addHeader sha record
 
 -- ^
+-- Create a result to be returned from a 'getMultiple' endpoint
+mkGetMultipleResult
+  :: ( AddHeader h String a orig
+     , AddHeader h2 String orig orig2
+     , AddHeader h4 String orig2 orig3
+     , AddHeader h3 String orig3 orig1
+     , AddHeader h1 String orig1 result
+     )
+  => ApiGetMultipleLink
+  -> [Text]
+  -> Maybe Text
+  -> [Text]
+  -> Maybe Int
+  -> (a, Pagination)
+  -> result
+mkGetMultipleResult getLink include query sort perPage (records, pagination) =
+  header paginationPage $
+  header paginationTotal $
+  header paginationLast $
+  header paginationSize $ mkLinkHeader pagination mkUrl records
+  where
+    header f = addHeader (show $ f pagination)
+    mkUrl p = getLink include query sort (Just p) perPage
+
+-- ^
 -- Create a result to be returned from a 'createSingle' method
 mkCreateSingleResult
   :: (Text -> String)
@@ -217,24 +241,6 @@ mkCreateMultipleResult getLink results =
   addHeader (intercalate ", " $ links results) (Multiple results)
   where
     links = fmap $ apiItem (const "<>") (mkLink . getCreateLink getLink)
-
--- ^
--- Create a result to be returned from a 'getMultiple' endpoint
-mkGetMultipleResult
-  :: ( AddHeader h4 String a orig3
-     , AddHeader h3 String orig3 orig2
-     , AddHeader h2 String orig2 orig1
-     , AddHeader h1 String orig1 orig
-     , AddHeader h String orig b
-     )
-  => (Int -> String) -> a -> Pagination -> b
-mkGetMultipleResult mkUrl records pagination =
-  header paginationPage $
-  header paginationTotal $
-  header paginationLast $
-  header paginationSize $ mkLinkHeader pagination mkUrl records
-  where
-    header f = addHeader (show $ f pagination)
 
 -- ^
 -- Check an ETag against a SHA and throw a 304 error or return the output
