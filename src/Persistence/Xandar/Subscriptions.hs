@@ -8,6 +8,8 @@ module Persistence.Xandar.Subscriptions
   , addTags
   , deleteSubscription
   , deleteSubscriptions
+  , getSubscription
+  , getSubscriptions
   , insertSubscription
   , insertSubscriptions
   , mkSubscriptions
@@ -23,6 +25,7 @@ import Control.Monad.Reader
 import Control.Monad.Trans.Control
 import Data.Bifunctor
 import Data.Bson hiding (lookup, label)
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.Monoid ((<>))
@@ -70,13 +73,35 @@ replaceSubscriptions
   => [Record] -> ApiItemsT [ApiError] m [Record]
 replaceSubscriptions = updateSubscriptions True
 
+getSubscription
+  :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
+  => RecordId -> ExceptT ApiError m Record
+getSubscription subId = do
+  result <- dbGetExisting subscriptionDefinition subId
+  counts <- esGetUnreadCounts [ getIdValue' result ]
+  return (setSubCount [] counts result)
+
+-- ^
+-- Get multiple subscriptions according to the input parameters
 getSubscriptions
   :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
   => [Field] -> [Field] -> [Field] -> Int -> Int -> ExceptT ApiError m [Record]
-getSubscriptions query sort include start limit = do
-  results <- runDb $ M.dbFind subscriptionDefinition query sort include start limit
-  -- TODO: populate unread counts
-  return results
+getSubscriptions query sort fields start limit = do
+  results <- runDb $ M.dbFind subscriptionDefinition query sort fields start limit
+  counts <- esGetUnreadCounts (getIdValue' <$> results)
+  return (setSubCount fields counts <$> results)
+
+-- ^
+-- Populate the unread count field for a subscription
+setSubCount :: [Field] -> Map.Map RecordId Int -> Record -> Record
+setSubCount fields countMap = set fields
+  where
+    set [] r = setCount r
+    set xs r
+      | hasField "unreadCount" (Record xs) = setCount r
+      | otherwise = r
+    getCount sub = fromMaybe 0 $ Map.lookup (getIdValue' sub) countMap
+    setCount sub = setValue "unreadCount" (getCount sub) sub
 
 -- ^
 -- Create multiple subscriptions
@@ -178,7 +203,7 @@ mkUserPostOnSubCreate subMap post = setRead True (mkBaseUserPost sub post)
 -- Make a user-post record populating only the subscription and post id's
 mkBaseUserPost :: Record -> Record -> RecordData Field
 mkBaseUserPost sub post =
-  Record ["subscriptionId" =: getIdValue' sub, "postId" =: getIdValue' post]
+  Record [subIdLabel =: getIdValue' sub, "postId" =: getIdValue' post]
 
 -- ^
 -- Populate the tags field of a user-post based on the delta
@@ -238,6 +263,8 @@ esDeleteUserPostsBySub subs = do
   search <- ExceptT (return $ mkSearchBySub subs)
   void . runEs $ E.deleteByQuery search userPostCollection
 
+-- ^
+-- Get the user-posts associated with the given subscriptions
 esGetUserPostsBySub
   :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
   => [Record] -> ExceptT ApiError m [Record]
@@ -247,14 +274,58 @@ esGetUserPostsBySub subs = do
   runEsAndExtract (E.searchDocuments search userPostCollection)
 
 -- ^
--- Create a query that would return the user-posts associated with
+-- Get the number of unread user-posts for each subscription in
+-- the specified subscription ids
+esGetUnreadCounts
+  :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
+  => [RecordId] -> ExceptT ApiError m (Map.Map Text Int)
+esGetUnreadCounts [] = return Map.empty
+esGetUnreadCounts subIds = do
+  let search = mkCountsSearch countAggName subIds
+  results <- runEs (E.searchDocuments search userPostCollection)
+  return (extractCounts countAggName results)
+
+-- ^
+-- Create a query that will return the user-posts associated with
 -- all specified subscriptions
 mkSearchBySub :: [Record] -> Either ApiError B.Search
 mkSearchBySub [] = Right E.zeroResultsSearch
 mkSearchBySub subs = first E.esToApiError $ E.mkSearchAll (Just filter') [] []
   where
     subIds = getIdValue' <$> subs
-    filter' = FilterRelOp In "subscriptionId" (TermList $ TermId <$> subIds)
+    subIdCol = ColumnName subIdLabel 1
+    termIds = TermId <$> subIds
+    filter' = FilterRelOp In subIdCol (TermList termIds)
+
+-- ^
+-- Create a query that will return the number of unread posts per subscription id
+mkCountsSearch :: Text -> [RecordId] -> B.Search
+mkCountsSearch bucketKey ids =
+  B.mkAggregateSearch (Just $ B.QueryBoolQuery boolQuery) termsAgg
+  where
+    boolQuery = B.mkBoolQuery [unreadQuery, subIdsQuery] [] []
+    unreadQuery = B.TermQuery (B.Term "read" "false") Nothing
+    subIdsQuery = B.TermsQuery subIdLabel (NE.fromList ids)
+    termsAgg = B.mkAggregations bucketKey agg
+    agg = B.TermsAgg $ B.mkTermsAggregation subIdLabel
+
+-- ^
+-- Extract the number of unread posts per subscription id from a search result
+extractCounts :: Text -> B.SearchResult a -> Map.Map Text Int
+extractCounts bucketKey results =
+  fromMaybe Map.empty $ toBucketMap <$> toBuckets
+  where
+    toBuckets = B.aggregations results >>= B.toTerms bucketKey
+    extractVal (B.TextValue v) = v
+    extractVal v = error $ "extractCounts: TextValue expected " ++ show v
+    extractTerm t = (extractVal (B.termKey t), B.termsDocCount t)
+    toBucketMap = Map.fromList . fmap extractTerm . B.buckets
+
+subIdLabel :: Label
+subIdLabel = "subscriptionId"
+
+countAggName :: Text
+countAggName = "unreadCountsPerSub"
 
 -- ^
 -- Make a record map indexed by the values of the feedId field

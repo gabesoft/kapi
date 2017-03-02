@@ -5,14 +5,15 @@
 -- GHCI setup for elastic-search
 module Test.ElasticSearchSetup where
 
-import Data.List.NonEmpty
 import Control.Applicative
 import Control.Monad.Catch
 import Control.Monad.Except
 import qualified Data.Aeson as A
+import Data.Bifunctor
 import Data.Bson
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import Data.Int
+import Data.List.NonEmpty
 import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.Text (Text)
@@ -92,6 +93,19 @@ scanSearch input = B.withBH defaultManagerSettings (B.Server eServer) scanSearch
     scanSearch =
       B.scanSearch (B.IndexName eIndex) (B.MappingName eMapping) search'
 
+countsSearch :: B.Search -> IO (Either B.EsError (Map.Map Text Int))
+countsSearch search = do
+  result <- searchDocuments search eMapping eServer eIndex
+  return (extractCounts "unreadCountsPerSub" <$> result)
+
+extractCounts :: Text -> B.SearchResult a -> Map.Map Text Int
+extractCounts bucketKey results = fromMaybe Map.empty $ toBucketMap <$> toBuckets
+  where
+    toBuckets = B.aggregations results >>= B.toTerms bucketKey
+    extractVal (B.TextValue v) = v
+    extractTerm t = (extractVal (B.termKey t), B.termsDocCount t)
+    toBucketMap = Map.fromList . fmap extractTerm . B.buckets
+
 subIds :: [Text]
 subIds =
   [ "56e60f7d1432afe539337b7e"
@@ -104,20 +118,11 @@ subIds =
   , "5792e720ed521f1f1704877f"
   ]
 
+printSearch src = putStrLn $ LBS.unpack (A.encode src)
+
 subCountsSearch :: [Text] -> B.Search
 subCountsSearch ids =
-  B.Search
-    (Just $ B.QueryBoolQuery boolQuery)
-    Nothing
-    Nothing
-    (Just termsAgg)
-    Nothing
-    False
-    (B.From 0)
-    (B.Size 0)
-    B.SearchTypeCount
-    Nothing
-    Nothing
+  B.mkAggregateSearch (Just $ B.QueryBoolQuery boolQuery) termsAgg
   where
     boolQuery = B.mkBoolQuery [readQuery, idsQuery] [] []
     readQuery = B.TermQuery (B.Term "read" "false") Nothing

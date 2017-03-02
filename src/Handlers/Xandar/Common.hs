@@ -8,6 +8,7 @@
 -- Common handlers
 module Handlers.Xandar.Common where
 
+import Data.Bson (Field)
 import Api.Xandar
 import Control.Monad.Except
 import Control.Monad.Reader
@@ -60,28 +61,30 @@ getMultiple :: ApiGetMultipleLink -> RecordDefinition -> ServerT GetMultiple Api
 getMultiple getLink def include query sort page perPage =
   runSingle getRecords (return . respond)
   where
-    getRecords = getMultiple' def include query sort page perPage
+    getRecords = getMultiple' find def include query sort page perPage
     mkUrl page' = getLink include query sort (Just page') perPage
     respond = uncurry (mkGetMultipleResult mkUrl)
+    find q s fields start = runDb . DB.dbFind def q s fields start
 
 -- ^
 -- Helper for 'getMultiple'
 getMultiple'
   :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
-  => RecordDefinition
+  => ([Field] -> [Field] -> [Field] -> Int -> Int -> ExceptT ApiError m [Record])
+  -> RecordDefinition
   -> [Text]
   -> Maybe Text
   -> [Text]
   -> Maybe Int
   -> Maybe Int
   -> ExceptT ApiError m ([Record], Pagination)
-getMultiple' def include query sort page perPage = do
+getMultiple' find def include query sort page perPage = do
   query' <- ExceptT (return getQuery)
   count <- runDb (DB.dbCount def query')
   let pagination = mkPagination page perPage count
   let start = paginationStart pagination
   let limit = paginationLimit pagination
-  records <- runDb $ DB.dbFind def query' sort' include' start limit
+  records <- find query' sort' include' start limit
   return (records, pagination)
   where
     sort' = DB.mkSortFields (splitLabels sort)

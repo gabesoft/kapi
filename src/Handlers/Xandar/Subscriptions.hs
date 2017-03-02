@@ -11,13 +11,16 @@ module Handlers.Xandar.Subscriptions where
 import Api.Xandar
 import Control.Monad.Except
 import Control.Monad.Reader
+import Control.Monad.Trans.Control
 import Data.Text (Text)
 import Handlers.Xandar.Common
-       (runSingle, runMulti, mkCreateSingleResult, mkCreateMultipleResult,
-        updateSingle)
+       (runSingle, runMulti, mkGetSingleResult, mkGetMultipleResult,
+        getMultiple', mkCreateSingleResult, mkCreateMultipleResult,
+        updateSingle, mkPagination)
 import qualified Handlers.Xandar.Common as C
 import Persistence.Common
-import Persistence.Facade (dbPipe)
+import Persistence.Facade (dbPipe, runDb)
+import qualified Persistence.MongoDB as DB
 import Persistence.Xandar.Common (subscriptionDefinition)
 import Persistence.Xandar.Subscriptions
 import Servant
@@ -26,12 +29,20 @@ import Types.Common
 -- ^
 -- Get a single record by id
 getSingle :: Maybe Text -> Text -> Api (Headers '[ Header "ETag" String] Record)
-getSingle = C.getSingle subscriptionDefinition
+getSingle etag sid = runSingle (getSubscription sid) return >>= mkGetSingleResult etag
 
 -- ^
 -- Get multiple records
 getMultiple :: ServerT GetMultiple Api
-getMultiple = C.getMultiple mkSubscriptionGetMultipleLink subscriptionDefinition
+getMultiple include query sort page perPage =
+  runSingle getRecords (return . respond)
+  where
+    -- TODO: consolidate with Handlers.Common
+    getLink = mkSubscriptionGetMultipleLink
+    getRecords = getMultiple' getSubscriptions def include query sort page perPage
+    def = subscriptionDefinition
+    respond = uncurry (mkGetMultipleResult mkUrl)
+    mkUrl page' = getLink include query sort (Just page') perPage
 
 -- ^
 -- Delete a single record
