@@ -63,7 +63,7 @@ getMultiple'
   -> Maybe Int
   -> Maybe Int
   -> ExceptT ApiError m ([Record], Pagination)
-getMultiple' include query sortFields page perPage = do
+getMultiple' include query sort page perPage = do
   cnt <- runEs . count' =<< getCountSearch
   let pagination = mkPagination page perPage cnt
   let start = paginationStart pagination
@@ -75,7 +75,7 @@ getMultiple' include query sortFields page perPage = do
     getCountSearch = ExceptT . return $ prepareSearch include' query sort' 0 0
     getSearch start = ExceptT . return . prepareSearch [] query sort' start
     include' = splitLabels include
-    sort' = splitLabels sortFields
+    sort' = splitLabels sort
     count' s = countDocuments s mappingName
 
 -- ^

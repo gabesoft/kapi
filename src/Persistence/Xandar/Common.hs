@@ -161,6 +161,19 @@ userPostDefinition =
     , mkOptDef' "tags"
     ]
 
+postQueryDefinition :: RecordDefinition
+postQueryDefinition =
+  RecordDefinition "postqueries" "post-queries" $
+  Map.fromList
+    [ mkReqDef' "userId"
+    , mkReqDef "pinState" (Just 0 :: Maybe Int)
+    , mkOptDef' "title"
+    , mkOptDef' "userText"
+    , mkOptDef' "text"
+    , mkOptDef' "query"
+    , mkOptDef' "lastUsed"
+    ]
+
 subscriptionCollection :: Collection
 subscriptionCollection = recordCollection subscriptionDefinition
 
@@ -176,15 +189,13 @@ postCollection = recordCollection postDefinition
 userPostCollection :: Collection
 userPostCollection = recordCollection userPostDefinition
 
+postQueryCollection :: Collection
+postQueryCollection = recordCollection postQueryDefinition
+
 validateSubscriptions
   :: Monad m
   => [Record] -> ApiItemsT [ApiError] m [Record]
 validateSubscriptions = validateMulti subscriptionDefinition
-
-validateUserPosts
-  :: Monad m
-  => [Record] -> ApiItemsT [ApiError] m [Record]
-validateUserPosts = validateMulti userPostDefinition
 
 validateUsers
   :: Monad m
@@ -200,3 +211,13 @@ validateFeeds
   :: Monad m
   => [Record] -> ApiItemsT [ApiError] m [Record]
 validateFeeds = validateMulti feedDefinition
+
+validateUserPosts
+  :: Monad m
+  => [Record] -> ApiItemsT [ApiError] m [Record]
+validateUserPosts = validateMulti userPostDefinition
+
+validatePostQueries
+  :: Monad m
+  => [Record] -> ApiItemsT [ApiError] m [Record]
+validatePostQueries = validateMulti postQueryDefinition

@@ -12,7 +12,12 @@
 #
 # Get all feeds
 #
-GET http://:host/:path
+GET http://:host/:path?per_page=3
+
+#
+# Get all feeds (postCount)
+#
+GET http://:host/:path?per_page=50&include=title,postCount,uri
 
 #
 # Get all feeds - sort & partial response

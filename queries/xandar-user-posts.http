@@ -13,7 +13,7 @@
 #
 # Get all posts
 #
-GET http://:host/:path?sort=post.link&include=post.link,post.title,title
+GET http://:host/:path?per_page=2
 
 #
 # Run a HEAD request against the user-posts collection
@@ -84,6 +84,16 @@ GET http://:host/:path?where=(tags in [])
 # Find with invalid query 1
 #
 GET http://:host/:path?where=(tags eq ['haskell','emacs'])
+
+#
+# Find by tags 2
+#
+GET http://:host/:path?where=(tags in ['must-read', 'interesting'])&include=tags,title
+
+#
+# Find by tags, read, and title
+#
+GET http://:host/:path?where=((tags ~in ['programming']) and (read eq false) and (post.title contains 'monad stack' or post.description:2 contains 'monad stack'))&include=tags,read,post.title,post.description
 
 #
 # Find all unread

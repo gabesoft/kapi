@@ -444,8 +444,10 @@ extractRecord results =
 -- ^
 -- Extract all 'Record's from a 'SearchResult'
 extractRecords :: [Text] -> SearchResult Record -> [Record]
-extractRecords fields input = includeFields fields' <$> records
+extractRecords fields input = include fields' <$> records
   where
+    include [] r = r
+    include xs r = includeFields xs r
     fields' = mkIncludeLabels fields
     result = B.searchHits input
     hits = B.hits result
