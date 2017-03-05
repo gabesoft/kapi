@@ -5,22 +5,12 @@
 -- Common functionality for persistence modules
 module Persistence.Xandar.Common where
 
-import Control.Monad.Except
-import Control.Monad.Trans.Control
-import qualified Data.Aeson as A
-import Data.Bifunctor
 import Data.Bson hiding (lookup, label)
-import qualified Data.ByteString.Lazy.Char8 as LBS
 import qualified Data.Map.Strict as Map
-import Data.Maybe
-import Data.Monoid ((<>))
-import Database.Bloodhound (EsError(..), SearchResult(..))
-import Database.MongoDB
-       (Database, Collection, Pipe, Failure, Index(..))
+import Data.Text (Text)
+import Database.MongoDB (Collection, Index(..))
 import Persistence.Common
-import qualified Persistence.ElasticSearch as E
 import Persistence.Facade (validateMulti)
-import qualified Persistence.MongoDB as M
 import Types.Common
 
 subscriptionDefinition :: RecordDefinition
@@ -186,6 +176,11 @@ postQueryIndices =
     }
   ]
 
+tagsDefinition :: RecordDefinition
+tagsDefinition =
+  RecordDefinition "tags" "tags" $
+  Map.fromList [mkReqDef' "userId", mkOptDef "tags" (Just [] :: Maybe [Text])]
+
 subscriptionCollection :: Collection
 subscriptionCollection = recordCollection subscriptionDefinition
 
@@ -203,6 +198,9 @@ userPostCollection = recordCollection userPostDefinition
 
 postQueryCollection :: Collection
 postQueryCollection = recordCollection postQueryDefinition
+
+tagsCollection :: Collection
+tagsCollection = recordCollection tagsDefinition
 
 validateSubscriptions
   :: Monad m

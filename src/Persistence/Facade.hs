@@ -38,15 +38,12 @@ import Control.Monad.Reader
 import Control.Monad.Trans.Control
 import Data.Aeson (encode)
 import Data.Bifunctor
-import Data.Bson (Label, (=:))
-import qualified Data.ByteString.Lazy.Char8 as LBS
+import Data.Bson (Label)
 import Data.Either
 import qualified Data.Map.Strict as Map
 import Data.Maybe
-import Data.Monoid ((<>))
 import qualified Data.Set as Set
 import Data.Text (Text)
-import qualified Data.Text as T
 import Database.Bloodhound.Types (EsError, SearchResult)
 import Database.MongoDB (Pipe, Database, Failure)
 import Network.HTTP.Types.Status

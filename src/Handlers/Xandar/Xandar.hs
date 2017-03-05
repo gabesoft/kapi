@@ -19,7 +19,8 @@ app =
                  postHandlers :<|>
                  subscriptionHandlers :<|>
                  userPostHandlers :<|>
-                 postQueryHandlers
+                 postQueryHandlers :<|>
+                 tagsHandlers
                 )
   where
     userHandlers :: ServerT XandarUserApi Api
@@ -30,6 +31,8 @@ app =
     postHandlers = handlers postDefinition mkPostGetSingleLink mkPostGetMultipleLink
     postQueryHandlers :: ServerT XandarPostQueryApi Api
     postQueryHandlers = handlers postQueryDefinition mkPostQueryGetSingleLink mkPostQueryGetMultipleLink
+    tagsHandlers :: ServerT XandarTagsApi Api
+    tagsHandlers = handlers tagsDefinition mkTagsGetSingleLink mkTagsGetMultipleLink
     handlers def mkGetSingleLink mkGetMultipleLink =
       getMultiple mkGetMultipleLink def :<|>
       getSingle def :<|>

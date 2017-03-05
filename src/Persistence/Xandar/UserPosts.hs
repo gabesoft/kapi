@@ -24,30 +24,19 @@ module Persistence.Xandar.UserPosts
   , replaceUserPosts
   ) where
 
-import Control.Applicative ((<|>))
 import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.Trans.Control
-import qualified Data.Aeson as A
 import Data.Bifunctor
 import Data.Bson hiding (lookup, label)
-import qualified Data.ByteString.Lazy.Char8 as LBS
-import Data.Either
 import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.Monoid ((<>))
-import qualified Data.Set as Set
 import Data.Text (Text)
-import qualified Data.Text as T
 import Data.Time (UTCTime)
-import Database.Bloodhound (EsError(..), SearchResult(..))
-import Database.MongoDB (Database, Pipe, Failure)
-import Debug.Trace
-import Network.HTTP.Types
 import Persistence.Common
 import qualified Persistence.ElasticSearch as E
 import Persistence.Facade
-import qualified Persistence.MongoDB as M
 import Persistence.Xandar.Common
 import Types.Common
 import Util.Constants
@@ -107,9 +96,12 @@ updateUserPosts update input = do
 
 -- ^
 -- Delete multiple records by id
+deleteUserPosts
+  :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)
+  => [RecordId] -> ApiItemsT [ApiError] m [Record]
 deleteUserPosts ids = do
   existing <- getExistingUserPosts ids
-  runExceptT $ runEs (E.deleteByIds ids userPostCollection)
+  _ <- runExceptT $ runEs (E.deleteByIds ids userPostCollection)
   return existing
 
 -- ^

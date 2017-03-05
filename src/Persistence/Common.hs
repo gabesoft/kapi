@@ -9,17 +9,14 @@ import Control.Monad.IO.Class
 import Data.Aeson as AESON
 import Data.Bifunctor
 import Data.Bson as BSON
-import qualified Data.ByteString.Lazy.Char8 as LBS
 import Data.Digest.Pure.SHA
-import Data.List (find, findIndex, foldl, inits, nub, (\\))
+import Data.List (find, findIndex, foldl, nub)
 import qualified Data.Map.Strict as Map
 import Data.Maybe
-import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time (getCurrentTime)
 import Database.MongoDB (Database)
-import Network.HTTP.Types.Status
 import Types.Common
 import Util.Constants
 
@@ -156,10 +153,10 @@ getIdValue' = fromJust . getValue idLabel
 -- ^
 -- Return true if the value of a field is a 'True' value
 isValueOn :: Label -> Record -> Bool
-isValueOn label record = isJust val && fromJust val
+isValueOn name record = isJust bval && fromJust bval
   where
-    val :: Maybe Bool
-    val = getValue label record
+    bval :: Maybe Bool
+    bval = getValue name record
 
 -- ^
 -- Set the value of a field to the current time
@@ -334,7 +331,7 @@ excludeFields :: [Label] -> Record -> Record
 excludeFields keys (Record d) =
   Record $ foldl remove d (splitAtDot <$> keys)
   where
-    remove _ [] = error "exclude: no field name specified"
+    remove _ [] = error "excludeFields: no field name specified"
     remove doc [name] = filter (\(k := _) -> k /= name) doc
     remove doc (name:ns) = withField name doc id (process ns)
     process ns (xs, y, ys) _ = xs ++ [removeNested y ns] ++ ys
@@ -351,6 +348,7 @@ includeFields keys (Record doc) = Record fields
     tuples = second toRecord <$> mapMaybe add (splitAtDot <$> keys)
     toRecord = Record . (: [])
     toField = head . getDocument
+    add [] = error "includeFields: no field specified"
     add [name] = (,) name <$> find (\(k := _) -> k == name) doc
     add (name:ns) = (,) name <$> withField name doc (const Nothing) (process ns)
     process ns (_, y, _) _ = addNested y ns
@@ -441,7 +439,7 @@ paginate page' size' total' =
   , paginationSize = size
   , paginationNext = next
   , paginationPrev = prev
-  , paginationFirst = first
+  , paginationFirst = first'
   , paginationLast = last'
   , paginationStart = start
   , paginationLimit = limit
@@ -449,11 +447,11 @@ paginate page' size' total' =
   where
     total = max total' 0
     size = max size' 1
-    first = 1
+    first' = 1
     last' = max 1 (div total size + min 1 (mod total size))
-    page = min (max page' first) last'
+    page = min (max page' first') last'
     next = min (page + 1) last'
-    prev = max first (page - 1)
+    prev = max first' (page - 1)
     start = max 0 ((page - 1) * size)
     limit = size
 

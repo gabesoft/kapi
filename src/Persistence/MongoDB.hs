@@ -38,7 +38,6 @@ import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as T
 import Database.MongoDB
-import Network.HTTP.Types.Status
 import Network.Socket (HostName, PortNumber)
 import Parsers.Filter (parse)
 import Persistence.Common

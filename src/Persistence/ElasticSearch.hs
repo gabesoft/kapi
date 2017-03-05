@@ -27,9 +27,7 @@ module Persistence.ElasticSearch
   ) where
 
 import Control.Applicative
-import Control.Monad (join)
 import Control.Monad.Catch
-import Control.Monad.IO.Class
 import Data.Aeson (ToJSON)
 import qualified Data.Aeson as A
 import Data.Bifunctor
@@ -37,7 +35,6 @@ import qualified Data.ByteString.Lazy.Char8 as L
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import Data.Char (isSpace)
 import Data.List.NonEmpty (NonEmpty(..))
-import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -234,6 +231,7 @@ mkIdsSearch ids mappingName =
 
 -- ^
 -- Create a search that will return no results
+zeroResultsSearch :: Search
 zeroResultsSearch = mkSearch' (Just zeroResults) Nothing Nothing [] 0 0
 
 -- ^
@@ -254,6 +252,7 @@ mkSearch expr sort fields' start limit = first mkError $ search <$> query
 
 -- ^
 -- Create a search that will return all results (no pagination)
+mkSearchAll :: Maybe FilterExpr -> [Text] -> [Text] -> Either EsError Search
 mkSearchAll e s f = mkSearch e s f 0 maxSize
 
 mkSearch' :: Maybe Query
@@ -304,7 +303,7 @@ exprToQuery = toQuery
     mkMatchQuery' (ColumnName c x) (TermStr v) =
       Right . QueryMatchQuery $ (mkMatchQuery c v $ hasSpace v) (mkBoost x)
     mkMatchQuery' _ t = Left $ "Unexpected " ++ show t ++ ". Expected a string."
-    mkInQuery (ColumnName c _) (TermList []) = Right zeroResults
+    mkInQuery (ColumnName _ _) (TermList []) = Right zeroResults
     mkInQuery (ColumnName c _) (TermList (y:ys)) =
       Right $ TermsQuery c (termToText <$> y :| ys)
     mkInQuery _ t = Left $ "Unexpected " ++ show t ++ ". Expected a list."
@@ -336,6 +335,7 @@ exprToQuery = toQuery
     hasSpace = isJust . T.find isSpace
     compose = liftA2 . mkCompositeQuery
 
+zeroResults :: Query
 zeroResults = IdsQuery (MappingName mempty) []
 
 mkRangeDouble :: FilterRelationalOperator -> Double -> RangeValue
@@ -442,13 +442,14 @@ extractRecord results =
     x:_ -> Just x
 
 -- ^
--- Extract all 'Record's from a 'SearchResult'
+-- Extract all 'Record's from a 'SearchResult' including only the
+-- specified labels or all if none specified.
 extractRecords :: [Text] -> SearchResult Record -> [Record]
-extractRecords fields input = include fields' <$> records
+extractRecords labels input = include fields' <$> records
   where
     include [] r = r
     include xs r = includeFields xs r
-    fields' = mkIncludeLabels fields
+    fields' = mkIncludeLabels labels
     result = B.searchHits input
     hits = B.hits result
     getRecord = catMaybes . (: []) . getRecord'

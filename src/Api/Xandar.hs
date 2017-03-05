@@ -30,6 +30,8 @@ type SubscriptionApiPath = "subscriptions"
 
 type PostQueryApiPath = "post-queries"
 
+type TagsApiPath = "tags"
+
 type XandarUserApi = XandarApiPath :> UserApiPath :> GenericApi
 
 type XandarFeedApi = XandarApiPath :> FeedApiPath :> GenericApi
@@ -42,12 +44,15 @@ type XandarSubscriptionApi = XandarApiPath :> SubscriptionApiPath :> GenericApi
 
 type XandarPostQueryApi = XandarApiPath :> PostQueryApiPath :> GenericApi
 
+type XandarTagsApi = XandarApiPath :> TagsApiPath :> GenericApi
+
 type XandarApi = XandarUserApi
             :<|> XandarFeedApi
             :<|> XandarPostApi
             :<|> XandarSubscriptionApi
             :<|> XandarUserPostApi
             :<|> XandarPostQueryApi
+            :<|> XandarTagsApi
 
 type ApiGetMultipleLink = [Text] -> Maybe Text -> [Text] -> Maybe Int -> Maybe Int -> String
 
@@ -71,6 +76,9 @@ apiSubscriptionProxy = Proxy :: Proxy XandarSubscriptionApi
 
 apiPostQueryProxy :: Proxy XandarPostQueryApi
 apiPostQueryProxy = Proxy :: Proxy XandarPostQueryApi
+
+apiTagsProxy :: Proxy XandarTagsApi
+apiTagsProxy = Proxy :: Proxy XandarTagsApi
 
 apiUserProxyGetSingle
   :: Proxy (XandarApiPath :> (UserApiPath :> GetSingle))
@@ -102,6 +110,11 @@ apiPostQueryProxyGetSingle
 apiPostQueryProxyGetSingle =
   Proxy :: Proxy (XandarApiPath :> PostQueryApiPath :> GetSingle)
 
+apiTagsProxyGetSingle
+  :: Proxy (XandarApiPath :> (TagsApiPath :> GetSingle))
+apiTagsProxyGetSingle =
+  Proxy :: Proxy (XandarApiPath :> TagsApiPath :> GetSingle)
+
 apiUserProxyGetMultiple
   :: Proxy (XandarApiPath :> (UserApiPath :> GetMultiple))
 apiUserProxyGetMultiple =
@@ -132,6 +145,11 @@ apiPostQueryProxyGetMultiple
 apiPostQueryProxyGetMultiple =
   Proxy :: Proxy (XandarApiPath :> PostQueryApiPath :> GetMultiple)
 
+apiTagsProxyGetMultiple
+  :: Proxy (XandarApiPath :> (TagsApiPath :> GetMultiple))
+apiTagsProxyGetMultiple =
+  Proxy :: Proxy (XandarApiPath :> TagsApiPath :> GetMultiple)
+
 mkUserGetSingleLink :: Text -> String
 mkUserGetSingleLink = mkLink1 apiUserProxy apiUserProxyGetSingle
 
@@ -150,6 +168,9 @@ mkSubscriptionGetSingleLink = mkLink1 apiSubscriptionProxy apiSubscriptionProxyG
 mkPostQueryGetSingleLink :: Text -> String
 mkPostQueryGetSingleLink = mkLink1 apiPostQueryProxy apiPostQueryProxyGetSingle
 
+mkTagsGetSingleLink :: Text -> String
+mkTagsGetSingleLink = mkLink1 apiTagsProxy apiTagsProxyGetSingle
+
 mkUserGetMultipleLink :: ApiGetMultipleLink
 mkUserGetMultipleLink = mkLink5 apiUserProxy apiUserProxyGetMultiple
 
@@ -167,3 +188,6 @@ mkSubscriptionGetMultipleLink = mkLink5 apiSubscriptionProxy apiSubscriptionProx
 
 mkPostQueryGetMultipleLink :: ApiGetMultipleLink
 mkPostQueryGetMultipleLink = mkLink5 apiPostQueryProxy apiPostQueryProxyGetMultiple
+
+mkTagsGetMultipleLink :: ApiGetMultipleLink
+mkTagsGetMultipleLink = mkLink5 apiTagsProxy apiTagsProxyGetMultiple
