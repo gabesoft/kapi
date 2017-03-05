@@ -10,18 +10,12 @@ module Handlers.Xandar.Subscriptions where
 
 import Api.Common (GetMultiple)
 import Api.Xandar
-import Control.Monad.Except
-import Control.Monad.Reader
-import Control.Monad.Trans.Control
 import Data.Text (Text)
 import Handlers.Xandar.Common
        (runSingle, runMulti, mkGetSingleResult, mkGetMultipleResult,
         getMultiple', mkCreateSingleResult, mkCreateMultipleResult,
-        updateSingle, mkPagination)
+        updateSingle)
 import qualified Handlers.Xandar.Common as C
-import Persistence.Common
-import Persistence.Facade (dbPipe, runDb)
-import qualified Persistence.MongoDB as DB
 import Persistence.Xandar.Common (subscriptionDefinition)
 import Persistence.Xandar.Subscriptions
 import Servant

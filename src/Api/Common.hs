@@ -10,8 +10,6 @@ module Api.Common where
 
 import Data.Text (Text)
 import Servant
-import Servant.API
-import Servant.Utils.Links
 import Types.Common
 
 type GetMultiple = QueryParams "include" Text
