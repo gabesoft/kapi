@@ -1,0 +1,35 @@
+# -*- restclient -*-
+#
+# Queries against the /xandar/tags endpoints
+#
+
+# variables
+:date := (shell-command-to-string "echo -n (date +%Y-%m-%d-%M-%s)")
+:host = 127.0.0.1:8001
+:path = xandar/tags
+:json = application/json
+
+#
+# Get a single tags object
+#
+GET http://:host/:path/58bc44575984183044000001
+
+#
+# Get all tags
+#
+GET http://:host/:path?per_page=15
+
+#
+# Find post queries
+#
+GET http://:host/:path?where=(userText contains 'read')
+
+#
+# Create a single post-query
+#
+POST http://:host/:path
+Content-Type: :json
+{
+  "userId": "56d7cc3fccee17506699e735",
+  "tags": ["programming","must-read","haskell","javascript"]
+}
