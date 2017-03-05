@@ -54,8 +54,8 @@ library
                      , SHA
                      , scientific >= 0.3
                      , servant >= 0.9
-                     , servant-server
-                     , servant-docs
+                     , servant-server >= 0.9
+                     , servant-docs >= 0.9
                      , text >= 1.2
                      , time >= 1.6
                      , transformers-base >= 0.4
