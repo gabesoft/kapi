@@ -7,8 +7,6 @@ import Handlers.Xandar.Common
 import qualified Handlers.Xandar.Subscriptions as S
 import qualified Handlers.Xandar.UserPosts as UP
 import Persistence.Xandar.Common
-       (feedDefinition, feedIndices, postDefinition, postIndices,
-        subscriptionIndices, userDefinition, userIndices)
 import Servant
 import Types.Common
 
@@ -20,7 +18,8 @@ app =
                  feedHandlers :<|>
                  postHandlers :<|>
                  subscriptionHandlers :<|>
-                 userPostHandlers
+                 userPostHandlers :<|>
+                 postQueryHandlers
                 )
   where
     userHandlers :: ServerT XandarUserApi Api
@@ -29,6 +28,8 @@ app =
     feedHandlers = handlers feedDefinition mkFeedGetSingleLink mkFeedGetMultipleLink
     postHandlers :: ServerT XandarPostApi Api
     postHandlers = handlers postDefinition mkPostGetSingleLink mkPostGetMultipleLink
+    postQueryHandlers :: ServerT XandarPostQueryApi Api
+    postQueryHandlers = handlers postQueryDefinition mkPostQueryGetSingleLink mkPostQueryGetMultipleLink
     handlers def mkGetSingleLink mkGetMultipleLink =
       getMultiple mkGetMultipleLink def :<|>
       getSingle def :<|>
@@ -71,4 +72,5 @@ appInit =
   addDbIndices userIndices >>
   addDbIndices feedIndices >>
   addDbIndices postIndices >>
-  addDbIndices subscriptionIndices
+  addDbIndices subscriptionIndices >>
+  addDbIndices postQueryIndices

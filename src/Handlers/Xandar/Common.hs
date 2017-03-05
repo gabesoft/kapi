@@ -8,20 +8,19 @@
 -- Common handlers
 module Handlers.Xandar.Common where
 
-import Data.Bson (Field)
+import Api.Common (GetMultiple)
 import Api.Xandar
 import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.Trans.Control
 import Data.Aeson (encode)
 import Data.Bifunctor
-import qualified Data.ByteString.Char8 as BS
-import qualified Data.ByteString.Lazy.Char8 as LBS
+import Data.Bson (Field)
 import Data.List (intercalate)
 import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as T
-import Database.MongoDB (Database, Index, Pipe, Failure)
+import Database.MongoDB (Index)
 import Network.HTTP.Types.Status
 import Persistence.Common
 import Persistence.Facade

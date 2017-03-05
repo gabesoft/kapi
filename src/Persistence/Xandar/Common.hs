@@ -23,62 +23,6 @@ import Persistence.Facade (validateMulti)
 import qualified Persistence.MongoDB as M
 import Types.Common
 
-subscriptionIndices :: [Index]
-subscriptionIndices =
-  [ Index
-    { iColl = recordCollection subscriptionDefinition
-    , iKey = ["userId" =: (1 :: Int), "feedId" =: (1 :: Int)]
-    , iName = "userid_feedid_unique"
-    , iUnique = True
-    , iDropDups = True
-    , iExpireAfterSeconds = Nothing
-    }
-  ]
-
-userIndices :: [Index]
-userIndices =
-  [ Index
-    { iColl = recordCollection userDefinition
-    , iKey = ["email" =: (1 :: Int)]
-    , iName = "email_unique"
-    , iUnique = True
-    , iDropDups = True
-    , iExpireAfterSeconds = Nothing
-    }
-  ]
-
-feedIndices :: [Index]
-feedIndices =
-  [ Index
-    { iColl = recordCollection feedDefinition
-    , iKey = ["uri" =: (1 :: Int)]
-    , iName = "uri_unique"
-    , iUnique = True
-    , iDropDups = True
-    , iExpireAfterSeconds = Nothing
-    }
-  ]
-
-postIndices :: [Index]
-postIndices =
-  [ Index
-    { iColl = recordCollection postDefinition
-    , iKey = ["guid" =: (1 :: Int)]
-    , iName = "guid_unique"
-    , iUnique = True
-    , iDropDups = True
-    , iExpireAfterSeconds = Nothing
-    }
-  , Index
-    { iColl = recordCollection postDefinition
-    , iKey = ["link" =: (1 :: Int)]
-    , iName = "link_unique"
-    , iUnique = True
-    , iDropDups = True
-    , iExpireAfterSeconds = Nothing
-    }
-  ]
-
 subscriptionDefinition :: RecordDefinition
 subscriptionDefinition =
   RecordDefinition "feedsubscriptions" "subscriptions" $
@@ -92,6 +36,18 @@ subscriptionDefinition =
     , mkOptDef "unreadCount" (Just 0 :: Maybe Int)
     ]
 
+subscriptionIndices :: [Index]
+subscriptionIndices =
+  [ Index
+    { iColl = recordCollection subscriptionDefinition
+    , iKey = ["userId" =: (1 :: Int), "feedId" =: (1 :: Int)]
+    , iName = "userid_feedid_unique"
+    , iUnique = True
+    , iDropDups = True
+    , iExpireAfterSeconds = Nothing
+    }
+  ]
+
 userDefinition :: RecordDefinition
 userDefinition =
   RecordDefinition "users" "users" $
@@ -103,6 +59,18 @@ userDefinition =
     , mkOptDef' "githubUrl"
     , mkOptDef' "githubLogin"
     ]
+
+userIndices :: [Index]
+userIndices =
+  [ Index
+    { iColl = recordCollection userDefinition
+    , iKey = ["email" =: (1 :: Int)]
+    , iName = "email_unique"
+    , iUnique = True
+    , iDropDups = True
+    , iExpireAfterSeconds = Nothing
+    }
+  ]
 
 feedDefinition :: RecordDefinition
 feedDefinition =
@@ -128,6 +96,18 @@ feedDefinition =
     , mkReqDef' "uri"
     ]
 
+feedIndices :: [Index]
+feedIndices =
+  [ Index
+    { iColl = recordCollection feedDefinition
+    , iKey = ["uri" =: (1 :: Int)]
+    , iName = "uri_unique"
+    , iUnique = True
+    , iDropDups = True
+    , iExpireAfterSeconds = Nothing
+    }
+  ]
+
 postDefinition :: RecordDefinition
 postDefinition =
   RecordDefinition "posts" "posts" $
@@ -146,6 +126,26 @@ postDefinition =
     , mkOptDef' "summary"
     , mkOptDef' "title"
     ]
+
+postIndices :: [Index]
+postIndices =
+  [ Index
+    { iColl = recordCollection postDefinition
+    , iKey = ["guid" =: (1 :: Int)]
+    , iName = "guid_unique"
+    , iUnique = True
+    , iDropDups = True
+    , iExpireAfterSeconds = Nothing
+    }
+  , Index
+    { iColl = recordCollection postDefinition
+    , iKey = ["link" =: (1 :: Int)]
+    , iName = "link_unique"
+    , iUnique = True
+    , iDropDups = True
+    , iExpireAfterSeconds = Nothing
+    }
+  ]
 
 userPostDefinition :: RecordDefinition
 userPostDefinition =
@@ -173,6 +173,18 @@ postQueryDefinition =
     , mkOptDef' "query"
     , mkOptDef' "lastUsed"
     ]
+
+postQueryIndices :: [Index]
+postQueryIndices =
+  [ Index
+    { iColl = recordCollection postQueryDefinition
+    , iKey = ["userId" =: (1 :: Int), "text" =: (1 :: Int)]
+    , iName = "userid_text_unique"
+    , iUnique = True
+    , iDropDups = True
+    , iExpireAfterSeconds = Nothing
+    }
+  ]
 
 subscriptionCollection :: Collection
 subscriptionCollection = recordCollection subscriptionDefinition

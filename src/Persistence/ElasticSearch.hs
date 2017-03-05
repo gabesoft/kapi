@@ -245,7 +245,7 @@ mkSearch
   -> RecordStart
   -> ResultLimit
   -> Either EsError Search
-mkSearch expr sort fields' start limit = first mkError $ liftA search query
+mkSearch expr sort fields' start limit = first mkError $ search <$> query
   where
     query = sequence (exprToQuery <$> expr)
     sort' = mToMaybe $ exprToSort <$> catMaybes (mkSortExpr <$> sort)

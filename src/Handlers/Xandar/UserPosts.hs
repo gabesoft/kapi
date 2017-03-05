@@ -8,6 +8,7 @@
 -- Handlers for the user posts endpoints
 module Handlers.Xandar.UserPosts where
 
+import Api.Common (GetMultiple)
 import Api.Xandar
 import Control.Monad.Except
 import Control.Monad.Reader

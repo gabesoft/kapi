@@ -7,42 +7,11 @@
 
 -- |
 -- Declaration for all endpoints used by the Xandar app
-module Api.Xandar
-  ( ApiGetMultipleLink
-  , GetMultiple
-  , GetSingle
-  , UserApiPath
-  , XandarApi
-  , XandarApiPath
-  , XandarFeedApi
-  , XandarPostApi
-  , XandarSubscriptionApi
-  , XandarUserApi
-  , XandarUserPostApi
-  , apiFeedProxy
-  , apiPostProxy
-  , apiProxy
-  , apiSubscriptionProxy
-  , apiUserPostProxy
-  , apiUserProxy
-  , appName
-  , mkFeedGetMultipleLink
-  , mkFeedGetSingleLink
-  , mkPostGetMultipleLink
-  , mkPostGetSingleLink
-  , mkSubscriptionGetMultipleLink
-  , mkSubscriptionGetSingleLink
-  , mkUserGetMultipleLink
-  , mkUserGetSingleLink
-  , mkUserPostGetMultipleLink
-  , mkUserPostGetSingleLink
-  , perPageDefault
-  ) where
+module Api.Xandar where
 
 import Api.Common
 import Data.Text (Text)
 import Servant
-import Types.Common
 
 perPageDefault :: Int
 perPageDefault = 50
@@ -53,11 +22,13 @@ type UserApiPath = "users"
 
 type FeedApiPath = "feeds"
 
-type SubscriptionApiPath = "subscriptions"
-
 type PostApiPath = "posts"
 
 type UserPostApiPath = "user-posts"
+
+type SubscriptionApiPath = "subscriptions"
+
+type PostQueryApiPath = "post-queries"
 
 type XandarUserApi = XandarApiPath :> UserApiPath :> GenericApi
 
@@ -69,7 +40,14 @@ type XandarUserPostApi = XandarApiPath :> UserPostApiPath :> GenericApi
 
 type XandarSubscriptionApi = XandarApiPath :> SubscriptionApiPath :> GenericApi
 
-type XandarApi = XandarUserApi :<|> XandarFeedApi :<|> XandarPostApi :<|> XandarSubscriptionApi :<|> XandarUserPostApi
+type XandarPostQueryApi = XandarApiPath :> PostQueryApiPath :> GenericApi
+
+type XandarApi = XandarUserApi
+            :<|> XandarFeedApi
+            :<|> XandarPostApi
+            :<|> XandarSubscriptionApi
+            :<|> XandarUserPostApi
+            :<|> XandarPostQueryApi
 
 type ApiGetMultipleLink = [Text] -> Maybe Text -> [Text] -> Maybe Int -> Maybe Int -> String
 
@@ -90,6 +68,9 @@ apiUserPostProxy = Proxy :: Proxy XandarUserPostApi
 
 apiSubscriptionProxy :: Proxy XandarSubscriptionApi
 apiSubscriptionProxy = Proxy :: Proxy XandarSubscriptionApi
+
+apiPostQueryProxy :: Proxy XandarPostQueryApi
+apiPostQueryProxy = Proxy :: Proxy XandarPostQueryApi
 
 apiUserProxyGetSingle
   :: Proxy (XandarApiPath :> (UserApiPath :> GetSingle))
@@ -116,6 +97,11 @@ apiSubscriptionProxyGetSingle
 apiSubscriptionProxyGetSingle =
   Proxy :: Proxy (XandarApiPath :> SubscriptionApiPath :> GetSingle)
 
+apiPostQueryProxyGetSingle
+  :: Proxy (XandarApiPath :> (PostQueryApiPath :> GetSingle))
+apiPostQueryProxyGetSingle =
+  Proxy :: Proxy (XandarApiPath :> PostQueryApiPath :> GetSingle)
+
 apiUserProxyGetMultiple
   :: Proxy (XandarApiPath :> (UserApiPath :> GetMultiple))
 apiUserProxyGetMultiple =
@@ -141,6 +127,11 @@ apiSubscriptionProxyGetMultiple
 apiSubscriptionProxyGetMultiple =
   Proxy :: Proxy (XandarApiPath :> SubscriptionApiPath :> GetMultiple)
 
+apiPostQueryProxyGetMultiple
+  :: Proxy (XandarApiPath :> (PostQueryApiPath :> GetMultiple))
+apiPostQueryProxyGetMultiple =
+  Proxy :: Proxy (XandarApiPath :> PostQueryApiPath :> GetMultiple)
+
 mkUserGetSingleLink :: Text -> String
 mkUserGetSingleLink = mkLink1 apiUserProxy apiUserProxyGetSingle
 
@@ -156,6 +147,9 @@ mkUserPostGetSingleLink = mkLink1 apiUserPostProxy apiUserPostProxyGetSingle
 mkSubscriptionGetSingleLink :: Text -> String
 mkSubscriptionGetSingleLink = mkLink1 apiSubscriptionProxy apiSubscriptionProxyGetSingle
 
+mkPostQueryGetSingleLink :: Text -> String
+mkPostQueryGetSingleLink = mkLink1 apiPostQueryProxy apiPostQueryProxyGetSingle
+
 mkUserGetMultipleLink :: ApiGetMultipleLink
 mkUserGetMultipleLink = mkLink5 apiUserProxy apiUserProxyGetMultiple
 
@@ -170,3 +164,6 @@ mkUserPostGetMultipleLink = mkLink5 apiUserPostProxy apiUserPostProxyGetMultiple
 
 mkSubscriptionGetMultipleLink :: ApiGetMultipleLink
 mkSubscriptionGetMultipleLink = mkLink5 apiSubscriptionProxy apiSubscriptionProxyGetMultiple
+
+mkPostQueryGetMultipleLink :: ApiGetMultipleLink
+mkPostQueryGetMultipleLink = mkLink5 apiPostQueryProxy apiPostQueryProxyGetMultiple

@@ -8,6 +8,7 @@
 -- Handlers for the subscription endpoints
 module Handlers.Xandar.Subscriptions where
 
+import Api.Common (GetMultiple)
 import Api.Xandar
 import Control.Monad.Except
 import Control.Monad.Reader
