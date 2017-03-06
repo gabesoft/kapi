@@ -5,8 +5,7 @@ module TestHelper where
 
 import Data.Bson
 import Data.Maybe
-import Data.String
-import Data.Text (Text, unpack, pack)
+import Data.Text (Text, unpack)
 import Data.Time (UTCTime)
 import Data.Time.ISO8601
 import Persistence.Common
@@ -25,6 +24,7 @@ replaceUTCDate name = modField name setTime
     setTime :: Maybe UTCTime -> Maybe UTCTime
     setTime field = const (date dateReplacement) <$> field
 
+replaceTextDate :: Label -> Record -> Record
 replaceTextDate name = modField name setText
   where
     setText :: Maybe Text -> Maybe Text
@@ -39,8 +39,10 @@ mkId v = ObjId (read $ unpack v)
 mkObjId :: RecordId -> Field
 mkObjId = mkObjId' "_id"
 
+date :: Text -> UTCTime
 date = fromJust . parseISO8601 . unpack
 
+dateTerm :: Text -> FilterTerm
 dateTerm = TermDate . date
 
 mkObjId' :: Label -> RecordId -> Field
@@ -50,22 +52,22 @@ mkRecId :: RecordId -> Field
 mkRecId = mkTxtField "_id"
 
 mkStrField :: Label -> String -> Field
-mkStrField name val = name =: val
+mkStrField name v = name =: v
 
 mkTxtField :: Label -> Text -> Field
-mkTxtField name val = name =: val
+mkTxtField name v = name =: v
 
 mkStrListField :: Label -> [String] -> Field
-mkStrListField name val = name =: val
+mkStrListField name v = name =: v
 
 mkIntField :: Label -> Int -> Field
-mkIntField name val = name =: val
+mkIntField name v = name =: v
 
 mkFloatField :: Label -> Double -> Field
-mkFloatField name val = name =: val
+mkFloatField name v = name =: v
 
 mkBoolField :: Label -> Bool -> Field
-mkBoolField name val = name =: val
+mkBoolField name v = name =: v
 
 fromRight :: (Show a, Show b) => Either a b -> b
 fromRight (Right x) = x

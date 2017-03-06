@@ -76,4 +76,5 @@ appInit =
   addDbIndices feedIndices >>
   addDbIndices postIndices >>
   addDbIndices subscriptionIndices >>
-  addDbIndices postQueryIndices
+  addDbIndices postQueryIndices >>
+  addDbIndices tagsIndices

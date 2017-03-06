@@ -78,11 +78,6 @@ refreshIndex :: Text -> Text -> IO (Either EsError Text)
 refreshIndex server index = withBH server (B.refreshIndex $ IndexName index)
 
 -- ^
--- Maximum number of results returned from a search
-maxSize :: Int
-maxSize = 1048576
-
--- ^
 -- Add a new type to an existing index
 putMapping
   :: ToJSON a
@@ -174,7 +169,7 @@ deleteByQuery search mappingName server index = do
       search
       { fields = Just [FieldName idLabel]
       , from = B.From 0
-      , size = B.Size maxSize
+      , size = B.Size maxResultsSize
       }
     scanSearch
       :: (B.MonadBH m, MonadThrow m)
@@ -253,7 +248,7 @@ mkSearch expr sort fields' start limit = first mkError $ search <$> query
 -- ^
 -- Create a search that will return all results (no pagination)
 mkSearchAll :: Maybe FilterExpr -> [Text] -> [Text] -> Either EsError Search
-mkSearchAll e s f = mkSearch e s f 0 maxSize
+mkSearchAll e s f = mkSearch e s f 0 maxResultsSize
 
 mkSearch' :: Maybe Query
           -> Maybe Filter

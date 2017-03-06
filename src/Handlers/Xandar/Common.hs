@@ -26,6 +26,7 @@ import qualified Persistence.MongoDB as DB
 import Servant
 import Servant.Utils.Enter (Enter)
 import Types.Common
+import Util.Constants
 import Util.Error
 
 -- ^
@@ -252,7 +253,9 @@ checkEtag sha output etag
 -- Create a 'Pagination' object
 mkPagination :: Maybe Int -> Maybe Int -> Int -> Pagination
 mkPagination page perPage =
-  paginate (fromMaybe 1 page) (fromMaybe perPageDefault perPage)
+  paginate
+    (fromMaybe 1 page)
+    (min maxResultsSize $ fromMaybe perPageDefault perPage)
 
 -- ^
 -- Create a set of pagination links to be returned in the 'Link' header

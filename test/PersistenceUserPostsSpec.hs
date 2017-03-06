@@ -1,3 +1,4 @@
+{-# LANGUAGE Strict #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 -- ^
@@ -5,20 +6,14 @@
 module Main (main) where
 
 import Control.Monad.IO.Class
-import Data.Bifunctor
 import Data.Bson
-import Data.List (all)
-import qualified Data.Map.Strict as Map
-import Data.Monoid ((<>))
 import Data.Text (Text)
 import Data.Time (UTCTime)
-import Mocks.Common
 import Network.HTTP.Types
 import Persistence.Common
 import Persistence.Xandar.Common
 import Persistence.Xandar.UserPosts
 import Test.Hspec
-import Test.QuickCheck
 import TestHelper
 import Types.Common
 import Util.Constants
@@ -52,8 +47,8 @@ main =
       it "modifies the existing record" =<< runIO verifyModify
 
 verifyValidation :: Record -> (Record, ValidationResult) -> Expectation
-verifyValidation input exp =
-  validateRecord userPostDefinition input `shouldBe` exp
+verifyValidation input expected =
+  validateRecord userPostDefinition input `shouldBe` expected
 
 verifyCreateUserPostMissingPost
   :: MonadIO m
@@ -175,17 +170,6 @@ inputInvalid1 =
       , mkStrField "guid" "27d179f7-0c55-4177-9f15-404221e9b8c0"
       ]
     , mkStrField "feedId" "57e9f802d5ec56510904c9d9"
-    ]
-
-inputInvalid2 :: Record
-inputInvalid2 =
-  Record
-    [ mkBoolField "read" True
-    , mkStrField "title" "Feed title"
-    , mkStrField "subscriptionId" "56d7de07c788cb1d6eb91a82"
-    , mkStrField "postId" "56d7d88bc788cb1d6eb919c1"
-    , "post" =: [mkStrField "author" "unknown"]
-    , mkStrListField "tags" ["haskell", "javascript"]
     ]
 
 inputValid1 :: Record
@@ -352,44 +336,6 @@ userPost2 =
     , mkTxtField updatedAtLabel dateReplacement
     , mkTxtField createdAtLabel "2016-09-27T04:39:31.460Z"
     ]
-
-existingPost :: Record
-existingPost =
-  Record
-    [ mkStrListField "tags" ["existing-tag", "javascript"]
-    , mkStrField "title" "Existing title"
-    , mkRecId userPost1Id
-    , "post" =:
-      [ mkStrField "author" "Existing post author"
-      , mkStrField "comments" []
-      , mkStrField "date" "2016-03-01T03:45:00.000Z"
-      , mkStrField "description" "Existing post description"
-      , mkStrField "guid" "8196e7a1-4fdd-417d-b49b-c74640089314"
-      , mkStrField "link" "http://example.com/feeds/1233.html"
-      , mkStrField "summary" "Post summary"
-      , mkStrField "title" "Post title"
-      , "image" =: [mkStrField "url" "http://example.com/feeds/1233.rss"]
-      ]
-    , mkStrField "postId" "56d7d88bc788cb1d6eb919a1"
-    , mkStrField "subscriptionId" "56d7de07c788cb1d6eb91a82"
-    , mkStrField "userId" "56d7cc3fccee17506699e735"
-    , mkStrField "feedId" "56d7de07c788cb1d6eb91a6d"
-    , mkBoolField "read" False
-    , mkTxtField updatedAtLabel "2016-09-27T04:53:11.163Z"
-    , mkTxtField createdAtLabel "2016-09-27T04:39:31.460Z"
-    ]
-
-result1 :: Maybe Record -> [Either ApiError (Record, RecordId)]
-result1 input =
-  [ Right (userPost1, userPost1Id)
-  , Left
-      ApiError
-      { apiErrorInput = input
-      , apiErrorStatus =
-          Status {statusCode = 400, statusMessage = "Bad Request"}
-      , apiErrorMessage = "Post not found."
-      }
-  ]
 
 result2 :: Maybe Record -> Either ApiError b
 result2 input =

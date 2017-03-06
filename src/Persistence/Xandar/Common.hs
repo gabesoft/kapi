@@ -141,11 +141,11 @@ userPostDefinition :: RecordDefinition
 userPostDefinition =
   RecordDefinition "post" "user-posts" $
   Map.fromList
-    [ mkReqDef' "subscriptionId"
-    , mkReqDef' "postId"
+    [ mkIdDef "subscriptionId"
+    , mkIdDef "postId"
     , mkOptDef' "feedId"
-    , mkOptDef "read" (Just False)
     , mkOptDef' "userId"
+    , mkReqDef "read" (Just False)
     , mkOptDef' "post"
     , mkOptDef' "title"
     , mkOptDef' "tags"
@@ -155,7 +155,7 @@ postQueryDefinition :: RecordDefinition
 postQueryDefinition =
   RecordDefinition "postqueries" "post-queries" $
   Map.fromList
-    [ mkReqDef' "userId"
+    [ mkIdDef "userId"
     , mkReqDef "pinState" (Just 0 :: Maybe Int)
     , mkOptDef' "title"
     , mkOptDef' "userText"
@@ -179,7 +179,19 @@ postQueryIndices =
 tagsDefinition :: RecordDefinition
 tagsDefinition =
   RecordDefinition "tags" "tags" $
-  Map.fromList [mkReqDef' "userId", mkOptDef "tags" (Just [] :: Maybe [Text])]
+  Map.fromList [mkIdDef "userId", mkOptDef "tags" (Just [] :: Maybe [Text])]
+
+tagsIndices :: [Index]
+tagsIndices =
+  [ Index
+    { iColl = recordCollection tagsDefinition
+    , iKey = ["userId" =: (1 :: Int)]
+    , iName = "userid_unique"
+    , iUnique = True
+    , iDropDups = True
+    , iExpireAfterSeconds = Nothing
+    }
+  ]
 
 subscriptionCollection :: Collection
 subscriptionCollection = recordCollection subscriptionDefinition

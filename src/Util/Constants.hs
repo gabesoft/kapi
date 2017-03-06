@@ -14,3 +14,8 @@ updatedAtLabel = "updatedAt"
 
 idLabel :: Label
 idLabel = "_id"
+
+-- ^
+-- Maximum number of results returned from a search or query
+maxResultsSize :: Int
+maxResultsSize = 1048576

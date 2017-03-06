@@ -12,7 +12,7 @@
 #
 # Get a single tags object
 #
-GET http://:host/:path/58bc44575984183044000001
+GET http://:host/:path/58bc450d5984183817000001
 
 #
 # Get all tags
@@ -20,12 +20,12 @@ GET http://:host/:path/58bc44575984183044000001
 GET http://:host/:path?per_page=15
 
 #
-# Find post queries
+# Get all tags for a user
 #
-GET http://:host/:path?where=(userText contains 'read')
+GET http://:host/:path?where=(userId eq 56d7cc3fccee17506699e735)
 
 #
-# Create a single post-query
+# Create a tags object for one user
 #
 POST http://:host/:path
 Content-Type: :json
@@ -33,3 +33,26 @@ Content-Type: :json
   "userId": "56d7cc3fccee17506699e735",
   "tags": ["programming","must-read","haskell","javascript"]
 }
+
+#
+# Update the tags for a user
+#
+PUT http://:host/:path/58bc450d5984183817000001
+Content-Type: :json
+{
+  "userId": "56d7cc3fccee17506699e735",
+  "tags": ["programming","must-read","go","technology","design","web"]
+}
+
+#
+# Create multiple tags objects
+#
+POST http://:host/:path
+Content-Type: :json
+[{
+  "userId": "54c31312bef9f6ce5fc1f23d",
+  "tags": ["web-design","sql","mongodb"]
+},{
+  "userId": "56da18c8fa51ced05cd8db0a",
+  "tags": ["technology","security","cryptography"]
+}]

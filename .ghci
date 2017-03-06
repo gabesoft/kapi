@@ -2,4 +2,5 @@
 
 import qualified Database.Bloodhound as B
 
-:load test/ElasticSearchSetup.hs
+:set -package hspec
+:load test/ElasticSearchSetup.hs test/TestHelper.hs
