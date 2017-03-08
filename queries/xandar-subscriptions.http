@@ -30,9 +30,14 @@ GET http://:host/:path?per_page=10&where=(disabled eq false)&include=feedId,titl
 GET http://:host/:path?where=(feedId eq 56d7d88bc788cb1d6eb9199c)
 
 #
-# Get a subscription by feed id
+# Get a subscription by feed id and user id
 #
-GET http://:host/:path?where=(feedId eq 56d7ddf8c788cb1d6eb919d8)
+GET http://:host/:path?where=(feedId eq 5814f2d909a64c359672dde2 and userId eq 56d7cc3fccee17506699e735)
+
+#
+# Get all subscriptions for a user
+#
+GET http://:host/:path?where=(userId eq 56da18c8fa51ced05cd8db0a)&per_page=1000&include=_id
 
 #
 # Get all subscription for feeds
@@ -58,7 +63,7 @@ GET http://:host/:path?page=4&per_page=5
 # Get a single subscription
 # feedId: 56d7df90c788cb1d6eb9277e
 #
-GET http://:host/:path/56d7df90c788cb1d6eb92789
+GET http://:host/:path/5814f2d909a64c359672dded
 
 #
 # Get a single subscription using ETag

@@ -22,7 +22,7 @@ GET http://:host/:path?per_page=15
 #
 # Get all tags for a user
 #
-GET http://:host/:path?where=(userId eq 56d7cc3fccee17506699e735)
+GET http://:host/:path?where=(userId eq 56da18c8fa51ced05cd8db0a)
 
 #
 # Create a tags object for one user

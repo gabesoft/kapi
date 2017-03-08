@@ -35,6 +35,11 @@ GET http://:host/:path?sort=email&include=email,admin
 GET http://:host/:path?where=(admin eq true)
 
 #
+# Get by email
+#
+GET http://:host/:path?where=(email eq 'gabesoft@gmail.com')
+
+#
 # Get users filtered by email
 #
 GET http://:host/:path?where=(email contains "updated") or (email contains "admin")&include=email&sort=-email
@@ -86,6 +91,11 @@ If-None-Match: 8751d26bd52c1d762b2dc1662c1e581adaed121c
 DELETE http://:host/:path/non-existent
 
 #
+# Delete an existent user
+#
+DELETE http://:host/:path/58bf8ddb5984181c6800006d
+
+#
 # Create a single user
 #
 POST http://:host/:path
@@ -94,6 +104,22 @@ Content-Type: :json
   "email": "admin:date@aol.com",
   "githubUrl" : "https://api.github.com/users/admin",
   "admin": true
+}
+
+#
+# Create a single user 2
+#
+POST http://:host/:path
+Content-Type: :json
+{
+  "email": "gabesoft@gmail.com",
+  "githubAvatar": "https://avatars0.githubusercontent.com/u/606000?v=3",
+  "admin": false,
+  "createdAt": "2017-03-08T04:37:53.141Z",
+  "disabled": false,
+  "githubLogin": "gabesoft",
+  "updatedAt": "2017-03-08T04:37:53.141Z",
+  "githubUrl": "https://api.github.com/users/gabesoft"
 }
 
 #

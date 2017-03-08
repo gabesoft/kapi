@@ -15,6 +15,11 @@
 GET http://:host/:path?per_page=3
 
 #
+# Get feeds sorted by last post date
+#
+GET http://:host/:path?where=(image.url eq null and image ~eq null)&include=image
+
+#
 # Get all feeds (postCount)
 #
 GET http://:host/:path?per_page=50&include=title,postCount,uri
@@ -52,7 +57,7 @@ GET http://:host/:path?page=4&per_page=5
 #
 # Get a single feed
 #
-GET http://:host/:path/56d7ddf3c788cb1d6eb919b2
+GET http://:host/:path/56d7dedfc788cb1d6eb9216c
 
 #
 # Get a single feed using ETag
@@ -188,4 +193,13 @@ PATCH http://:host/:path/587ad83859841886c7000003
 Content-Type: :json
 {
     "email": "updated3@aol.com"
+}
+
+#
+# Modify a single feed 2
+#
+PATCH http://:host/:path/56d7dedfc788cb1d6eb9216c
+Content-Type: :json
+{
+    "image": null
 }

@@ -46,6 +46,21 @@ GET http://:host/:path?where=(subscriptionId eq 58b5244e5984182c66000012)&includ
 GET http://:host/:path?where=(feedId eq 56d7ddf8c788cb1d6eb919d8)&include=createdAt,updatedAt,title,subscriptionId,tags
 
 #
+# Find by feed id 2
+#
+GET http://:host/:path?where=(feedId eq 5814f2d909a64c359672dde2)&sort=-post.date
+
+#
+# Find by post id
+#
+GET http://:host/:path?where=(postId eq 58bcfa2559841810d1000c00)&include=createdAt,updatedAt,title,subscriptionId,tags
+
+#
+# Find by ids
+#
+GET http://:host/:path?where=(_id in ['58bcfa2559841810d1000c00-5814f2d909a64c359672dded'])
+
+#
 # Count by subscription ids (head)
 #
 HEAD http://:host/:path?where=(subscriptionId in [56d7d89dc788cb1d6eb919b1, 56d7df90c788cb1d6eb92789, 56d7ddf5c788cb1d6eb919d7])&include=title,feedId,subscriptionId,link,tags
@@ -320,6 +335,34 @@ Content-Type: :json
 
 #
 # Modify multiple posts
+#
+PATCH http://:host/:path
+Content-Type: :json
+[
+  {
+    "read": true,
+    "_id": "56f2b33ea8b967f57a2ce8bc-56e60fae1432afe539337b80"
+  },
+  {
+    "read": true,
+    "_id": "56f3ecdf7ae0ece73a37e3b3-56e60fae1432afe539337b80"
+  },
+  {
+    "read": true,
+    "_id": "56f541107ae0ece73a37edf5-56e60fae1432afe539337b80"
+  },
+  {
+    "read": true,
+    "_id": "56f7b65b48c80e51524d4049-56e60fae1432afe539337b80"
+  },
+  {
+    "read": true,
+    "_id": "5786ccaeed521f1f170423b7-56e60fae1432afe539337b80"
+  }
+]
+
+#
+# Modify multiple posts 2
 #
 PATCH http://:host/:path
 Content-Type: :json

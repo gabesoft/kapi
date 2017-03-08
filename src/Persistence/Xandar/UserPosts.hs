@@ -194,7 +194,7 @@ mkUserPostOnUpdate f (Just existing) input =
   mkUserPostTuple
     (Just existing)
     (getIdValue' existing)
-    (excludeFields [idLabel] $ f existing record)
+    (excludeFields [idLabel, "__v"] $ f existing record)
   where
     record = excludeFields skipFieldsOnUpdate input
 
