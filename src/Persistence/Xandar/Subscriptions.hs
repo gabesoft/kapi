@@ -306,8 +306,8 @@ mkCountsSearch bucketKey ids =
     boolQuery = B.mkBoolQuery [unreadQuery, subIdsQuery] [] []
     unreadQuery = B.TermQuery (B.Term "read" "false") Nothing
     subIdsQuery = B.TermsQuery subIdLabel (NE.fromList ids)
-    termsAgg = B.mkAggregations bucketKey agg
-    agg = B.TermsAgg $ B.mkTermsAggregation subIdLabel
+    termsAgg = B.mkAggregations bucketKey (B.TermsAgg agg)
+    agg = (B.mkTermsAggregation subIdLabel) {B.termSize = Just (length ids)}
 
 -- ^
 -- Extract the number of unread posts per subscription id from a search result

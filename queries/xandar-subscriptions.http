@@ -30,6 +30,21 @@ GET http://:host/:path?per_page=10&where=(disabled eq false)&include=feedId,titl
 GET http://:host/:path?where=(feedId eq 56d7d88bc788cb1d6eb9199c)
 
 #
+# Get a subscription by id
+#
+GET http://:host/:path?where=(disabled eq false and _id in [56d7e1b0c788cb1d6eb93948, 57f34664966d70b95f5e4fa3, 5814f2d909a64c359672dded])&fields=''
+
+#
+# Get a subscription by user id sorted
+#
+GET http://:host/:path?where=(disabled eq false and userId eq 56d7cc3fccee17506699e735)&sort=title&per_page=16
+
+#
+# Get a subscription by user id sorted 2
+#
+GET http://:host/:path?where=(disabled eq false and userId eq 56d7cc3fccee17506699e735)&sort=title&per_page=50
+
+#
 # Get a subscription by feed id and user id
 #
 GET http://:host/:path?where=(feedId eq 5814f2d909a64c359672dde2 and userId eq 56d7cc3fccee17506699e735)
