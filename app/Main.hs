@@ -11,6 +11,7 @@ import Network.Wai.Middleware.RequestLogger
 import System.Environment
 import Types.Common
 
+conf :: ApiConfig
 conf =
   ApiConfig
   { apiPort = 8001
@@ -27,15 +28,15 @@ main = do
   env <- lookupEnv "KAPI_ENV"
   let port = apiPort conf
   let dev = fromMaybe False $ (== "development") <$> env
-  let env = withEnv dev "development mode" "production mode"
-  putStrLn ("Server started on port " ++ show port ++ " in " ++ env)
+  let environment = withEnv dev "development mode" "production mode"
+  putStrLn ("Server started on port " ++ show port ++ " in " ++ environment)
   let xandarConf = conf {appName = Just "xandar"}
   XA.appInit xandarConf >> runApp dev xandarConf XA.app
 
 runApp :: Bool -> ApiConfig -> (ApiConfig -> Application) -> IO ()
-runApp dev conf app = do
-  let port = fromIntegral $ apiPort conf
-  run port $ withEnv dev logStdoutDev id (app conf)
+runApp dev cfg app = do
+  let port = fromIntegral $ apiPort cfg
+  run port $ withEnv dev logStdoutDev id (app cfg)
 
 withEnv :: Bool -> t -> t -> t
 withEnv dev fd fp =

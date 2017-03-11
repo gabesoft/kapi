@@ -47,26 +47,26 @@ mkIdDef name = mkFieldDef name True True (Nothing :: Maybe String)
 -- ^
 -- Create a definition for a required field without a default value
 mkReqDef' :: Label -> (Label, FieldDefinition)
-mkReqDef' name = mkReqDef name (Nothing :: Maybe String)
+mkReqDef' name = mkFieldDef name True False (Nothing :: Maybe String)
 
 -- ^
 -- Create a definition for a required field
 mkReqDef
   :: Val a
-  => Label -> Maybe a -> (Label, FieldDefinition)
-mkReqDef name = mkFieldDef name True False
+  => Label -> a -> (Label, FieldDefinition)
+mkReqDef name v = mkFieldDef name True False (Just v)
 
 -- ^
 -- Create a definition for an optional field without a default value
 mkOptDef' :: Label -> (Label, FieldDefinition)
-mkOptDef' name = mkOptDef name (Nothing :: Maybe String)
+mkOptDef' name = mkFieldDef name False False (Nothing :: Maybe String)
 
 -- ^
 -- Create a definition for an optional field
 mkOptDef
   :: Val a
-  => Label -> Maybe a -> (Label, FieldDefinition)
-mkOptDef name = mkFieldDef name False False
+  => Label -> a -> (Label, FieldDefinition)
+mkOptDef name v = mkFieldDef name False False (Just v)
 
 -- ^
 -- Get the MongoDB database name for an application

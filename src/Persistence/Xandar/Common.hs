@@ -21,9 +21,9 @@ subscriptionDefinition =
     , mkIdDef "feedId"
     , mkOptDef' "title"
     , mkOptDef' "notes"
-    , mkOptDef "tags" (Just [] :: Maybe [String])
-    , mkReqDef "disabled" (Just False :: Maybe Bool)
-    , mkOptDef "unreadCount" (Just 0 :: Maybe Int)
+    , mkOptDef "tags" ([] :: [String])
+    , mkReqDef "disabled" False
+    , mkOptDef "unreadCount" (0 :: Int)
     ]
 
 subscriptionIndices :: [Index]
@@ -43,8 +43,8 @@ userDefinition =
   RecordDefinition "users" "users" $
   Map.fromList
     [ mkReqDef' "email"
-    , mkReqDef "disabled" (Just False)
-    , mkReqDef "admin" (Just False)
+    , mkReqDef "disabled" False
+    , mkReqDef "admin" False
     , mkOptDef' "githubAvatar"
     , mkOptDef' "githubUrl"
     , mkOptDef' "githubLogin"
@@ -70,7 +70,7 @@ feedDefinition =
     , mkOptDef' "data"
     , mkOptDef' "date"
     , mkOptDef' "description"
-    , mkReqDef "failedAttempts" (Just 0 :: Maybe Int)
+    , mkReqDef "failedAttempts" (0 :: Int)
     , mkOptDef' "favicon"
     , mkOptDef' "format"
     , mkOptDef' "generator"
@@ -81,7 +81,7 @@ feedDefinition =
     , mkOptDef' "lastReadDate"
     , mkOptDef' "lastReadStatus"
     , mkOptDef' "link"
-    , mkReqDef "postCount" (Just 0 :: Maybe Int)
+    , mkReqDef "postCount" (0 :: Int)
     , mkOptDef' "title"
     , mkReqDef' "uri"
     ]
@@ -145,7 +145,7 @@ userPostDefinition =
     , mkIdDef "postId"
     , mkOptDef' "feedId"
     , mkOptDef' "userId"
-    , mkReqDef "read" (Just False)
+    , mkReqDef "read" False
     , mkOptDef' "post"
     , mkOptDef' "title"
     , mkOptDef' "tags"
@@ -156,10 +156,12 @@ postQueryDefinition =
   RecordDefinition "postqueries" "post-queries" $
   Map.fromList
     [ mkIdDef "userId"
-    , mkReqDef "pinState" (Just 0 :: Maybe Int)
+    , mkReqDef "pinState" (0 :: Int)
+    , mkReqDef "isSearch" False
     , mkOptDef' "title"
     , mkOptDef' "userText"
     , mkOptDef' "text"
+    , mkOptDef' "hash"
     , mkOptDef' "query"
     , mkOptDef' "lastUsed"
     ]
@@ -179,7 +181,7 @@ postQueryIndices =
 tagsDefinition :: RecordDefinition
 tagsDefinition =
   RecordDefinition "tags" "tags" $
-  Map.fromList [mkIdDef "userId", mkOptDef "tags" (Just [] :: Maybe [Text])]
+  Map.fromList [mkIdDef "userId", mkOptDef "tags" ([] :: [Text])]
 
 tagsIndices :: [Index]
 tagsIndices =

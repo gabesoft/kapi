@@ -111,9 +111,9 @@ recDef =
   RecordDefinition "test-collection" mempty $
   Map.fromList
     [ mkOptDef' "optional"
-    , mkOptDef "optionalWithDefault" (Just 1 :: Maybe Int)
+    , mkOptDef "optionalWithDefault" (1 :: Int)
     , mkReqDef' "required"
-    , mkReqDef "requiredWithDefault" (Just "a" :: Maybe String)
+    , mkReqDef "requiredWithDefault" ("a" :: String)
     , mkIdDef "foreignKey"
     ]
 

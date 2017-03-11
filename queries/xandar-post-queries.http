@@ -20,6 +20,11 @@ GET http://:host/:path/58bb873a5984183970000003
 GET http://:host/:path?per_page=15
 
 #
+# Get all post queries 2
+#
+GET http://:host/:path?per_page=50&include=ast
+
+#
 # Find post queries
 #
 GET http://:host/:path?where=(userText contains 'read')
@@ -37,4 +42,23 @@ Content-Type: :json
   "text": "(\"monad cofunctor\" & :unread)",
   "query": "(read eq false) and (post.title contains 'monad cofunctor' or post.description:2 contains 'monad cofunctor')",
   "lastUsed": "2017-03-05T03:32:24.903Z"
+}
+
+#
+# Create a single post-query 2
+#
+POST http://:host/:path
+Content-Type: :json
+{
+  "userId": "56d7cc3fccee17506699e735",
+  "userText": ":unread",
+  "hash": "e985e1cf866999862687269d2b27274f",
+  "createdAt": "2017-03-11T05:01:06.958Z",
+  "text": ":unread",
+  "pinState": 0,
+  "isSearch": false,
+  "query": "(read eq false)",
+  "lastUsed": "2017-03-11T05:02:16.943Z",
+  "updatedAt": "2017-03-11T05:01:25.154Z",
+  "title": ":unread"
 }

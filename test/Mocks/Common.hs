@@ -17,17 +17,17 @@ def1 :: RecordDefinition
 def1 =
   RecordDefinition mempty mempty $
   Map.fromList
-    [ mkOptDef "admin" (Just False)
-    , mkReqDef "disabled" (Just False)
-    , mkReqDef "count" (Just 1 :: Maybe Int)
+    [ mkOptDef "admin" False
+    , mkReqDef "disabled" False
+    , mkReqDef "count" (1 :: Int)
     ]
 
 def2 :: RecordDefinition
 def2 =
   RecordDefinition mempty mempty $
   Map.fromList
-    [ mkReqDef "admin" (Just False)
-    , mkOptDef "disabled" (Just False)
+    [ mkReqDef "admin" False
+    , mkOptDef "disabled" False
     , mkReqDef' "count"
     , mkReqDef' "name"
     ]
