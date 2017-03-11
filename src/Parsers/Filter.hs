@@ -36,7 +36,7 @@ data SpecialCharacter
   deriving (Eq, Ord, Show)
 
 parse :: Text -> Either String FilterExpr
-parse = A.parseOnly (expr <* A.endOfInput)
+parse = A.parseOnly (skipSpace *> expr <* A.endOfInput)
 
 expr :: Parser FilterExpr
 expr = foldl mkExprParser simpleExpr [("and", And), ("or", Or)] <?> "expr"

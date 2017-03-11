@@ -35,6 +35,7 @@ validCases =
   , ("colId eq 56d7de0dc788cb1d6eb91abb", FilterRelOp Equal "colId" (TermId "56d7de0dc788cb1d6eb91abb"))
   , ("colId eq 56d7de0dc788cb1d6eb91ac6-56d7de0dc788cb1d6eb91abc", FilterRelOp Equal "colId" (TermId "56d7de0dc788cb1d6eb91ac6-56d7de0dc788cb1d6eb91abc"))
   , ("colNull eq null", FilterRelOp Equal "colNull" TermNull)
+  , ("  (colNull eq null)", FilterRelOp Equal "colNull" TermNull)
   , ("colNotNull ~eq null", FilterRelOp NotEqual "colNotNull" TermNull)
   , ( "colDate ge 2017-01-08T02:26:16.302Z"
     , FilterRelOp GreaterThanOrEqual "colDate" (dateTerm "2017-01-08T02:26:16.302Z"))
