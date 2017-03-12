@@ -18,4 +18,4 @@ idLabel = "_id"
 -- ^
 -- Maximum number of results returned from a search or query
 maxResultsSize :: Int
-maxResultsSize = 1048576
+maxResultsSize = 10000

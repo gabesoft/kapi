@@ -76,6 +76,11 @@ HEAD http://:host/:path?where=(subscriptionId in [56d7defcc788cb1d6eb922d8, 56d7
 GET http://:host/:path?where=(subscriptionId in [56d7defcc788cb1d6eb922d8, 56d7df24c788cb1d6eb92491, 56d7e123c788cb1d6eb934a0])&sort=post.title&per_page=10&include=postId,tags,subscriptionId,post.title
 
 #
+# Find by subscription id
+#
+GET http://:host/:path?where=(subscriptionId eq 58c4ac4b59841865ff000044)&sort=-post.date&include=post.title,tags
+
+#
 # Get unread counts
 #
 HEAD http://:host/:path?where=(subscriptionId eq 56e5cbdf1432afe53933798b and read eq false)

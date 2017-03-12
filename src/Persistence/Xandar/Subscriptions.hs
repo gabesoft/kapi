@@ -12,7 +12,10 @@ module Persistence.Xandar.Subscriptions
   , getSubscriptions
   , insertSubscription
   , insertSubscriptions
+  , mkFeedIndexedMap
   , mkSubscriptions
+  , mkUserPostOnSubCreate
+  , mkUserPostOnSubUpdate
   , modifySubscription
   , modifySubscriptions
   , replaceSubscription

@@ -45,6 +45,11 @@ GET http://:host/:path?where=(disabled eq false and userId eq 56d7cc3fccee175066
 GET http://:host/:path?where=(disabled eq false and userId eq 56d7cc3fccee17506699e735)&sort=title&per_page=50
 
 #
+# Get a subscription by title
+#
+GET http://:host/:path?where=(title contains 'techcrunch')
+
+#
 # Get a subscription by feed id and user id
 #
 GET http://:host/:path?where=(feedId eq 5814f2d909a64c359672dde2 and userId eq 56d7cc3fccee17506699e735)
@@ -145,6 +150,19 @@ Content-Type: :json
     "writing"
   ],
   "title": "Master Audio Feed 5 by 5"
+}
+
+#
+# Modify a subscription 2
+#
+PATCH http://:host/:path/58c4ac4b59841865ff000044
+Content-Type: :json
+{
+  "tags": [
+    "mongodb",
+    "elasticsearch",
+    "writing"
+  ]
 }
 
 #
