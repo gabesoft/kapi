@@ -5,6 +5,7 @@
 -- Facade that provides consistent access to persistence functionality
 module Persistence.Facade
   ( dbDelete
+  , dbDeleteByQuery
   , dbDeleteMulti
   , dbGetExisting
   , dbGetExistingMulti
@@ -38,7 +39,7 @@ import Control.Monad.Reader
 import Control.Monad.Trans.Control
 import Data.Aeson (encode)
 import Data.Bifunctor
-import Data.Bson (Label)
+import Data.Bson (Label, Field)
 import Data.Either
 import qualified Data.Map.Strict as Map
 import Data.Maybe
@@ -73,6 +74,11 @@ dbDelete
   :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
   => RecordDefinition -> RecordId -> ExceptT ApiError m Record
 dbDelete = toSingle . dbDeleteMulti
+
+dbDeleteByQuery
+  :: (MonadIO m, MonadReader ApiConfig m, MonadBaseControl IO m)
+  => RecordDefinition -> [Field] -> ExceptT ApiError m ()
+dbDeleteByQuery def query = runDb (DB.dbDeleteByQuery def query)
 
 dbGetExisting
   :: (MonadBaseControl IO m, MonadReader ApiConfig m, MonadIO m)

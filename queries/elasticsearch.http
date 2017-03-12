@@ -308,7 +308,8 @@ GET http://:host/:index1/_search
   "aggregations": {
     "unreadCountsPerSub": {
       "terms": {
-        "field": "subscriptionId"
+        "field": "subscriptionId",
+        "size": 10000
       }
     }
   },

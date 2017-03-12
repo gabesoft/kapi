@@ -4,8 +4,9 @@ module Handlers.Xandar.Xandar where
 
 import Api.Xandar
 import Handlers.Xandar.Common
+import qualified Handlers.Xandar.Feeds as F
 import qualified Handlers.Xandar.Subscriptions as S
-import qualified Handlers.Xandar.UserPosts as UP
+import qualified Handlers.Xandar.UserPosts as U
 import Persistence.Xandar.Common
 import Servant
 import Types.Common
@@ -25,8 +26,6 @@ app =
   where
     userHandlers :: ServerT XandarUserApi Api
     userHandlers = handlers userDefinition mkUserGetSingleLink mkUserGetMultipleLink
-    feedHandlers :: ServerT XandarFeedApi Api
-    feedHandlers = handlers feedDefinition mkFeedGetSingleLink mkFeedGetMultipleLink
     postHandlers :: ServerT XandarPostApi Api
     postHandlers = handlers postDefinition mkPostGetSingleLink mkPostGetMultipleLink
     postQueryHandlers :: ServerT XandarPostQueryApi Api
@@ -44,17 +43,28 @@ app =
       modifyMultiple def :<|>
       optionsSingle :<|>
       optionsMultiple
+    feedHandlers =
+      getMultiple mkFeedGetMultipleLink feedDefinition :<|>
+      getSingle feedDefinition :<|>
+      F.deleteSingle :<|>
+      createSingleOrMultiple feedDefinition mkFeedGetSingleLink :<|>
+      replaceSingle feedDefinition :<|>
+      replaceMultiple feedDefinition :<|>
+      modifySingle feedDefinition :<|>
+      modifyMultiple feedDefinition :<|>
+      optionsSingle :<|>
+      optionsMultiple
     userPostHandlers =
-      UP.getMultiple mkUserPostGetMultipleLink :<|>
-      UP.getSingle :<|>
-      UP.deleteSingle :<|>
-      UP.createSingleOrMultiple mkUserPostGetSingleLink :<|>
-      UP.replaceSingle :<|>
-      UP.replaceMultiple :<|>
-      UP.modifySingle :<|>
-      UP.modifyMultiple :<|>
-      UP.optionsSingle :<|>
-      UP.optionsMultiple
+      U.getMultiple mkUserPostGetMultipleLink :<|>
+      U.getSingle :<|>
+      U.deleteSingle :<|>
+      U.createSingleOrMultiple mkUserPostGetSingleLink :<|>
+      U.replaceSingle :<|>
+      U.replaceMultiple :<|>
+      U.modifySingle :<|>
+      U.modifyMultiple :<|>
+      U.optionsSingle :<|>
+      U.optionsMultiple
     subscriptionHandlers :: ServerT XandarSubscriptionApi Api
     subscriptionHandlers =
       S.getMultiple :<|>
@@ -65,8 +75,8 @@ app =
       S.replaceMultiple :<|>
       S.modifySingle :<|>
       S.modifyMultiple :<|>
-      S.optionsSingle :<|>
-      S.optionsMultiple
+      optionsSingle :<|>
+      optionsMultiple
 
 -- ^
 -- Perform any initialization to be done on server start

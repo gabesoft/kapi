@@ -15,7 +15,6 @@ import Handlers.Xandar.Common
        (runSingle, runMulti, mkGetSingleResult, mkGetMultipleResult,
         getMultiple', mkCreateSingleResult, mkCreateMultipleResult,
         updateSingle)
-import qualified Handlers.Xandar.Common as C
 import Persistence.Xandar.Common (subscriptionDefinition)
 import Persistence.Xandar.Subscriptions
 import Servant
@@ -88,14 +87,3 @@ replaceMultiple = runMulti . replaceSubscriptions
 -- Update (modify) multiple records
 modifyMultiple :: [Record] -> Api [ApiResult]
 modifyMultiple = runMulti . modifySubscriptions
-
--- ^
--- Handle an options request for a single record endpoint
-optionsSingle :: Text
-              -> Api (Headers '[ Header "Access-Control-Allow-Methods" String] NoContent)
-optionsSingle = C.optionsSingle
-
--- ^
--- Handle an options request for a multiple record endpoint
-optionsMultiple :: Api (Headers '[ Header "Access-Control-Allow-Methods" String] NoContent)
-optionsMultiple = C.optionsMultiple

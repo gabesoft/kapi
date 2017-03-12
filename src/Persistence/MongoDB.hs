@@ -6,6 +6,7 @@
 module Persistence.MongoDB
   ( dbAddIndex
   , dbCount
+  , dbDeleteByQuery
   , dbDeleteById
   , dbFind
   , dbGetById
@@ -115,7 +116,7 @@ dbFind
   -> Database
   -> Pipe
   -> m (Either Failure [Record])
-dbFind def filter' sort' fields skip' limit' dbName pipe =
+dbFind def query sort' fields skip' limit' dbName pipe =
   dbAction $
   do docs <- dbAccess action dbName pipe
      return $ Right (mkOutRecord def <$> docs)
@@ -123,21 +124,21 @@ dbFind def filter' sort' fields skip' limit' dbName pipe =
     collName = recordCollection def
     action =
       find
-        (select filter' collName)
+        (select query collName)
         { sort = sort'}
         { project = fields}
         { skip = fromIntegral skip'}
         { limit = fromIntegral limit'} >>= rest
 
 -- ^
--- Count the number of records in a collection
+-- Count the number of records matching a query
 dbCount
   :: (MonadBaseControl IO m, MonadIO m)
   => RecordDefinition -> [Field] -> Database -> Pipe -> m (Either Failure Int)
-dbCount def filter' dbName pipe = dbAction $ Right <$> dbAccess action dbName pipe
+dbCount def query dbName pipe = dbAction $ Right <$> dbAccess action dbName pipe
   where
     collName = recordCollection def
-    action = count (select filter' collName)
+    action = count (select query collName)
 
 -- ^
 -- Get a record by id
@@ -154,7 +155,19 @@ dbGetById def recId dbName pipe =
      return $ Right (mkOutRecord def <$> record)
   where
     collName = recordCollection def
-    action = findOne $ select (idQuery recId) collName
+    query = idQuery recId
+    action = findOne (select query collName)
+
+-- ^
+-- Delete all records matching a query
+dbDeleteByQuery
+  :: (MonadBaseControl IO m, MonadIO m)
+  => RecordDefinition -> [Field] -> Database -> Pipe -> m (Either Failure ())
+dbDeleteByQuery def query dbName pipe =
+    dbAction $ Right <$> dbAccess action dbName pipe
+    where
+      colName = recordCollection def
+      action = delete (select query colName)
 
 -- ^
 -- Delete a record by id
@@ -162,11 +175,11 @@ dbDeleteById
   :: (MonadBaseControl IO m, MonadIO m)
   => RecordDefinition -> RecordId -> Database -> Pipe -> m (Either Failure ())
 dbDeleteById def recId dbName pipe =
-  dbAction $
-  do dbAccess action dbName pipe
-     return $ Right ()
+  dbAction $ Right <$> dbAccess action dbName pipe
   where
-    action = delete $ select (idQuery recId) (recordCollection def)
+    colName = recordCollection def
+    query = idQuery recId
+    action = delete (select query colName)
 
 -- ^
 -- Perform a database action that could result in a 'Failure'
