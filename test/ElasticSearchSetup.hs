@@ -119,10 +119,10 @@ subIds =
   , "5792e720ed521f1f1704877f"
   ]
 
-printSearch
+printJSON
   :: B.ToJSON a
   => a -> IO ()
-printSearch = putStrLn . LBS.unpack . A.encode
+printJSON = putStrLn . LBS.unpack . A.encode
 
 subCountsSearch :: [Text] -> B.Search
 subCountsSearch ids =

@@ -28,8 +28,8 @@ main = do
   env <- lookupEnv "KAPI_ENV"
   let port = apiPort conf
   let dev = fromMaybe False $ (== "development") <$> env
-  let environment = withEnv dev "development mode" "production mode"
-  putStrLn ("Server started on port " ++ show port ++ " in " ++ environment)
+  let envDesc = withEnv dev "development mode" "production mode"
+  putStrLn ("Server started on port " ++ show port ++ " in " ++ envDesc)
   let xandarConf = conf {appName = Just "xandar"}
   XA.appInit xandarConf >> runApp dev xandarConf XA.app
 

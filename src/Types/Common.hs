@@ -1,3 +1,4 @@
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -367,6 +368,30 @@ data ApiConfig = ApiConfig
   , esIndices :: Map.Map AppName Database
   , esServer :: Text
   } deriving (Eq, Show)
+
+instance ToJSON ApiConfig where
+  toJSON ApiConfig {..} =
+    object
+      [ "port" .= (fromEnum apiPort :: Int)
+      , "app-name" .= appName
+      , "mongo-host" .= mongoHost
+      , "mongo-port" .= (fromEnum mongoPort :: Int)
+      , "mongo-databases" .= mongoDbs
+      , "es-indices" .= esIndices
+      , "es-server" .= esServer
+      ]
+
+instance FromJSON ApiConfig where
+  parseJSON (Object o) = do
+    apiPort <- toEnum <$> o .: "port"
+    appName <- o .:? "app-name"
+    mongoHost <- o .: "mongo-host"
+    mongoPort <- toEnum <$> o .: "mongo-port"
+    mongoDbs <- o .: "mongo-databases"
+    esIndices <- o .: "es-indices"
+    esServer <- o .: "es-server"
+    return ApiConfig {..}
+  parseJSON _ = fail "Expected an object for ApiConfig"
 
 -- ^
 -- Pagination data
