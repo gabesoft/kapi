@@ -1,5 +1,4 @@
 {
-  "app-name": "xandar",
   "es-indices": {"xandar": "kapi-xandar"},
   "es-server": "http://localhost:9200",
   "mongo-databases":{"xandar":"kapi-xandar"},
