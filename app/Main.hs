@@ -1,10 +1,10 @@
+{-# LANGUAGE Strict #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Main where
 
 import qualified Data.Aeson as A
 import qualified Data.ByteString.Lazy as L
-import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.Monoid ((<>))
 import qualified Handlers.Xandar.Xandar as XA
