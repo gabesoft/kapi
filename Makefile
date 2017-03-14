@@ -31,4 +31,8 @@ test:
 test-watch:
 	stack build --test --file-watch
 
+nix-package: export NIX_PATH=$(HOME)/.nix-deferexpr/channels
+nix-package:
+	cabal2nix . > kapi.nix
+
 .PHONY: install serve test
