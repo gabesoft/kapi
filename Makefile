@@ -35,4 +35,9 @@ nix-package: export NIX_PATH=$(HOME)/.nix-deferexpr/channels
 nix-package:
 	cabal2nix . > kapi.nix
 
+nix-build: export NIX_PATH=$(HOME)/.nix-deferexpr/channels
+nix-build:
+	nix-build default.nix
+	ls -lA ./result/bin
+
 .PHONY: install serve test

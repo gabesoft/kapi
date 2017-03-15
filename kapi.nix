@@ -26,6 +26,7 @@ mkDerivation {
     base bloodhound bson containers hspec hspec-core http-types
     iso8601-time QuickCheck quickcheck-text text time
   ];
+  doHaddock = false;
   homepage = "https://github.com/gabesoft/kapi#readme";
   description = "Rest api server";
   license = stdenv.lib.licenses.bsd3;
