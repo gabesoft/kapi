@@ -3,7 +3,7 @@
 
 -- ^
 -- GHCI setup for elastic-search
-module Test.ElasticSearchSetup where
+module ElasticSearchSetup where
 
 import Control.Applicative
 import qualified Data.Aeson as A
@@ -14,7 +14,7 @@ import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.Monoid ((<>))
 import Data.Text (Text)
-import qualified Database.Bloodhound as B
+import qualified Database.V5.Bloodhound as B
 import Network.HTTP.Client
 import Parsers.Filter
 import Persistence.Common
@@ -128,7 +128,7 @@ subCountsSearch :: [Text] -> B.Search
 subCountsSearch ids =
   B.mkAggregateSearch (Just $ B.QueryBoolQuery boolQuery) termsAgg
   where
-    boolQuery = B.mkBoolQuery [readQuery, idsQuery] [] []
+    boolQuery = B.mkBoolQuery [readQuery, idsQuery] [] [] []
     readQuery = B.TermQuery (B.Term "read" "false") Nothing
     idsQuery = B.TermsQuery "subscriptionId" (fromList ids)
     termsAgg = B.mkAggregations "unreadCountsPerSub" agg

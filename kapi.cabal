@@ -37,9 +37,9 @@ library
                      , Util.Error
   build-depends:       base >= 4.7 && < 5
                      , base-compat >= 0.9
-                     , aeson >= 1.0.2
+                     , aeson >= 1.2
                      , attoparsec >= 0.13
-                     , bloodhound >= 0.12
+                     , bloodhound >= 0.15
                      , bson
                      , bytestring >= 0.10
                      , containers >= 0.5
@@ -54,9 +54,9 @@ library
                      , network >= 2.6
                      , SHA
                      , scientific >= 0.3
-                     , servant >= 0.9
-                     , servant-server >= 0.9
-                     , servant-docs >= 0.9
+                     , servant >= 0.11
+                     , servant-server >= 0.11.0.1
+                     , servant-docs >= 0.11
                      , text >= 1.2
                      , time >= 1.6
                      , transformers-base >= 0.4
@@ -70,7 +70,7 @@ executable kapi-exe
   main-is:             Main.hs
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   build-depends:       base
-                     , aeson >= 1.0
+                     , aeson >= 1.2
                      , bytestring >= 0.10
                      , kapi
                      , containers >= 0.5
@@ -106,13 +106,16 @@ test-suite persistence-mongodb-test
                      , TestHelper
   build-depends:       base
                      , bson
+                     , bytestring >= 0.10
                      , containers >= 0.5
                      , hspec
                      , hspec-core >= 2.3
+                     , http-client >= 0.5
                      , iso8601-time >= 0.1
                      , kapi
                      , QuickCheck >= 2.8
                      , quickcheck-text >= 0.1
+                     , network >= 2.6
                      , text
                      , time >= 1.6
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
@@ -125,16 +128,19 @@ test-suite persistence-user-posts-test
   other-modules:       Mocks.Common
                      , TestHelper
   build-depends:       base
-                     , bloodhound >= 0.12
+                     , bloodhound >= 0.15
                      , bson
+                     , bytestring >= 0.10
                      , containers >= 0.5
                      , hspec
                      , hspec-core >= 2.3
+                     , http-client >= 0.5
                      , http-types >= 0.9
                      , iso8601-time >= 0.1
                      , kapi
                      , QuickCheck >= 2.8
                      , quickcheck-text >= 0.1
+                     , network >= 2.6
                      , text
                      , time >= 1.6
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
@@ -147,16 +153,20 @@ test-suite persistence-subscriptions-test
   other-modules:       Mocks.Common
                      , TestHelper
   build-depends:       base
-                     , bloodhound >= 0.12
+                     , aeson >= 1.2
+                     , bloodhound >= 0.15
                      , bson
+                     , bytestring >= 0.10
                      , containers >= 0.5
                      , hspec
                      , hspec-core >= 2.3
+                     , http-client >= 0.5
                      , http-types >= 0.9
                      , iso8601-time >= 0.1
                      , kapi
                      , QuickCheck >= 2.8
                      , quickcheck-text >= 0.1
+                     , network >= 2.6
                      , text
                      , time >= 1.6
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
@@ -170,15 +180,19 @@ test-suite persistence-elasticsearch-test
                      , TestHelper
                      , ElasticSearchSetup
   build-depends:       base
+                     , aeson >= 1.2
                      , bloodhound
-                     , bson
+                     , bson >= 0.3
+                     , bytestring >= 0.10
                      , containers >= 0.5
                      , hspec
                      , hspec-core >= 2.3
+                     , http-client >= 0.5
                      , iso8601-time >= 0.1
                      , kapi
                      , QuickCheck >= 2.8
                      , quickcheck-text >= 0.1
+                     , network >= 2.6
                      , text
                      , time >= 1.6
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
@@ -192,13 +206,17 @@ test-suite parsers-filter-test
                      , TestHelper
   build-depends:       base
                      , bson
+                     , bytestring >= 0.10
+                     , aeson >= 1.2
                      , containers >= 0.5
                      , hspec
                      , hspec-core >= 2.3
+                     , http-client >= 0.5
                      , iso8601-time >= 0.1
                      , kapi
                      , QuickCheck >= 2.8
                      , quickcheck-text >= 0.1
+                     , network >= 2.6
                      , text
                      , time >= 1.6
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N

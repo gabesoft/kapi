@@ -41,7 +41,7 @@ import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import Data.Time (UTCTime)
 import qualified Data.Vector as V
-import Database.Bloodhound
+import Database.V5.Bloodhound
        (IndexName(..), Server(..), EsError(..), Reply, MappingName(..),
         DocId(..), IndexSettings(..), ShardCount(..), ReplicaCount(..),
         BulkOperation(..), Search(..), SearchResult(..), From(..),
@@ -49,7 +49,7 @@ import Database.Bloodhound
         SortOrder(..), Sort, SortSpec(..), Term(..), Boost(..),
         RangeQuery(..), RangeValue(..), QueryString(..), MatchQuery(..),
         MatchQueryType(..), BH)
-import qualified Database.Bloodhound as B
+import qualified Database.V5.Bloodhound as B
 import Network.HTTP.Client
 import Network.HTTP.Types.Status
 import Persistence.Common
@@ -270,6 +270,7 @@ mkSearch' query filter' sort fields' start limit =
     SearchTypeDfsQueryThenFetch
     (mToMaybe fields')
     Nothing
+    Nothing
 
 exprToQuery :: FilterExpr -> Either String Query
 exprToQuery = toQuery
@@ -291,10 +292,10 @@ exprToQuery = toQuery
     mkBoost 1 = Nothing
     mkBoost n = Just $ Boost n
     mkBoost' n = fromMaybe (Boost 1) (mkBoost n)
-    mkNotQuery = fmap (\q -> QueryBoolQuery $ B.mkBoolQuery [] [q] [])
+    mkNotQuery = fmap (\q -> QueryBoolQuery $ B.mkBoolQuery [] [] [q] [])
     mkCompositeQuery mkQuery q1 q2 = QueryBoolQuery $ mkQuery q1 q2
-    mkAndQuery = compose (\q1 q2 -> B.mkBoolQuery [q1, q2] [] [])
-    mkOrQuery = compose (\q1 q2 -> B.mkBoolQuery [] [] [q1, q2])
+    mkAndQuery = compose (\q1 q2 -> B.mkBoolQuery [q1, q2] [] [] [])
+    mkOrQuery = compose (\q1 q2 -> B.mkBoolQuery [] [] [] [q1, q2])
     mkMatchQuery' (ColumnName c x) (TermStr v) =
       Right . QueryMatchQuery $ (mkMatchQuery c v $ hasSpace v) (mkBoost x)
     mkMatchQuery' _ t = Left $ "Unexpected " ++ show t ++ ". Expected a string."
@@ -348,7 +349,7 @@ mkRangeDate LessThanOrEqual = RangeDateLte . B.LessThanEqD
 mkRangeDate op = error $ "invalid range operator " ++ show op
 
 mkMatchQuery :: Text -> Text -> Bool -> Maybe Boost -> MatchQuery
-mkMatchQuery field query phrase =
+mkMatchQuery field query phrase boost =
   MatchQuery
     (FieldName field)
     (QueryString query)
@@ -358,6 +359,8 @@ mkMatchQuery field query phrase =
     (queryType phrase)
     Nothing
     Nothing
+    Nothing
+    boost
     Nothing
   where
     queryType True = Just MatchPhrase

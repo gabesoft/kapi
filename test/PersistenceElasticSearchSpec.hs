@@ -6,22 +6,21 @@ module Main
   ( main
   ) where
 
-import Data.Bson ((=:))
+import Data.Bson ((=:), Field(..))
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.Text as T
-import Database.Bloodhound hiding (mkSearch)
+import Database.V5.Bloodhound hiding (mkSearch)
 import Parsers.Filter
 import Persistence.ElasticSearch
 import Test.Hspec
-import Test.QuickCheck
 import TestHelper
-import Types.Common (Record(..), RecordData(..))
+import Types.Common (RecordData(..))
 
 main :: IO ()
 main =
-  hspec $ do
+  hspec $
     describe "Persistence.ElasticSearch" $ do
-      describe "mkSearch" $ do (mapM_ runCase cases)
+      describe "mkSearch" $ mapM_ runCase cases
       describe "extractRecords" $ do
         it "full result" verifyExtractRecordsFullResult
         it "partial result" verifyExtractRecordsPartialResult
@@ -30,15 +29,18 @@ runCase :: (T.Text, Either EsError Search) -> SpecWith (Arg Expectation)
 runCase c = it (T.unpack $ fst c) (verifySearch c)
 
 verifySearch :: (T.Text, Either EsError Search) -> Expectation
-verifySearch (filter, exp) =
-  mkSearch (Just $ fromRight $ parse filter) [] [] 3 12 `shouldBe` exp
+verifySearch (searchFilter, expected) =
+  mkSearch (Just $ fromRight $ parse searchFilter) [] [] 3 12 `shouldBe` expected
 
+verifyExtractRecordsFullResult :: Expectation
 verifyExtractRecordsFullResult =
   extractRecords [] searchResults `shouldBe` extractResults1
 
+verifyExtractRecordsPartialResult :: Expectation
 verifyExtractRecordsPartialResult =
   extractRecords ["read", "userId", "feedId", "_id"] searchResults `shouldBe`
   extractResults2
+
 
 cases :: [(T.Text, Either EsError Search)]
 cases =
@@ -60,6 +62,7 @@ cases =
         , searchType = SearchTypeDfsQueryThenFetch
         , fields = Nothing
         , source = Nothing
+        , suggestBody = Nothing
         })
   , ( "read eq true"
     , Right
@@ -77,6 +80,7 @@ cases =
         , searchType = SearchTypeDfsQueryThenFetch
         , fields = Nothing
         , source = Nothing
+        , suggestBody = Nothing
         })
   , ( "read eq false"
     , Right
@@ -94,6 +98,7 @@ cases =
         , searchType = SearchTypeDfsQueryThenFetch
         , fields = Nothing
         , source = Nothing
+        , suggestBody = Nothing
         })
   , ( "name in 123"
     , Left $ EsError 400 "Unexpected TermInt 123. Expected a list.")
@@ -114,6 +119,7 @@ cases =
                  , matchQueryMaxExpansions = Nothing
                  , matchQueryLenient = Nothing
                  , matchQueryBoost = Nothing
+                 , matchQueryMinimumShouldMatch = Nothing
                  })
         , filterBody = Nothing
         , sortBody = Nothing
@@ -125,6 +131,7 @@ cases =
         , searchType = SearchTypeDfsQueryThenFetch
         , fields = Nothing
         , source = Nothing
+        , suggestBody = Nothing
         })
   , ( "title contains 'word1 word2'"
     , Right
@@ -143,6 +150,7 @@ cases =
                  , matchQueryMaxExpansions = Nothing
                  , matchQueryLenient = Nothing
                  , matchQueryBoost = Nothing
+                 , matchQueryMinimumShouldMatch = Nothing
                  })
         , filterBody = Nothing
         , sortBody = Nothing
@@ -154,6 +162,7 @@ cases =
         , searchType = SearchTypeDfsQueryThenFetch
         , fields = Nothing
         , source = Nothing
+        , suggestBody = Nothing
         })
   , ( "title ~eq 'haskell'"
     , Right
@@ -172,6 +181,7 @@ cases =
                  , boolQueryMinimumShouldMatch = Nothing
                  , boolQueryBoost = Nothing
                  , boolQueryDisableCoord = Nothing
+                 , boolQueryFilter = []
                  })
         , filterBody = Nothing
         , sortBody = Nothing
@@ -183,6 +193,7 @@ cases =
         , searchType = SearchTypeDfsQueryThenFetch
         , fields = Nothing
         , source = Nothing
+        , suggestBody = Nothing
         })
   , ( "version lt 12"
     , Right
@@ -205,6 +216,7 @@ cases =
         , searchType = SearchTypeDfsQueryThenFetch
         , fields = Nothing
         , source = Nothing
+        , suggestBody = Nothing
         })
   , ( "date ge 2017-01-23T01:21:15.513Z"
     , Right
@@ -229,6 +241,7 @@ cases =
         , searchType = SearchTypeDfsQueryThenFetch
         , fields = Nothing
         , source = Nothing
+        , suggestBody = Nothing
         })
   , ( "version le 12"
     , Right
@@ -251,6 +264,7 @@ cases =
         , searchType = SearchTypeDfsQueryThenFetch
         , fields = Nothing
         , source = Nothing
+        , suggestBody = Nothing
         })
   , ( "version gt 12"
     , Right
@@ -273,6 +287,7 @@ cases =
         , searchType = SearchTypeDfsQueryThenFetch
         , fields = Nothing
         , source = Nothing
+        , suggestBody = Nothing
         })
   , ( "name in ['bob', 'tom', 'alice']"
     , Right
@@ -288,6 +303,7 @@ cases =
         , searchType = SearchTypeDfsQueryThenFetch
         , fields = Nothing
         , source = Nothing
+        , suggestBody = Nothing
         })
   , ( "name in []"
     , Right
@@ -303,6 +319,7 @@ cases =
         , searchType = SearchTypeDfsQueryThenFetch
         , fields = Nothing
         , source = Nothing
+        , suggestBody = Nothing
         })
   , ( "title ~contains 'haskell'"
     , Right
@@ -325,12 +342,14 @@ cases =
                          , matchQueryMaxExpansions = Nothing
                          , matchQueryLenient = Nothing
                          , matchQueryBoost = Nothing
+                         , matchQueryMinimumShouldMatch = Nothing
                          }
                      ]
                  , boolQueryShouldMatch = []
                  , boolQueryMinimumShouldMatch = Nothing
                  , boolQueryBoost = Nothing
                  , boolQueryDisableCoord = Nothing
+                 , boolQueryFilter = []
                  })
         , filterBody = Nothing
         , sortBody = Nothing
@@ -342,6 +361,7 @@ cases =
         , searchType = SearchTypeDfsQueryThenFetch
         , fields = Nothing
         , source = Nothing
+        , suggestBody = Nothing
         })
   , ( "(title eq 'haskell') and (description contains 'reader monad')"
     , Right
@@ -366,6 +386,7 @@ cases =
                          , matchQueryMaxExpansions = Nothing
                          , matchQueryLenient = Nothing
                          , matchQueryBoost = Nothing
+                         , matchQueryMinimumShouldMatch = Nothing
                          }
                      ]
                  , boolQueryMustNotMatch = []
@@ -373,6 +394,7 @@ cases =
                  , boolQueryMinimumShouldMatch = Nothing
                  , boolQueryBoost = Nothing
                  , boolQueryDisableCoord = Nothing
+                 , boolQueryFilter = []
                  })
         , filterBody = Nothing
         , sortBody = Nothing
@@ -384,6 +406,7 @@ cases =
         , searchType = SearchTypeDfsQueryThenFetch
         , fields = Nothing
         , source = Nothing
+        , suggestBody = Nothing
         })
   , ( "(title eq 'haskell' and description contains 'reader monad') or (version gt 12 and version lt 15)"
     , Right
@@ -415,6 +438,7 @@ cases =
                                  , matchQueryMaxExpansions = Nothing
                                  , matchQueryLenient = Nothing
                                  , matchQueryBoost = Nothing
+                                 , matchQueryMinimumShouldMatch = Nothing
                                  }
                              ]
                          , boolQueryMustNotMatch = []
@@ -422,6 +446,7 @@ cases =
                          , boolQueryMinimumShouldMatch = Nothing
                          , boolQueryBoost = Nothing
                          , boolQueryDisableCoord = Nothing
+                         , boolQueryFilter = []
                          }
                      , QueryBoolQuery
                          BoolQuery
@@ -446,11 +471,13 @@ cases =
                          , boolQueryMinimumShouldMatch = Nothing
                          , boolQueryBoost = Nothing
                          , boolQueryDisableCoord = Nothing
+                         , boolQueryFilter = []
                          }
                      ]
                  , boolQueryMinimumShouldMatch = Nothing
                  , boolQueryBoost = Nothing
                  , boolQueryDisableCoord = Nothing
+                 , boolQueryFilter = []
                  })
         , filterBody = Nothing
         , sortBody = Nothing
@@ -462,9 +489,11 @@ cases =
         , searchType = SearchTypeDfsQueryThenFetch
         , fields = Nothing
         , source = Nothing
+        , suggestBody = Nothing
         })
   ]
 
+searchResults :: SearchResult (RecordData Field)
 searchResults =
   SearchResult
   { took = 2
@@ -562,8 +591,10 @@ searchResults =
       }
   , aggregations = Nothing
   , scrollId = Nothing
+  , suggest = Nothing
   }
 
+extractResults1 :: [RecordData Field]
 extractResults1 =
   [ Record
       [ "read" =: False
@@ -627,6 +658,7 @@ extractResults1 =
       ]
   ]
 
+extractResults2 :: [RecordData Field]
 extractResults2 =
   [ Record
       [ mkRecId "57856cdeed521f1f17040f30-56e60f7d1432afe539337b7e"

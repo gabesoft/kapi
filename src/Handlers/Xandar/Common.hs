@@ -24,24 +24,29 @@ import Persistence.Common
 import Persistence.Facade
 import qualified Persistence.MongoDB as DB
 import Servant
-import Servant.Utils.Enter (Enter)
+import Servant.Utils.Enter ((:~>)(NT), Enter, Entered, enter)
 import Types.Common
 import Util.Constants
 import Util.Error
 
 -- ^
 -- Create an application that provides CRUD functionality for a record type
-app'
-  :: (Enter a (Api :~> Handler) (ServerT api Handler), HasServer api '[])
-  => Proxy api -> a -> ApiConfig -> Application
+app' ::
+     ( Enter (Entered Handler Api (ServerT api Handler)) Api Handler (ServerT api Handler)
+     , HasServer api '[]
+     )
+  => Proxy api
+  -> Entered Handler Api (ServerT api Handler)
+  -> ApiConfig
+  -> Application
 app' proxy handlers = serve proxy . server' handlers
   where
-    server'
-      :: Enter a (Api :~> Handler) b
-      => a -> ApiConfig -> b
+    -- server' :: Entered Handler Api ret -> ApiConfig -> ret
+    -- server' :: Enter a (Api :~> Handler) b => a -> ApiConfig -> b
     server' hs cfg = enter (toHandler cfg) hs
     toHandler :: ApiConfig -> Api :~> Handler
-    toHandler conf = Nat (`runReaderT` conf)
+    toHandler conf = NT (`runReaderT` conf)
+
 
 -- ^
 -- Get a single record by id

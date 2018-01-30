@@ -83,7 +83,7 @@ dbInsert def record dbName pipe =
      return $ maybe (Left writeError) Right maybeId
   where
     action = insert (recordCollection def)
-    writeError = WriteFailure 0 "Unexpected missing document"
+    writeError = WriteFailure 0 0 "Unexpected missing document"
 
 -- ^
 -- Save an existing record into the database
@@ -354,6 +354,6 @@ termToField NotContains (ColumnName _ _) _ = Left "~contains: expected a string 
 -- ^
 -- Convert a MongoDB 'Failure' into an 'ApiError'
 dbToApiError :: Failure -> ApiError
-dbToApiError (WriteFailure _ msg) = mk400Err' msg
+dbToApiError (WriteFailure _ _ msg) = mk400Err' msg
 dbToApiError (QueryFailure _ msg) = mk400Err' msg
 dbToApiError err = mk500Err' (show err)

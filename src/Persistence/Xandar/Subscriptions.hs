@@ -35,7 +35,7 @@ import Data.Monoid ((<>))
 import Data.Set ((\\))
 import qualified Data.Set as Set
 import Data.Text (Text)
-import qualified Database.Bloodhound as B
+import qualified Database.V5.Bloodhound as B
 import Persistence.Common
 import qualified Persistence.ElasticSearch as E
 import Persistence.Facade as F
@@ -306,7 +306,7 @@ mkCountsSearch :: Text -> [RecordId] -> B.Search
 mkCountsSearch bucketKey ids =
   B.mkAggregateSearch (Just $ B.QueryBoolQuery boolQuery) termsAgg
   where
-    boolQuery = B.mkBoolQuery [unreadQuery, subIdsQuery] [] []
+    boolQuery = B.mkBoolQuery [unreadQuery, subIdsQuery] [] [] []
     unreadQuery = B.TermQuery (B.Term "read" "false") Nothing
     subIdsQuery = B.TermsQuery subIdLabel (NE.fromList ids)
     termsAgg = B.mkAggregations bucketKey (B.TermsAgg agg)
@@ -316,7 +316,7 @@ mkCountsSearch bucketKey ids =
 -- Extract the number of unread posts per subscription id from a search result
 extractCounts :: Text -> B.SearchResult a -> Map.Map Text Int
 extractCounts bucketKey results =
-  fromMaybe Map.empty $ toBucketMap <$> toBuckets
+  maybe Map.empty toBucketMap toBuckets
   where
     toBuckets = B.aggregations results >>= B.toTerms bucketKey
     extractVal (B.TextValue v) = v

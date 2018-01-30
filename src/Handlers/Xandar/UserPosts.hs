@@ -16,7 +16,7 @@ import Control.Monad.Trans.Control
 import Data.Bifunctor
 import Data.Bson ((=:))
 import Data.Text (Text)
-import Database.Bloodhound (Search)
+import Database.V5.Bloodhound (Search)
 import Handlers.Xandar.Common
        (mkPagination, splitLabels, mkGetMultipleResult,
         mkCreateMultipleResult, mkGetSingleResult, mkCreateSingleResult,

@@ -45,7 +45,7 @@ import qualified Data.Map.Strict as Map
 import Data.Maybe
 import qualified Data.Set as Set
 import Data.Text (Text)
-import Database.Bloodhound.Types (EsError, SearchResult)
+import Database.V5.Bloodhound.Types (EsError, SearchResult)
 import Database.MongoDB (Pipe, Database, Failure)
 import Network.HTTP.Types.Status
 import Persistence.Common
@@ -288,7 +288,7 @@ validateMulti'
   -> [a]
   -> ApiItemsT [ApiError] m [a]
 validateMulti' f v records =
-  ApiItemsT . return . concatItems $ (vResultToItems f . v) <$> records
+  ApiItemsT . return . concatItems $ vResultToItems f . v <$> records
 
 vResultToItems :: (a -> Record)
                -> (a, ValidationResult)
