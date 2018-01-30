@@ -8,7 +8,7 @@
 -- | Common API definitions
 module Api.Common where
 
-import Data.Text (Text)
+import Data.Text (Text, unpack)
 import Servant
 import Types.Common
 
@@ -50,14 +50,14 @@ type GenericApi =
   :<|> OptionsNoContent '[JSON] (Headers '[Header "Access-Control-Allow-Methods" String] NoContent)
 
 mkLink1
-  :: (MkLink endpoint ~ (a -> x), HasLink endpoint, Show x, IsElem endpoint api)
+  :: (MkLink endpoint ~ (a -> x), HasLink endpoint, ToHttpApiData x, IsElem endpoint api)
   => Proxy api -> Proxy endpoint -> a -> String
 mkLink1 api method = mkPath . safeLink api method
 
 mkLink2
   :: (MkLink endpoint ~ (a -> b -> x)
      ,HasLink endpoint
-     ,Show x
+     ,ToHttpApiData x
      ,IsElem endpoint api)
   => Proxy api -> Proxy endpoint -> a -> b -> String
 mkLink2 api method a = mkPath . safeLink api method a
@@ -65,7 +65,7 @@ mkLink2 api method a = mkPath . safeLink api method a
 mkLink3
   :: (MkLink endpoint ~ (a -> b -> c -> x)
      ,HasLink endpoint
-     ,Show x
+     ,ToHttpApiData x
      ,IsElem endpoint api)
   => Proxy api -> Proxy endpoint -> a -> b -> c -> String
 mkLink3 api method a b = mkPath . safeLink api method a b
@@ -73,7 +73,7 @@ mkLink3 api method a b = mkPath . safeLink api method a b
 mkLink4
   :: (MkLink endpoint ~ (a -> b -> c -> d -> x)
      ,HasLink endpoint
-     ,Show x
+     ,ToHttpApiData x
      ,IsElem endpoint api)
   => Proxy api -> Proxy endpoint -> a -> b -> c -> d -> String
 mkLink4 api method a b c = mkPath . safeLink api method a b c
@@ -81,7 +81,7 @@ mkLink4 api method a b c = mkPath . safeLink api method a b c
 mkLink5
   :: (MkLink endpoint ~ (a -> b -> c -> d -> e -> x)
      ,HasLink endpoint
-     ,Show x
+     ,ToHttpApiData x
      ,IsElem endpoint api)
   => Proxy api -> Proxy endpoint -> a -> b -> c -> d -> e -> String
 mkLink5 api method a b c d = mkPath . safeLink api method a b c d
@@ -89,10 +89,10 @@ mkLink5 api method a b c d = mkPath . safeLink api method a b c d
 mkLink6
   :: (MkLink endpoint ~ (a -> b -> c -> d -> e -> f -> x)
      ,HasLink endpoint
-     ,Show x
+     ,ToHttpApiData x
      ,IsElem endpoint api)
   => Proxy api -> Proxy endpoint -> a -> b -> c -> d -> e -> f -> String
 mkLink6 api method a b c d e = mkPath . safeLink api method a b c d e
 
-mkPath :: Show a => a -> String
-mkPath = ("/" ++) . show
+mkPath :: ToHttpApiData a => a -> String
+mkPath = ("/" ++) . unpack . toUrlPiece
