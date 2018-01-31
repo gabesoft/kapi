@@ -12,7 +12,7 @@ import Api.Lono
 import Api.Xandar
 import Servant
 
-type MainApi = LonoApi :<|> XandarApi
+type MainApi = XandarApi :<|> LonoApi
 
 mainProxy :: Proxy MainApi
 mainProxy = Proxy :: Proxy MainApi

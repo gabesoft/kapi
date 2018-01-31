@@ -13,10 +13,12 @@ import Servant
 import Types.Common
 
 -- ^
--- Create an application for providing the user functionality
+-- Create an application containing all Lono API endpoints
 app :: ApiConfig -> Application
 app = app' apiProxy handlers
 
+-- ^
+-- Lono API handlers
 handlers :: ServerT LonoApi Api
 handlers =
     userHandlers :<|>

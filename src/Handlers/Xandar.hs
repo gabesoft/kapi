@@ -13,10 +13,12 @@ import Servant
 import Types.Common
 
 -- ^
--- Create an application for providing the user functionality
+-- Create an application containing all Xandar API endpoints
 app :: ApiConfig -> Application
 app = app' apiProxy handlers
 
+-- ^
+-- Xandar API handlers
 handlers :: ServerT XandarApi Api
 handlers =
     userHandlers :<|>

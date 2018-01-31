@@ -31,7 +31,7 @@ main = do
   let lonoConf = getApiConfig "lono" conf
   LO.appInit lonoConf
   XA.appInit xandarConf
-  runApp dev lonoConf app
+  runApp dev (app xandarConf lonoConf) conf
 
 getApiConfig :: ApiName -> AppConfig -> ApiConfig
 getApiConfig apiName conf =
@@ -62,10 +62,10 @@ readConfigFile f = do
   json <- L.readFile f
   return $ fromJust (A.decode json)
 
-runApp :: Bool -> ApiConfig -> (ApiConfig -> Application) -> IO ()
-runApp dev conf app = do
-  let port = fromIntegral $ apiPort conf
-  run port $ withEnv dev logStdoutDev id (app conf)
+runApp :: Bool -> Application -> AppConfig -> IO ()
+runApp dev app conf = do
+  let port = fromIntegral $ appPort conf
+  run port $ withEnv dev logStdoutDev id app
 
 withEnv :: Bool -> t -> t -> t
 withEnv dev fd fp =
