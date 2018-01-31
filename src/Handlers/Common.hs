@@ -40,12 +40,14 @@ app' ::
   -> Application
 app' proxy handlers = serve proxy . server' handlers
   where
-    -- server' :: Entered Handler Api ret -> ApiConfig -> ret
-    -- server' :: Enter a (Api :~> Handler) b => a -> ApiConfig -> b
+    server' ::
+         (Enter (Entered Handler Api ret) Api Handler ret)
+      => Entered Handler Api ret
+      -> ApiConfig
+      -> ret
     server' hs cfg = enter (toHandler cfg) hs
     toHandler :: ApiConfig -> Api :~> Handler
     toHandler conf = NT (`runReaderT` conf)
-
 
 -- ^
 -- Get a single record by id

@@ -10,6 +10,7 @@ import Data.Maybe
 import Data.Monoid ((<>))
 import qualified Data.Text as T
 import qualified Handlers.Lono as LO
+import Handlers.Main (app)
 import qualified Handlers.Xandar as XA
 import Network.Wai
 import Network.Wai.Handler.Warp
@@ -28,8 +29,9 @@ main = do
   putStrLn ("Server started on port " ++ show port ++ " in " ++ envDesc)
   let xandarConf = getApiConfig "xandar" conf
   let lonoConf = getApiConfig "lono" conf
-  LO.appInit lonoConf >> runApp dev lonoConf LO.app
-  XA.appInit xandarConf >> runApp dev xandarConf XA.app
+  LO.appInit lonoConf
+  XA.appInit xandarConf
+  runApp dev lonoConf app
 
 getApiConfig :: ApiName -> AppConfig -> ApiConfig
 getApiConfig apiName conf =

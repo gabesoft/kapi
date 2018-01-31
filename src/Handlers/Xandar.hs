@@ -10,7 +10,6 @@ import qualified Handlers.RssReaders.UserPosts as U
 import Persistence.RssReaders.Common
 import Persistence.Xandar.Common
 import Servant
-import Servant.Utils.Enter (Entered)
 import Types.Common
 
 -- ^
@@ -18,7 +17,7 @@ import Types.Common
 app :: ApiConfig -> Application
 app = app' apiProxy handlers
 
-handlers :: Entered Handler Api (ServerT XandarApi Handler)
+handlers :: ServerT XandarApi Api
 handlers =
     userHandlers :<|>
     feedHandlers :<|>
