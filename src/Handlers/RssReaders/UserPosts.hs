@@ -6,10 +6,9 @@
 
 -- ^
 -- Handlers for the user posts endpoints
-module Handlers.Xandar.UserPosts where
+module Handlers.RssReaders.UserPosts where
 
-import Api.Common (GetMultiple)
-import Api.Xandar
+import Api.Common (GetMultiple, ApiGetMultipleLink)
 import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.Trans.Control
@@ -17,16 +16,16 @@ import Data.Bifunctor
 import Data.Bson ((=:))
 import Data.Text (Text)
 import Database.V5.Bloodhound (Search)
-import Handlers.Xandar.Common
+import Handlers.Common
        (mkPagination, splitLabels, mkGetMultipleResult,
         mkCreateMultipleResult, mkGetSingleResult, mkCreateSingleResult,
         runSingle, updateSingle, runMulti)
-import qualified Handlers.Xandar.Common as C
+import qualified Handlers.Common as C
 import Parsers.Filter (parse)
 import Persistence.ElasticSearch
 import Persistence.Facade (runEs)
-import Persistence.Xandar.Common (userPostDefinition)
-import Persistence.Xandar.UserPosts
+import Persistence.RssReaders.Common (userPostDefinition)
+import Persistence.RssReaders.UserPosts
        (deleteUserPost, insertUserPost, insertUserPosts, replaceUserPost,
         replaceUserPosts, modifyUserPost, modifyUserPosts)
 import Servant

@@ -11,8 +11,8 @@ import Data.Text (Text)
 import Data.Time (UTCTime)
 import Network.HTTP.Types
 import Persistence.Common
-import Persistence.Xandar.Common
-import Persistence.Xandar.UserPosts
+import Persistence.RssReaders.Common
+import Persistence.RssReaders.UserPosts
 import Test.Hspec
 import TestHelper
 import Types.Common
@@ -22,7 +22,7 @@ main :: IO ()
 main =
   hspec $
   describe "Persistence.Xandar.UserPosts" $ do
-    describe "validate" $ do
+    describe "validate" $
       it "ensures a user post contains a postId and a subscriptionId" $
         verifyValidation inputInvalid1 (inputInvalid1, invalidErrors)
 

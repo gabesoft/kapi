@@ -3,8 +3,7 @@
 -- | Tests for Parsers.Filter
 module Main (main) where
 
-import Data.Maybe
-import Data.Text (Text, unpack, pack)
+import Data.Text (Text, unpack)
 import qualified Data.Text as T
 import Parsers.Filter (parse)
 import Test.Hspec
@@ -14,7 +13,9 @@ import Types.Common
 main :: IO ()
 main = hspec $ describe "Parsers.Filter" $ mapM_ (runCase Right) validCases
 
-runCase ctor (input, exp) = it (unpack input) $ parse input `shouldBe` ctor exp
+runCase ::
+     (t -> Either String FilterExpr) -> (Text, t) -> SpecWith (Arg Expectation)
+runCase ctor (input, expected) = it (unpack input) $ parse input `shouldBe` ctor expected
 
 validCases :: [(Text, FilterExpr)]
 validCases =
@@ -79,6 +80,7 @@ validCases =
         (FilterRelOp LessThan "c" (TermInt 10)))
   ]
 
+expr :: Int -> (Text, FilterExpr)
 expr n = validCases !! n
 
 mkAnd :: (Text, FilterExpr) -> (Text, FilterExpr) -> (Text, FilterExpr)
@@ -87,6 +89,7 @@ mkAnd = mkOp ("and", And)
 mkOr :: (Text, FilterExpr) -> (Text, FilterExpr) -> (Text, FilterExpr)
 mkOr = mkOp ("or", Or)
 
+parens :: (Text, b) -> (Text, b)
 parens (e1, r1) = (T.concat ["(", e1, ")"], r1) 
 
 mkOp

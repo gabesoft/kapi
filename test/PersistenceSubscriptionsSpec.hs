@@ -9,8 +9,8 @@ import Control.Monad.IO.Class
 import Data.Bson
 import Persistence.Common
 import Persistence.Facade (mkIdIndexedMap)
-import Persistence.Xandar.Subscriptions
-import Persistence.Xandar.UserPosts (mkUserPostId)
+import Persistence.RssReaders.Subscriptions
+import Persistence.RssReaders.UserPosts (mkUserPostId)
 import Test.Hspec
 import TestHelper
 import Types.Common

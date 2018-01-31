@@ -1,22 +1,20 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeOperators #-}
 
 -- ^
 -- Handlers for the subscription endpoints
-module Handlers.Xandar.Subscriptions where
+module Handlers.RssReaders.Subscriptions where
 
-import Api.Common (GetMultiple)
-import Api.Xandar
+import Api.Common (GetMultiple, ApiGetMultipleLink)
 import Data.Text (Text)
-import Handlers.Xandar.Common
+import Handlers.Common
        (runSingle, runMulti, mkGetSingleResult, mkGetMultipleResult,
         getMultiple', mkCreateSingleResult, mkCreateMultipleResult,
         updateSingle)
-import Persistence.Xandar.Common (subscriptionDefinition)
-import Persistence.Xandar.Subscriptions
+import Persistence.RssReaders.Common (subscriptionDefinition)
+import Persistence.RssReaders.Subscriptions
 import Servant
 import Types.Common
 
@@ -27,11 +25,10 @@ getSingle etag sid = runSingle (getSubscription sid) return >>= mkGetSingleResul
 
 -- ^
 -- Get multiple records
-getMultiple :: ServerT GetMultiple Api
-getMultiple include query sort page perPage =
+getMultiple :: ApiGetMultipleLink -> ServerT GetMultiple Api
+getMultiple getLink include query sort page perPage =
   runSingle getRecords (return . mkResult)
   where
-    getLink = mkSubscriptionGetMultipleLink
     def = subscriptionDefinition
     getRecords = getMultiple' getSubscriptions def include query sort page perPage
     mkResult = mkGetMultipleResult getLink include query sort perPage
@@ -43,30 +40,32 @@ deleteSingle uid = runSingle (deleteSubscription uid) (const $ return NoContent)
 
 -- ^
 -- Create one or more records
-createSingleOrMultiple
-  :: ApiData Record
+createSingleOrMultiple ::
+     (Text -> String)
+  -> ApiData Record
   -> Api (Headers '[ Header "Location" String, Header "Link" String] (ApiData ApiResult))
-createSingleOrMultiple (Single r) = createSingle r
-createSingleOrMultiple (Multiple rs) = createMultiple rs
+createSingleOrMultiple getLink (Single r) = createSingle getLink r
+createSingleOrMultiple getLink (Multiple rs) = createMultiple getLink rs
 
 -- ^
 -- Create a single record
-createSingle
-  :: Record
+createSingle ::
+     (Text -> String)
+  -> Record
   -> Api (Headers '[ Header "Location" String, Header "Link" String] (ApiData ApiResult))
-createSingle input =
+createSingle getLink input =
   runSingle
     (insertSubscription input)
-    (mkCreateSingleResult mkSubscriptionGetSingleLink)
+    (mkCreateSingleResult getLink)
 
 -- ^
 -- Create multiple records
-createMultiple
-  :: [Record]
+createMultiple ::
+     (Text -> String)
+  -> [Record]
   -> Api (Headers '[ Header "Location" String, Header "Link" String] (ApiData ApiResult))
-createMultiple input =
-  runMulti (insertSubscriptions input) >>=
-  mkCreateMultipleResult mkSubscriptionGetSingleLink
+createMultiple getLink input =
+  runMulti (insertSubscriptions input) >>= mkCreateMultipleResult getLink
 
 -- ^
 -- Update (replace) a single record

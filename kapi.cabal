@@ -16,13 +16,17 @@ library
   hs-source-dirs:      src
   exposed-modules:     Api.Common
                      , Api.Xandar
+                     , Api.Lono
+                     , Api.Main
                      , Data.AesonBson
                      , Data.AesonBson.Instances
-                     , Handlers.Xandar.Common
-                     , Handlers.Xandar.Feeds
-                     , Handlers.Xandar.Subscriptions
-                     , Handlers.Xandar.UserPosts
-                     , Handlers.Xandar.Xandar
+                     , Handlers.Common
+                     , Handlers.Main
+                     , Handlers.RssReaders.Feeds
+                     , Handlers.RssReaders.Subscriptions
+                     , Handlers.RssReaders.UserPosts
+                     , Handlers.Xandar
+                     , Handlers.Lono
                      , Parsers.Filter
                      , Parsers.Unescape
                      , Persistence.Common
@@ -30,8 +34,10 @@ library
                      , Persistence.MongoDB
                      , Persistence.ElasticSearch
                      , Persistence.Xandar.Common
-                     , Persistence.Xandar.Subscriptions
-                     , Persistence.Xandar.UserPosts
+                     , Persistence.Lono.Common
+                     , Persistence.RssReaders.Common
+                     , Persistence.RssReaders.Subscriptions
+                     , Persistence.RssReaders.UserPosts
                      , Types.Common
                      , Util.Constants
                      , Util.Error
@@ -49,7 +55,7 @@ library
                      , iso8601-time
                      , lifted-base >= 0.2
                      , monad-control >= 1.0
-                     , mongoDB >= 2.1
+                     , mongoDB >= 2.3
                      , mtl >= 2.2
                      , network >= 2.6
                      , SHA
@@ -74,6 +80,7 @@ executable kapi-exe
                      , bytestring >= 0.10
                      , kapi
                      , containers >= 0.5
+                     , text >= 1.2
                      , wai >= 3.2
                      , wai-extra >= 3.0
                      , warp >= 3.2

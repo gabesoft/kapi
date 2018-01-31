@@ -6,10 +6,9 @@
 
 -- ^
 -- Common handlers
-module Handlers.Xandar.Common where
+module Handlers.Common where
 
-import Api.Common (GetMultiple)
-import Api.Xandar
+import Api.Common (GetMultiple, ApiGetMultipleLink, perPageDefault)
 import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.Trans.Control

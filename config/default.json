@@ -1,8 +1,17 @@
 {
-  "es-indices": {"xandar": "kapi-xandar"},
-  "es-server": "http://localhost:9200",
-  "mongo-databases":{"xandar":"kapi-xandar"},
-  "mongo-host": "127.0.0.1",
-  "mongo-port": 27017,
+  "es-indices": {
+    "xandar": "kapi-xandar",
+    "lono": "kapi-lono"
+  },
+  "es-servers": {
+    "default": "http://localhost:9200"
+  },
+  "mongo-databases": {
+    "xandar": "kapi-xandar",
+    "lono": "kapi-lono"
+  },
+  "mongo-servers": {
+    "default": "127.0.0.1:27017"
+  },
   "port": 8001
 }

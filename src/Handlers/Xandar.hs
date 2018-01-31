@@ -1,38 +1,42 @@
 -- ^
 -- Handlers for Xandar endpoints
-module Handlers.Xandar.Xandar where
+module Handlers.Xandar where
 
 import Api.Xandar
-import Handlers.Xandar.Common
-import qualified Handlers.Xandar.Feeds as F
-import qualified Handlers.Xandar.Subscriptions as S
-import qualified Handlers.Xandar.UserPosts as U
+import Handlers.Common
+import qualified Handlers.RssReaders.Feeds as F
+import qualified Handlers.RssReaders.Subscriptions as S
+import qualified Handlers.RssReaders.UserPosts as U
+import Persistence.RssReaders.Common
 import Persistence.Xandar.Common
 import Servant
+import Servant.Utils.Enter (Entered)
 import Types.Common
 
 -- ^
 -- Create an application for providing the user functionality
 app :: ApiConfig -> Application
-app =
-  app' apiProxy (userHandlers :<|>
-                 feedHandlers :<|>
-                 postHandlers :<|>
-                 subscriptionHandlers :<|>
-                 userPostHandlers :<|>
-                 postQueryHandlers :<|>
-                 tagsHandlers
-                )
+app = app' apiProxy handlers
+
+handlers :: Entered Handler Api (ServerT XandarApi Handler)
+handlers =
+    userHandlers :<|>
+    feedHandlers :<|>
+    postHandlers :<|>
+    subscriptionHandlers :<|>
+    userPostHandlers :<|>
+    postQueryHandlers :<|>
+    tagsHandlers
   where
     userHandlers :: ServerT XandarUserApi Api
-    userHandlers = handlers userDefinition mkUserGetSingleLink mkUserGetMultipleLink
+    userHandlers = mkHandlers userDefinition mkUserGetSingleLink mkUserGetMultipleLink
     postHandlers :: ServerT XandarPostApi Api
-    postHandlers = handlers postDefinition mkPostGetSingleLink mkPostGetMultipleLink
+    postHandlers = mkHandlers postDefinition mkPostGetSingleLink mkPostGetMultipleLink
     postQueryHandlers :: ServerT XandarPostQueryApi Api
-    postQueryHandlers = handlers postQueryDefinition mkPostQueryGetSingleLink mkPostQueryGetMultipleLink
+    postQueryHandlers = mkHandlers postQueryDefinition mkPostQueryGetSingleLink mkPostQueryGetMultipleLink
     tagsHandlers :: ServerT XandarTagsApi Api
-    tagsHandlers = handlers tagsDefinition mkTagsGetSingleLink mkTagsGetMultipleLink
-    handlers def mkGetSingleLink mkGetMultipleLink =
+    tagsHandlers = mkHandlers tagsDefinition mkTagsGetSingleLink mkTagsGetMultipleLink
+    mkHandlers def mkGetSingleLink mkGetMultipleLink =
       getMultiple mkGetMultipleLink def :<|>
       getSingle def :<|>
       deleteSingle def :<|>
@@ -67,10 +71,10 @@ app =
       U.optionsMultiple
     subscriptionHandlers :: ServerT XandarSubscriptionApi Api
     subscriptionHandlers =
-      S.getMultiple :<|>
+      S.getMultiple mkSubscriptionGetMultipleLink :<|>
       S.getSingle :<|>
       S.deleteSingle :<|>
-      S.createSingleOrMultiple :<|>
+      S.createSingleOrMultiple mkSubscriptionGetSingleLink :<|>
       S.replaceSingle :<|>
       S.replaceMultiple :<|>
       S.modifySingle :<|>

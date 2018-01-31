@@ -51,8 +51,8 @@ import Util.Error
 -- Create a database connection
 -- >>> pipe <- mkPipe "127.0.0.1" 27017
 -- >>> close pipe
-mkPipe :: HostName -> PortNumber -> IO Pipe
-mkPipe addr port = connect (Host addr $ PortNumber port)
+mkPipe :: (HostName, PortNumber) -> IO Pipe
+mkPipe (addr, port) = connect (Host addr $ PortNumber port)
 
 -- ^
 -- Perform an action with master access on a database

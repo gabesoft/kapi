@@ -45,8 +45,8 @@ import qualified Data.Map.Strict as Map
 import Data.Maybe
 import qualified Data.Set as Set
 import Data.Text (Text)
-import Database.V5.Bloodhound.Types (EsError, SearchResult)
 import Database.MongoDB (Pipe, Database, Failure)
+import Database.V5.Bloodhound.Types (EsError, SearchResult)
 import Network.HTTP.Types.Status
 import Persistence.Common
 import qualified Persistence.ElasticSearch as ES
@@ -302,7 +302,7 @@ vResultToItems f (a, err) =
 dbPipe
   :: MonadIO m
   => ApiConfig -> m Pipe
-dbPipe conf = liftIO $ DB.mkPipe (mongoHost conf) (mongoPort conf)
+dbPipe conf = liftIO $ DB.mkPipe (mongoServer conf)
 
 -- ^
 -- Make a make a map with the ids as keys and records as values

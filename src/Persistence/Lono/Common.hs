@@ -2,8 +2,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 -- ^
--- Common functionality for Xandar persistence modules
-module Persistence.Xandar.Common where
+-- Common functionality for Lono persistence modules
+module Persistence.Lono.Common where
 
 import Data.Bson
 import qualified Data.Map.Strict as Map
@@ -19,9 +19,11 @@ userDefinition =
     [ mkReqDef' "email"
     , mkReqDef "disabled" False
     , mkReqDef "admin" False
-    , mkOptDef' "githubAvatar"
-    , mkOptDef' "githubUrl"
-    , mkOptDef' "githubLogin"
+    , mkOptDef' "imageUrl"
+    , mkOptDef' "givenName"
+    , mkOptDef' "familyName"
+    , mkOptDef' "name"
+    , mkOptDef "locale" ("en" :: String)
     ]
 
 userIndices :: [Index]

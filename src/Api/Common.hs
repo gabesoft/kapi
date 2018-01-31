@@ -5,7 +5,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE OverloadedStrings #-}
 
--- | Common API definitions
+-- ^ Common API definitions
 module Api.Common where
 
 import Data.Text (Text, unpack)
@@ -48,6 +48,11 @@ type GenericApi =
   -- options
   :<|> Capture "id" Text :> OptionsNoContent '[JSON] (Headers '[Header "Access-Control-Allow-Methods" String] NoContent)
   :<|> OptionsNoContent '[JSON] (Headers '[Header "Access-Control-Allow-Methods" String] NoContent)
+
+type ApiGetMultipleLink = [Text] -> Maybe Text -> [Text] -> Maybe Int -> Maybe Int -> String
+
+perPageDefault :: Int
+perPageDefault = 50
 
 mkLink1
   :: (MkLink endpoint ~ (a -> x), HasLink endpoint, ToHttpApiData x, IsElem endpoint api)

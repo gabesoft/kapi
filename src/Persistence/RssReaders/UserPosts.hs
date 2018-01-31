@@ -3,7 +3,7 @@
 
 -- ^
 -- Persistence functionality for user-posts
-module Persistence.Xandar.UserPosts
+module Persistence.RssReaders.UserPosts
   ( deleteUserPost
   , deleteUserPosts
   , indexUserPosts
@@ -37,7 +37,7 @@ import Data.Time (UTCTime)
 import Persistence.Common
 import qualified Persistence.ElasticSearch as E
 import Persistence.Facade
-import Persistence.Xandar.Common
+import Persistence.RssReaders.Common
 import Types.Common
 import Util.Constants
 import Util.Error
@@ -246,10 +246,10 @@ addTimestamp existing new =
     existingTextDate = existing >>= getValue createdAtLabel
     existingUTCDate :: Maybe UTCTime
     existingUTCDate = existing >>= getValue createdAtLabel
-    mergeDates r Nothing = setTimestamp True r
-    mergeDates r (Just createdAt) = do
-      record <- setTimestamp False r
-      return (setValue createdAtLabel createdAt record)
+    mergeDates r Nothing =
+      setTimestamp True r
+    mergeDates r (Just createdAt) =
+      setValue createdAtLabel createdAt <$> setTimestamp False r
 
 -- ^
 -- Get all ids required to create a user-post record
@@ -301,3 +301,4 @@ skipFieldsOnUpdate = ["post", "feedId", "userId", "postId", "subscriptionId"]
 skipFieldsOnCreate :: [Label]
 skipFieldsOnCreate =
   ["post", "userId", "feedId", createdAtLabel, updatedAtLabel, idLabel]
+

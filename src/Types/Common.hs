@@ -74,7 +74,7 @@ instance FromJSON a =>
 
 -- ^
 -- Representation of a record
-data RecordData a =
+newtype RecordData a =
   Record [a]
   deriving (Eq, Show)
 
@@ -114,7 +114,7 @@ instance ToJSON ApiError where
 
 -- ^
 -- The result of a validation operation
-data ValidationErrors a =
+newtype ValidationErrors a =
   ValidationErrors [a]
   deriving (Eq, Show)
 
@@ -354,44 +354,57 @@ instance (Monoid e, MonadBaseControl b m) =>
   restoreM = defaultRestoreM
 
 -- ^
--- Application name
-type AppName = Text
+-- Api name
+type ApiName = Text
+
+-- ^
+-- Global app configuration
+data AppConfig = AppConfig
+  { appPort :: PortNumber
+  , appMongoServers :: Map.Map ApiName (HostName, PortNumber)
+  , appMongoDbs :: Map.Map ApiName Database
+  , appEsIndices :: Map.Map ApiName Database
+  , appEsServers :: Map.Map ApiName Text
+  } deriving (Eq, Show)
+
+toServer :: (Show a2, Show a1) => (a1, a2) -> String
+toServer (host, port) = show host ++ ":" ++ show port
+
+fromServer :: Text -> (HostName, PortNumber)
+fromServer server = (T.unpack h, read $ T.unpack p)
+  where [h, p] = T.split (== ':') server
+
+instance ToJSON AppConfig where
+  toJSON AppConfig {..} =
+    object
+      [ "port" .= (fromEnum appPort :: Int)
+      , "mongo-servers" .= Map.map toServer appMongoServers
+      , "mongo-databases" .= appMongoDbs
+      , "es-indices" .= appEsIndices
+      , "es-servers" .= appEsServers
+      ]
+
+instance FromJSON AppConfig where
+  parseJSON (Object o) = do
+    appPort <- toEnum <$> o .: "port"
+    mongoServers <- o .: "mongo-servers"
+    appMongoDbs <- o .: "mongo-databases"
+    appEsIndices <- o .: "es-indices"
+    appEsServers <- o .: "es-servers"
+
+    let appMongoServers = Map.map fromServer mongoServers
+    return AppConfig {..}
+  parseJSON _ = fail "Expected an object for ApiConfig"
 
 -- ^
 -- Api configuration data
 data ApiConfig = ApiConfig
   { apiPort :: PortNumber
-  , appName :: Maybe AppName
-  , mongoHost :: HostName
-  , mongoPort :: PortNumber
-  , mongoDbs :: Map.Map AppName Database
-  , esIndices :: Map.Map AppName Database
+  , mongoServer :: (HostName, PortNumber)
+  , mongoDatabase :: Database
+  , esIndex :: Database
   , esServer :: Text
   } deriving (Eq, Show)
-
-instance ToJSON ApiConfig where
-  toJSON ApiConfig {..} =
-    object
-      [ "port" .= (fromEnum apiPort :: Int)
-      , "app-name" .= appName
-      , "mongo-host" .= mongoHost
-      , "mongo-port" .= (fromEnum mongoPort :: Int)
-      , "mongo-databases" .= mongoDbs
-      , "es-indices" .= esIndices
-      , "es-server" .= esServer
-      ]
-
-instance FromJSON ApiConfig where
-  parseJSON (Object o) = do
-    apiPort <- toEnum <$> o .: "port"
-    appName <- o .:? "app-name"
-    mongoHost <- o .: "mongo-host"
-    mongoPort <- toEnum <$> o .: "mongo-port"
-    mongoDbs <- o .: "mongo-databases"
-    esIndices <- o .: "es-indices"
-    esServer <- o .: "es-server"
-    return ApiConfig {..}
-  parseJSON _ = fail "Expected an object for ApiConfig"
 
 -- ^
 -- Pagination data

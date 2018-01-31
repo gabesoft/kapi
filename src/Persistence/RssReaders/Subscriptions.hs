@@ -3,7 +3,7 @@
 
 -- ^
 -- Persistence functions for feed subscriptions
-module Persistence.Xandar.Subscriptions
+module Persistence.RssReaders.Subscriptions
   ( addRead
   , addTags
   , deleteSubscription
@@ -27,7 +27,7 @@ import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.Trans.Control
 import Data.Bifunctor
-import Data.Bson hiding (lookup, label)
+import Data.Bson
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as Map
 import Data.Maybe
@@ -40,8 +40,8 @@ import Persistence.Common
 import qualified Persistence.ElasticSearch as E
 import Persistence.Facade as F
 import qualified Persistence.MongoDB as M
-import Persistence.Xandar.Common
-import Persistence.Xandar.UserPosts
+import Persistence.RssReaders.Common
+import Persistence.RssReaders.UserPosts
        (mkUserPostId, indexUserPosts', mkUserPostsOnCreate,
         mkUserPostOnCreate, mkUserPostOnModify)
 import Types.Common

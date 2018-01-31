@@ -1,0 +1,200 @@
+# -*- restclient -*-
+#
+# Queries against the /lono/users endpoints
+#
+
+# variables
+:date := (shell-command-to-string "echo -n (date +%Y-%m-%d-%M-%s)")
+:host = 127.0.0.1:8001
+:path = lono/users
+:json = application/json
+
+#
+# Get all users
+#
+GET http://:host/:path
+
+#
+# Run a HEAD request on the users collection
+#
+HEAD http://:host/:path
+
+#
+# Run a OPTIONS request on the users collection
+#
+OPTIONS http://:host/:path
+
+#
+# Get all users - sort & partial response
+#
+GET http://:host/:path?sort=email&include=email,admin
+
+#
+# Get all admin users
+#
+GET http://:host/:path?where=(admin eq true)
+
+#
+# Get by email
+#
+GET http://:host/:path?where=(email eq 'gabesoft@gmail.com')
+
+#
+# Get users filtered by email
+#
+GET http://:host/:path?where=(email contains "updated") or (email contains "admin")&include=email&sort=-email
+
+#
+# Get users created afte a date
+#
+GET http://:host/:path?where=(createdAt ge 2017-01-08T07:47:45.928Z)
+
+#
+# Get all users - pagination
+#
+GET http://:host/:path?page=4&per_page=5
+
+#
+# Get all users - in query
+#
+GET http://:host/:path?where=(admin in [])
+
+#
+# Get a single user
+#
+GET http://:host/:path/58ab43d55984185882000007
+
+#
+# Run a HEAD request on a single user
+#
+HEAD http://:host/:path/5869ec3e59841810dc000009
+
+#
+# Run an OPTIONS request on a single user
+#
+OPTIONS http://:host/:path/5869ec3e59841810dc000009
+
+#
+# Get a single non-existent user 
+#
+GET http://:host/:path/non-existent
+
+#
+# Get a single user using ETag
+#
+GET http://:host/:path/58ab3f4059841827d1000003
+If-None-Match: 8751d26bd52c1d762b2dc1662c1e581adaed121c
+
+#
+# Delete a non-existent user
+#
+DELETE http://:host/:path/non-existent
+
+#
+# Delete an existent user
+#
+DELETE http://:host/:path/58bf8ddb5984181c6800006d
+
+#
+# Create a single user
+#
+POST http://:host/:path
+Content-Type: :json
+{
+  "email": "admin:date@aol.com",
+  "admin": true
+}
+
+#
+# Create a single user 2
+#
+POST http://:host/:path
+Content-Type: :json
+{
+  "email": "markus@gmail.com",
+  "admin": false,
+  "createdAt": "2017-03-08T04:37:53.141Z",
+  "disabled": false,
+  "name": "Markus Aurelius",
+  "givenName": "Markus",
+  "familyName": "Aurelius",
+  "updatedAt": "2017-03-08T04:37:53.141Z",
+  "imageUrl": "https://api.github.com/users/gabesoft"
+}
+
+#
+# Create an invalid user
+#
+POST http://:host/:path
+Content-Type: :json
+{
+  "githubUrl" : "https://api.github.com/users/admin",
+  "admin": true
+}
+
+#
+# Create multiple users
+#
+POST http://:host/:path
+Content-Type: :json
+[
+  {
+    "email": "user1:date@aol.com",
+    "imageUrl": "https://api.github.com/users/user1",
+    "admin": false
+  },
+  {
+    "email": "admin1:date@aol.com",
+    "imageUrl": "https://api.github.com/users/admin1",
+    "admin": true
+  },
+  {
+    "email": "admin2@aol.com",
+    "imageUrl": "https://api.github.com/users/admin2",
+    "admin": true
+  },
+  {
+    "imageUrl": "https://api.github.com/users/other"
+  }
+]
+
+#
+# Replace a single user
+#
+PUT http://:host/:path/587a810d598418739b000001
+Content-Type: :json
+{
+    "email": "replaced3@aol.com",
+    "admin": true
+}
+
+#
+# Modify a single user
+#
+PATCH http://:host/:path/587a810d598418739b000001
+Content-Type: :json
+{
+    "email": "updated3@aol.com"
+}
+
+#
+# Replace multiple
+#
+PUT http://:host/:path
+Content-Type: :json
+[
+  {
+    "email": "user12017-02-20-30-1487619029@aol.com",
+    "admin": true,
+    "_id": "58ab43d55984185882000007",
+    "disabled": false,
+    "imageUrl": "https://api.github.com/users/user1"
+  },
+  {
+    "email": "admin12017-02-20-30-1487619029@aol.com",
+    "admin": true,
+    "_id": "58ab43d55984185882000008",
+    "disabled": false,
+    "imageUrl": "https://api.github.com/users/admin1"
+  }
+]

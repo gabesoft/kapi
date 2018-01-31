@@ -2,15 +2,15 @@
 
 -- ^
 -- Handlers for the feeds endpoints
-module Handlers.Xandar.Feeds where
+module Handlers.RssReaders.Feeds where
 
 import Control.Monad.Except
 import Data.Monoid ((<>))
 import Data.Text (Text)
-import Handlers.Xandar.Common (runSingle)
+import Handlers.Common (runSingle)
 import Persistence.Facade
 import Persistence.MongoDB (queryToDoc)
-import Persistence.Xandar.Common (postDefinition, feedDefinition)
+import Persistence.RssReaders.Common (postDefinition, feedDefinition)
 import Servant
 import Types.Common
 

@@ -5,8 +5,6 @@
 module Main (main) where
 
 import Data.Bson
-import Data.List (all)
-import qualified Data.Map.Strict as Map
 import Mocks.Common
 import Persistence.Common
 import Test.Hspec
@@ -139,7 +137,7 @@ main =
       it "can determine if a nested value exists - 0" $
         verifyHasValue rec6 "d.f.h" False
 
-    describe "populateDefaults" $ do
+    describe "populateDefaults" $
       it "can populate defaults" $ verifyPopulateDefaults def1 rec7 popRes1
 
     describe "isValueOn" $ do
@@ -163,86 +161,86 @@ main =
       it "computes pagination" $ verifyPagination 4 3 15 pgeRes1
 
 verifyMerge :: Record -> Record -> Record -> Expectation
-verifyMerge r1 r2 exp = mergeRecords r1 r2 `shouldMatchRecord` exp
+verifyMerge r1 r2 expected = mergeRecords r1 r2 `shouldMatchRecord` expected
 
 verifyReplace :: [Label] -> Record -> Record -> Record -> Expectation
-verifyReplace preserve r1 r2 exp = replaceRecords preserve r1 r2 `shouldMatchRecord` exp
+verifyReplace preserve r1 r2 expected = replaceRecords preserve r1 r2 `shouldMatchRecord` expected
 
 verifyExclude :: Record -> Record -> [Label] -> Expectation
-verifyExclude r exp labels = excludeFields labels r `shouldMatchRecord` exp
+verifyExclude r expected recLabels = excludeFields recLabels r `shouldMatchRecord` expected
 
 verifyInclude :: Record -> Record -> [Label] -> Expectation
-verifyInclude r exp labels = includeFields labels r `shouldMatchRecord` exp
+verifyInclude r expected recLabels = includeFields recLabels r `shouldMatchRecord` expected
 
 verifyGetField :: Record -> Label -> Maybe Field -> Expectation
-verifyGetField r name exp = getField name r `shouldBe` exp
+verifyGetField r name expected = getField name r `shouldBe` expected
 
 verifyGetValue
   :: Val a
   => Record -> Label -> Maybe a -> Expectation
-verifyGetValue r name exp = getValue name r `shouldBe` exp
+verifyGetValue r name expected = getValue name r `shouldBe` expected
 
 verifySetField :: Record -> Field -> Record -> Expectation
-verifySetField r field exp = setField field r `shouldBe` exp
+verifySetField r field expected = setField field r `shouldBe` expected
 
 verifySetValue
   :: Val a
   => Record -> Label -> a -> Record -> Expectation
-verifySetValue r name value exp = setValue name value r `shouldBe` exp
+verifySetValue r name recVal expected = setValue name recVal r `shouldBe` expected
 
 verifyDelField :: Record -> Label -> Record -> Expectation
-verifyDelField r name exp = delField name r `shouldBe` exp
+verifyDelField r name expected = delField name r `shouldBe` expected
 
 verifyDelValue :: Record -> Label -> Record -> Expectation
-verifyDelValue r name exp = delValue name r `shouldBe` exp
+verifyDelValue r name expected = delValue name r `shouldBe` expected
 
 verifyHasField :: Record -> Label -> Bool -> Expectation
-verifyHasField r name exp = hasField name r `shouldBe` exp
+verifyHasField r name expected = hasField name r `shouldBe` expected
 
 verifyHasValue :: Record -> Label -> Bool -> Expectation
-verifyHasValue r name exp = hasValue name r `shouldBe` exp
+verifyHasValue r name expected = hasValue name r `shouldBe` expected
 
 verifyIsValueOn :: Record -> Label -> Bool -> Expectation
-verifyIsValueOn r name exp = isValueOn name r `shouldBe` exp
+verifyIsValueOn r name expected = isValueOn name r `shouldBe` expected
 
 verifyRenameField :: Label -> Label -> Record -> Record -> Expectation
-verifyRenameField old new r exp = renameField old new r `shouldBe` exp
+verifyRenameField old new r expected = renameField old new r `shouldBe` expected
 
 verifyPopulateDefaults :: RecordDefinition -> Record -> Record -> Expectation
-verifyPopulateDefaults def r exp = populateDefaults def r `shouldBe` exp
+verifyPopulateDefaults def r expected = populateDefaults def r `shouldBe` expected
 
 verifyValidate :: RecordDefinition -> Record -> ValidationResult -> Expectation
-verifyValidate def r exp = snd (validateRecord def r) `shouldBe` exp
+verifyValidate def r expected = snd (validateRecord def r) `shouldBe` expected
 
 verifyPagination :: Int -> Int -> Int -> Pagination -> Expectation
-verifyPagination page size total exp = paginate page size total `shouldBe` exp
+verifyPagination page size tot expected = paginate page size tot `shouldBe` expected
 
 prop_pagination :: Int -> Int -> Int -> Bool
 prop_pagination page' size' total' =
   and
-    [ page == min last (max page' first)
-    , total == max total' 0
+    [ page == min pLast (max page' pFirst)
+    , tot == max total' 0
     , size == max size' 1
     , next >= page
-    , next <= last
+    , next <= pLast
     , next - page <= 1
     , prev <= page
-    , prev >= first
+    , prev >= pFirst
     , page - prev <= 1
-    , first == 1
-    , last >= 1
-    , last <= div total size + 1
+    , pFirst == 1
+    , pLast >= 1
+    , pLast <= div tot size + 1
     , start == (page - 1) * size
     , limit == size
     ]
   where
     pagination = paginate page' size' total'
-    total = paginationTotal pagination
+    tot = paginationTotal pagination
     page = paginationPage pagination
     size = paginationSize pagination
     next = paginationNext pagination
     prev = paginationPrev pagination
-    first = paginationFirst pagination
-    last = paginationLast pagination
+    pFirst = paginationFirst pagination
+    pLast = paginationLast pagination
     start = paginationStart pagination
     limit = paginationLimit pagination

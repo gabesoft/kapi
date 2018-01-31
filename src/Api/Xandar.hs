@@ -4,16 +4,13 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
--- |
+-- ^
 -- Declaration for all endpoints used by the Xandar app
 module Api.Xandar where
 
 import Api.Common
 import Data.Text (Text)
 import Servant
-
-perPageDefault :: Int
-perPageDefault = 50
 
 type XandarApiPath = "xandar"
 
@@ -52,8 +49,6 @@ type XandarApi = XandarUserApi
             :<|> XandarUserPostApi
             :<|> XandarPostQueryApi
             :<|> XandarTagsApi
-
-type ApiGetMultipleLink = [Text] -> Maybe Text -> [Text] -> Maybe Int -> Maybe Int -> String
 
 apiProxy :: Proxy XandarApi
 apiProxy = Proxy :: Proxy XandarApi

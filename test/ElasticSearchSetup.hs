@@ -19,7 +19,7 @@ import Network.HTTP.Client
 import Parsers.Filter
 import Persistence.Common
 import Persistence.ElasticSearch
-import Persistence.Xandar.UserPosts
+import Persistence.RssReaders.UserPosts
 import TestHelper
 import Types.Common
 import Util.Constants
@@ -99,7 +99,7 @@ countsSearch search = do
 
 extractCounts :: Text -> B.SearchResult a -> Map.Map Text Int
 extractCounts bucketKey results =
-  fromMaybe Map.empty $ toBucketMap <$> toBuckets
+  maybe Map.empty toBucketMap toBuckets
   where
     toBuckets = B.aggregations results >>= B.toTerms bucketKey
     extractVal (B.TextValue v) = v
