@@ -358,7 +358,7 @@ instance (Monoid e, MonadBaseControl b m) =>
 type ApiName = Text
 
 -- ^
--- Global app configuration
+-- Application configuration data
 data AppConfig = AppConfig
   { appPort :: PortNumber
   , appMongoServers :: Map.Map ApiName (HostName, PortNumber)
@@ -397,7 +397,7 @@ instance FromJSON AppConfig where
   parseJSON _ = fail "Expected an object for ApiConfig"
 
 -- ^
--- Api configuration data
+-- Api configuration data to be used by a group of endpoints
 data ApiConfig = ApiConfig
   { apiPort :: PortNumber
   , mongoServer :: (HostName, PortNumber)

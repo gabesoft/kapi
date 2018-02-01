@@ -14,7 +14,14 @@ import Servant
 
 type MainApi = XandarApi :<|> LonoApi
 
-mainProxy :: Proxy MainApi
-mainProxy = Proxy :: Proxy MainApi
+type Documentation = "documentation.md"
 
+type MainApiWithDocs
+   = MainApi :<|> (Documentation :> Raw)
+
+mainApiProxy :: Proxy MainApi
+mainApiProxy = Proxy :: Proxy MainApi
+
+mainApiProxyWithDocs :: Proxy MainApiWithDocs
+mainApiProxyWithDocs = Proxy :: Proxy MainApiWithDocs
 

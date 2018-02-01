@@ -15,6 +15,11 @@
 GET http://:host/:path
 
 #
+# Documentation
+#
+GET http://:host/documentation
+
+#
 # Run a HEAD request on the users collection
 #
 HEAD http://:host/:path

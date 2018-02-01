@@ -40,4 +40,7 @@ nix-build:
 	nix-build default.nix
 	ls -lA ./result/bin
 
+docs:
+	curl -XGET http://localhost:$(PORT)/documentation.md | markdown | lynx -stdin
+
 .PHONY: install serve test
