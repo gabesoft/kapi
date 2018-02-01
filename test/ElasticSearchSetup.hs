@@ -46,12 +46,10 @@ sampleConf :: ApiConfig
 sampleConf =
   ApiConfig
   { apiPort = 8001
-  , appName = Just "xandar"
-  , mongoHost = mongoDbHost
-  , mongoPort = fromIntegral mongoDbPort
-  , mongoDbs = Map.fromList [("xandar", mongoDbName)]
+  , mongoServer = (mongoDbHost, fromIntegral mongoDbPort)
+  , mongoDatabase = mongoDbName
   , esServer = eServer
-  , esIndices = Map.fromList [("xandar", eIndex)]
+  , esIndex = eIndex
   }
 
 src :: Text -> RecordStart -> ResultLimit -> B.Search
