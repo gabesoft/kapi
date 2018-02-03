@@ -17,7 +17,7 @@ GET http://:host/:path?per_page=3
 #
 # Get feeds sorted by last post date
 #
-GET http://:host/:path?where=(image.url eq null and image ~eq null)&include=image
+GET http://:host/:path?sort=-lastPostDate&include=lastPostDate,title
 
 #
 # Get all feeds (postCount)
