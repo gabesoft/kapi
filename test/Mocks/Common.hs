@@ -15,7 +15,7 @@ import Util.Constants
 -- definitions
 def1 :: RecordDefinition
 def1 =
-  RecordDefinition mempty mempty $
+  RecordDefinition mempty mempty mempty $
   Map.fromList
     [ mkOptDef "admin" False
     , mkReqDef "disabled" False
@@ -24,7 +24,7 @@ def1 =
 
 def2 :: RecordDefinition
 def2 =
-  RecordDefinition mempty mempty $
+  RecordDefinition mempty mempty mempty $
   Map.fromList
     [ mkReqDef "admin" False
     , mkOptDef "disabled" False

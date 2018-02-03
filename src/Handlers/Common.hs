@@ -165,7 +165,7 @@ optionsMultiple = return $ addHeader "GET, POST, PATCH, PUT" NoContent
 addDbIndices :: [Index] -> ApiConfig -> IO ()
 addDbIndices indices conf = do
   pipe <- dbPipe conf
-  mapM_ (\idx -> DB.dbAddIndex idx (confGetDbName conf) pipe) indices
+  mapM_ (\idx -> DB.dbAddIndex idx (mongoDatabase conf) pipe) indices
 
 -- ^
 -- Run an action that could result in a single error

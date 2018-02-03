@@ -98,7 +98,7 @@ DELETE http://:host/:path/non-existent
 #
 # Delete an existent user
 #
-DELETE http://:host/:path/58bf8ddb5984181c6800006d
+DELETE http://:host/:path/5a7536fc598418d143000015
 
 #
 # Create a single user

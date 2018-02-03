@@ -15,7 +15,7 @@ import Types.Common
 
 subscriptionDefinition :: RecordDefinition
 subscriptionDefinition =
-  RecordDefinition "feedsubscriptions" "subscriptions" $
+  RecordDefinition "feedsubscriptions" "subscriptions" subscriptionIndices $
   Map.fromList
     [ mkIdDef "userId"
     , mkIdDef "feedId"
@@ -40,7 +40,7 @@ subscriptionIndices =
 
 feedDefinition :: RecordDefinition
 feedDefinition =
-  RecordDefinition "feeds" "feeds" $
+  RecordDefinition "feeds" "feeds" feedIndices $
   Map.fromList
     [ mkOptDef' "author"
     , mkOptDef' "data"
@@ -76,7 +76,7 @@ feedIndices =
 
 postDefinition :: RecordDefinition
 postDefinition =
-  RecordDefinition "posts" "posts" $
+  RecordDefinition "posts" "posts" postIndices $
   Map.fromList
     [ mkOptDef' "author"
     , mkOptDef' "comments"
@@ -115,7 +115,7 @@ postIndices =
 
 userPostDefinition :: RecordDefinition
 userPostDefinition =
-  RecordDefinition "post" "user-posts" $
+  RecordDefinition "post" "user-posts" [] $
   Map.fromList
     [ mkIdDef "subscriptionId"
     , mkIdDef "postId"
@@ -129,7 +129,7 @@ userPostDefinition =
 
 postQueryDefinition :: RecordDefinition
 postQueryDefinition =
-  RecordDefinition "postqueries" "post-queries" $
+  RecordDefinition "postqueries" "post-queries" postQueryIndices $
   Map.fromList
     [ mkIdDef "userId"
     , mkReqDef "pinState" (0 :: Int)
@@ -156,7 +156,7 @@ postQueryIndices =
 
 tagsDefinition :: RecordDefinition
 tagsDefinition =
-  RecordDefinition "tags" "tags" $
+  RecordDefinition "tags" "tags" tagsIndices $
   Map.fromList [mkIdDef "userId", mkOptDef "tags" ([] :: [Text])]
 
 tagsIndices :: [Index]

@@ -10,11 +10,9 @@ import Control.Monad.IO.Class
 import Data.Bson
 import qualified Data.Map.Strict as Map
 import Data.Text (Text)
-import Data.Time
 import Persistence.Common
 import Persistence.MongoDB
 import Test.Hspec
-import Test.Hspec.Core.Spec
 import TestHelper
 import Types.Common
 import Util.Constants
@@ -78,37 +76,37 @@ main =
        verifyRecordToDocument recDef sampleRecInvalidFK sampleDocMissingFK
 
 verifyValidateId :: Record -> ValidationResult -> Expectation
-verifyValidateId r exp = snd (validateRecordHasId r) `shouldBe` exp
+verifyValidateId r expected = snd (validateRecordHasId r) `shouldBe` expected
 
 verifyMkInDocument
   :: MonadIO m
   => Record -> Record -> m Expectation
-verifyMkInDocument r exp = do
+verifyMkInDocument r expected = do
   doc <- mkInDocument recDef (not $ hasField "_id" r) r
   return $
-    (replaceUTCDate createdAtLabel . replaceUTCDate updatedAtLabel) (Record doc) `shouldBe` exp
+    (replaceUTCDate createdAtLabel . replaceUTCDate updatedAtLabel) (Record doc) `shouldBe` expected
 
 verifyMkOutDocument :: Document -> Record -> Expectation
-verifyMkOutDocument doc exp =
-  replaceUTCDate createdAtLabel (mkOutRecord recDef doc) `shouldBe` exp
+verifyMkOutDocument doc expected =
+  replaceUTCDate createdAtLabel (mkOutRecord recDef doc) `shouldBe` expected
 
 verifyMkSortField :: Text -> Field -> Expectation
-verifyMkSortField name exp = mkSortField name `shouldBe` Just exp
+verifyMkSortField name expected = mkSortField name `shouldBe` Just expected
 
 verifyQueryToDoc :: Text -> Document -> Expectation
-verifyQueryToDoc query exp = queryToDoc recDef query `shouldBe` Right exp
+verifyQueryToDoc query expected = queryToDoc recDef query `shouldBe` Right expected
 
 verifyRecordToDocument :: RecordDefinition -> Record -> Document -> Expectation
-verifyRecordToDocument def record exp =
-  recordToDocument def record `shouldBe` exp
+verifyRecordToDocument def record expected =
+  recordToDocument def record `shouldBe` expected
 
 verifyDocumentToRecord :: RecordDefinition -> Document -> Record -> Expectation
-verifyDocumentToRecord def document exp =
-  documentToRecord def document `shouldBe` exp
+verifyDocumentToRecord def document expected =
+  documentToRecord def document `shouldBe` expected
 
 recDef :: RecordDefinition
 recDef =
-  RecordDefinition "test-collection" mempty $
+  RecordDefinition "test-collection" mempty mempty $
   Map.fromList
     [ mkOptDef' "optional"
     , mkOptDef "optionalWithDefault" (1 :: Int)

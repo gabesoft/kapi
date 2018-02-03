@@ -27,7 +27,7 @@ import Data.String
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time (UTCTime(..))
-import Database.MongoDB (Database)
+import Database.MongoDB (Database, Index(..))
 import GHC.Generics
 import Network.HTTP.Types.Status
 import Network.Socket (HostName, PortNumber)
@@ -51,6 +51,7 @@ data FieldDefinition = FieldDefinition
 data RecordDefinition = RecordDefinition
   { recordCollection :: Text
   , recordCollectionName :: Text
+  , recordIndices :: [Index]
   , recordFields :: Map.Map Label FieldDefinition
   } deriving (Eq, Show)
 

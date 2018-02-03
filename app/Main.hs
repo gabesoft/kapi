@@ -10,7 +10,7 @@ import Data.Maybe
 import Data.Monoid ((<>))
 import qualified Data.Text as T
 import qualified Handlers.Lono as LO
-import Handlers.Main (app)
+import qualified Handlers.Main as MA
 import qualified Handlers.Xandar as XA
 import Network.Wai
 import Network.Wai.Handler.Warp
@@ -31,7 +31,7 @@ main = do
   let lonoConf = getApiConfig "lono" conf
   LO.appInit lonoConf
   XA.appInit xandarConf
-  runApp dev (app xandarConf lonoConf) conf
+  runApp dev (MA.app xandarConf lonoConf) conf
 
 getApiConfig :: ApiName -> AppConfig -> ApiConfig
 getApiConfig apiName conf =

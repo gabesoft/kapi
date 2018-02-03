@@ -66,6 +66,17 @@ dbAddIndex :: MonadIO m => Index -> Database -> Pipe -> m ()
 dbAddIndex idx = dbAccess (createIndex idx)
 
 -- ^
+-- Ensure an index exists on the specified database
+dbEnsureIndex :: MonadIO m => Index -> Database -> Pipe -> m ()
+dbEnsureIndex idx = dbAccess (ensureIndex idx)
+
+-- ^
+-- Ensure a list of indices exist on the specified database
+dbEnsureIndices :: MonadIO m => [Index] -> Database -> Pipe -> m ()
+dbEnsureIndices indices dbName pipe =
+  mapM_ (\idx -> dbEnsureIndex idx dbName pipe) indices
+
+-- ^
 -- Insert a record into a collection and return the generated id
 -- dbInsert
 dbInsert
@@ -77,7 +88,8 @@ dbInsert
   -> m (Either Failure RecordId)
 dbInsert def record dbName pipe =
   dbAction $
-  do input <- mkInDocument def True record
+  do dbEnsureIndices (recordIndices def) dbName pipe
+     input <- mkInDocument def True record
      saved <- dbAccess (action input) dbName pipe
      let maybeId = objIdToRecId saved
      return $ maybe (Left writeError) Right maybeId
@@ -97,7 +109,8 @@ dbUpdate
   -> m (Either Failure RecordId)
 dbUpdate def input dbName pipe =
   dbAction $
-  do doc <- mkInDocument def False input
+  do dbEnsureIndices (recordIndices def) dbName pipe
+     doc <- mkInDocument def False input
      dbAccess (action doc) dbName pipe
      return $ Right (fromJust $ getIdValue input)
   where
@@ -356,4 +369,6 @@ termToField NotContains (ColumnName _ _) _ = Left "~contains: expected a string 
 dbToApiError :: Failure -> ApiError
 dbToApiError (WriteFailure _ _ msg) = mk400Err' msg
 dbToApiError (QueryFailure _ msg) = mk400Err' msg
+dbToApiError (CompoundFailure [WriteFailure _ _ msg]) = mk400Err' msg
+dbToApiError (CompoundFailure [QueryFailure _ msg]) = mk400Err' msg
 dbToApiError err = mk500Err' (show err)

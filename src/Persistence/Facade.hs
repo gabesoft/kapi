@@ -219,7 +219,7 @@ runDb'
 runDb' action = do
   conf <- ask
   pipe <- dbPipe conf
-  lift $ action (confGetDbName conf) pipe
+  lift $ action (mongoDatabase conf) pipe
 
 -- ^
 -- Run an elastic-search action
@@ -228,7 +228,7 @@ runEs
   => (Text -> Text -> IO (Either EsError a)) -> ExceptT ApiError m a
 runEs action = do
   conf <- ask
-  results <- liftIO $ action (esServer conf) (confGetEsIndex conf)
+  results <- liftIO $ action (esServer conf) (esIndex conf)
   ExceptT (return $ first ES.esToApiError results)
 
 -- ^

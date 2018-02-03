@@ -14,7 +14,7 @@ import Types.Common
 
 userDefinition :: RecordDefinition
 userDefinition =
-  RecordDefinition "users" "users" $
+  RecordDefinition "users" "users" userIndices $
   Map.fromList
     [ mkReqDef' "email"
     , mkReqDef "disabled" False

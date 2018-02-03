@@ -69,18 +69,6 @@ mkOptDef
 mkOptDef name v = mkFieldDef name False False (Just v)
 
 -- ^
--- Get the MongoDB database name for an application
--- from a configuration object
-confGetDbName :: ApiConfig -> Database
-confGetDbName = mongoDatabase
-
--- ^
--- Get the elastic-search index name for an application
--- from a configuration object
-confGetEsIndex :: ApiConfig -> Text
-confGetEsIndex = esIndex
-
--- ^
 -- Validate a record against it's definition
 validateRecord :: RecordDefinition -> Record -> (Record, ValidationResult)
 validateRecord def r = (r, ValidationErrors $ catMaybes results)
@@ -466,4 +454,5 @@ mkSortExpr name
 -- ^
 -- A record definition that contains only a required id field
 idDefinition :: RecordDefinition
-idDefinition = RecordDefinition mempty mempty $ Map.fromList [mkReqDef' idLabel]
+idDefinition =
+  RecordDefinition mempty mempty mempty $ Map.fromList [mkReqDef' idLabel]
