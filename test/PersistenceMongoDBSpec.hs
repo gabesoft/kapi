@@ -16,7 +16,6 @@ import Test.Hspec
 import TestHelper
 import Types.Common
 import Util.Constants
-import Data.Maybe
 
 main :: IO ()
 main =
@@ -35,7 +34,7 @@ main =
      it "creates a document ready to be saved - valid id" =<<
        runIO (verifyMkInDocument rec7 res4)
      it "creates a document ready to be saved - date field" =<<
-       runIO (verifyMkInDocument rec8 res8)
+       runIO (verifyMkInDocument rec8 (Record doc8))
      it "creates a record ready to be returned" $ verifyMkOutDocument rec5 res3
      it "can make a sort field for ascending sort" $
        verifyMkSortField "email" (mkIntField "email" 1)
@@ -75,6 +74,8 @@ main =
        verifyRecordToDocument recDef sampleNewRec sampleNewDoc
      it "converts a record to a document - old" $
        verifyRecordToDocument recDef sampleRec sampleDoc
+     it "converts a record to a document - with date field" $
+       verifyRecordToDocument recDef rec8 doc8
      it "converts a record to a document - invalid foreign key" $
        verifyRecordToDocument recDef sampleRecInvalidFK sampleDocMissingFK
 
@@ -133,51 +134,36 @@ commonDoc =
   , mkStrField "requiredWithDefault" "requiredValue"
   ]
 
-sampleNewDoc :: Document
-sampleNewDoc = merge commonDoc [mkObjId' "foreignKey" sampleId2]
-
-sampleNewDocMissingFK :: Document
-sampleNewDocMissingFK = commonDoc
-
 sampleNewRec :: Record
 sampleNewRec = Record (merge commonDoc [mkTxtField "foreignKey" sampleId2])
 
-sampleNewRecInvalidFK :: Record
-sampleNewRecInvalidFK = Record (merge commonDoc [mkStrField "foreignKey" "123"])
+sampleNewDoc :: Document
+sampleNewDoc = merge commonDoc [mkObjId' "foreignKey" sampleId2]
+
+sampleRec :: Record
+sampleRec = mergeRecords sampleNewRec (Record [mkRecId sampleId1])
 
 sampleDoc :: Document
 sampleDoc = merge [mkObjId sampleId1] sampleNewDoc
 
+sampleNewRecInvalidFK :: Record
+sampleNewRecInvalidFK = Record (merge commonDoc [mkStrField "foreignKey" "123"])
+
 sampleDocMissingFK :: Document
 sampleDocMissingFK = merge [mkObjId sampleId1] sampleNewDocMissingFK
 
-sampleRec :: Record
-sampleRec = mergeRecords sampleNewRec (Record [mkRecId sampleId1])
+sampleNewDocMissingFK :: Document
+sampleNewDocMissingFK = commonDoc
 
 sampleRecInvalidFK :: Record
 sampleRecInvalidFK =
   mergeRecords sampleNewRecInvalidFK (Record [mkRecId sampleId1])
 
-rec1 :: Record
-rec1 = Record [mkStrField "email" "a@email.com"]
-
-rec3 :: Record
-rec3 = Record [mkRecId sampleId1]
-
-rec4 :: Record
-rec4 = Record [mkStrField "email" "a@e.com", mkStrField createdAtLabel "1234"]
-
-rec5 :: Document
-rec5 = [mkObjId sampleId1]
-
-rec6 :: Record
-rec6 = Record [mkStrField "email" "a@e.com", mkRecId "1234"]
-
 rec7 :: Record
 rec7 = Record [mkStrField "email" "a@e.com", mkRecId sampleId1]
 
-rec8 :: Record
-rec8 = Record [ mkRecId sampleId1, mkStrField "someDate" "2017-01-13T02:09:05.000Z" ]
+rec1 :: Record
+rec1 = Record [mkStrField "email" "a@email.com"]
 
 res1 :: ValidationResult
 res1 = ValidationErrors [mkRecId "Field is required"]
@@ -186,8 +172,14 @@ res2 :: RecordData Field
 res2 =
   Record [mkStrField "email" "a@e.com", updatedAtLabel =: date dateReplacement]
 
+rec3 :: Record
+rec3 = Record [mkRecId sampleId1]
+
 res3 :: RecordData Field
 res3 = Record [mkRecId sampleId1]
+
+rec4 :: Record
+rec4 = Record [mkStrField "email" "a@e.com", mkStrField createdAtLabel "1234"]
 
 res4 :: RecordData Field
 res4 =
@@ -197,6 +189,9 @@ res4 =
     , updatedAtLabel =: date dateReplacement
     ]
 
+rec5 :: Document
+rec5 = [mkObjId sampleId1]
+
 res5 :: RecordData Field
 res5 =
   Record
@@ -204,6 +199,9 @@ res5 =
     , createdAtLabel =: date dateReplacement
     , updatedAtLabel =: date dateReplacement
     ]
+
+rec6 :: Record
+rec6 = Record [mkStrField "email" "a@e.com", mkRecId "1234"]
 
 res6 :: Document
 res6 =
@@ -213,9 +211,16 @@ res6 =
     ]
   ]
 
-res8 :: RecordData Field
-res8 =
+rec8 :: RecordData Field
+rec8 =
   Record
+    [ mkRecId sampleId1
+    , mkStrField "someDate" "2017-01-13T02:09:05.000Z"
+    , updatedAtLabel =: date dateReplacement
+    ]
+
+doc8 :: Document
+doc8 =
     [ mkObjId sampleId1
     , "someDate" =: date "2017-01-13T02:09:05.000Z"
     , updatedAtLabel =: date dateReplacement
