@@ -16,7 +16,6 @@ import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time (getCurrentTime)
-import Database.MongoDB (Database)
 import Types.Common
 import Util.Constants
 
@@ -35,38 +34,39 @@ apiItem _ g (Succ a) = g a
 -- Create a field definition
 mkFieldDef
   :: Val a
-  => Label -> Bool -> Bool -> Maybe a -> (Label, FieldDefinition)
-mkFieldDef name required isId defaultValue =
-  (name, FieldDefinition name required (val <$> defaultValue) isId)
+  => Label -> Bool -> Bool -> Bool -> Maybe a -> (Label, FieldDefinition)
+mkFieldDef name required isId isDate defaultValue =
+  (name, FieldDefinition name required (val <$> defaultValue) isId isDate)
 
 -- ^
 -- Create a definition for an id field used as a foreign key
 mkIdDef :: Label -> (Label, FieldDefinition)
-mkIdDef name = mkFieldDef name True True (Nothing :: Maybe String)
+mkIdDef name = mkFieldDef name True True False (Nothing :: Maybe String)
 
 -- ^
 -- Create a definition for a required field without a default value
 mkReqDef' :: Label -> (Label, FieldDefinition)
-mkReqDef' name = mkFieldDef name True False (Nothing :: Maybe String)
+mkReqDef' name = mkFieldDef name True False False (Nothing :: Maybe String)
 
 -- ^
 -- Create a definition for a required field
-mkReqDef
-  :: Val a
-  => Label -> a -> (Label, FieldDefinition)
-mkReqDef name v = mkFieldDef name True False (Just v)
+mkReqDef :: Val a => Label -> a -> (Label, FieldDefinition)
+mkReqDef name v = mkFieldDef name True False False (Just v)
 
 -- ^
 -- Create a definition for an optional field without a default value
 mkOptDef' :: Label -> (Label, FieldDefinition)
-mkOptDef' name = mkFieldDef name False False (Nothing :: Maybe String)
+mkOptDef' name = mkFieldDef name False False False (Nothing :: Maybe String)
 
 -- ^
 -- Create a definition for an optional field
-mkOptDef
-  :: Val a
-  => Label -> a -> (Label, FieldDefinition)
-mkOptDef name v = mkFieldDef name False False (Just v)
+mkOptDef :: Val a => Label -> a -> (Label, FieldDefinition)
+mkOptDef name v = mkFieldDef name False False False (Just v)
+
+-- ^
+-- Create a definition for a date optional field
+mkDateDef' :: Label -> (Label, FieldDefinition)
+mkDateDef' name = mkFieldDef name False False True (Nothing :: Maybe String)
 
 -- ^
 -- Validate a record against it's definition

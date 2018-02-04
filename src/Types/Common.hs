@@ -44,6 +44,7 @@ data FieldDefinition = FieldDefinition
   , fieldRequired :: Bool
   , fieldDefault :: Maybe BSON.Value
   , isObjectId :: Bool
+  , isJsDate :: Bool
   } deriving (Eq, Show)
 
 -- ^

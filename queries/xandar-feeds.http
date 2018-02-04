@@ -92,10 +92,10 @@ Content-Type: :json
   "favicon": null,
   "format": "rss-2.0",
   "generator": "https://wordpress.org/?v=4.7",
-  "guid": "https://subfictional.com",
+  "guid": "https://some-fictional-blog3.com",
   "image": {
     "title": "Subfictional Studios",
-    "url": "https://subfictional.com/files/2016/07/cropped-sf-logo-2016-sf-sq-512px-32x32.jpg"
+    "url": "https://some-fictional-blog3.com/files/2016/07/cropped-sf-logo-2016-sf-sq-512px-32x32.jpg"
   },
   "language": "en-US",
   "lastPostDate": "2017-01-13T02:09:05.000Z",
@@ -104,10 +104,10 @@ Content-Type: :json
     "readStatus": "failure",
     "readStatusError": "StatusCodeException (Status {statusCode = 304, statusMessage = \"Not Modified\"}) [(\"Date\",\"Sat, 14 Jan 2017 20:01:07 GMT\"),(\"Server\",\"Apache/2.4.7 (Ubuntu)\"),(\"ETag\",\"\\\"6b188e14abb0321740881b7893cbc0ab\\\"\"),(\"Expires\",\"Thu, 19 Nov 1981 08:52:00 GMT\"),(\"Cache-Control\",\"no-store, no-cache, must-revalidate, post-check=0, pre-check=0\"),(\"Vary\",\"User-Agent\"),(\"Set-Cookie\",\"PHPSESSID=cfiki8nufmmqr5qb3sifrnhha6; path=/\"),(\"X-Response-Body-Start\",\"\"),(\"X-Request-URL\",\"GET https://subfictional.com:443/feed/\")] (CJ {expose = [Cookie {cookie_name = \"PHPSESSID\", cookie_value = \"cfiki8nufmmqr5qb3sifrnhha6\", cookie_expiry_time = 3016-05-17 00:00:00 UTC, cookie_domain = \"subfictional.com\", cookie_path = \"/\", cookie_creation_time = 2017-01-14 20:01:07.288073354 UTC, cookie_last_access_time = 2017-01-14 20:01:07.288073354 UTC, cookie_persistent = False, cookie_host_only = True, cookie_secure_only = False, cookie_http_only = False}]})"
   },
-  "link": "https://subfictional.com",
+  "link": "https://some-fictional-blog3.com",
   "postCount": 17,
   "title": "Subfictional Studios",
-  "uri": "https://subfictional.com/feed/"
+  "uri": "https://some-fictional-blog3.com/feed/"
 }
 
 #

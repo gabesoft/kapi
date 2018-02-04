@@ -16,6 +16,7 @@ import Test.Hspec
 import TestHelper
 import Types.Common
 import Util.Constants
+import Data.Maybe
 
 main :: IO ()
 main =
@@ -33,6 +34,8 @@ main =
        runIO (verifyMkInDocument rec6 res2)
      it "creates a document ready to be saved - valid id" =<<
        runIO (verifyMkInDocument rec7 res4)
+     it "creates a document ready to be saved - date field" =<<
+       runIO (verifyMkInDocument rec8 res8)
      it "creates a record ready to be returned" $ verifyMkOutDocument rec5 res3
      it "can make a sort field for ascending sort" $
        verifyMkSortField "email" (mkIntField "email" 1)
@@ -113,6 +116,7 @@ recDef =
     , mkReqDef' "required"
     , mkReqDef "requiredWithDefault" ("a" :: String)
     , mkIdDef "foreignKey"
+    , mkDateDef' "someDate"
     ]
 
 sampleId1 :: RecordId
@@ -157,9 +161,6 @@ sampleRecInvalidFK =
 rec1 :: Record
 rec1 = Record [mkStrField "email" "a@email.com"]
 
-rec2 :: Record
-rec2 = Record [mkRecId "123"]
-
 rec3 :: Record
 rec3 = Record [mkRecId sampleId1]
 
@@ -174,6 +175,9 @@ rec6 = Record [mkStrField "email" "a@e.com", mkRecId "1234"]
 
 rec7 :: Record
 rec7 = Record [mkStrField "email" "a@e.com", mkRecId sampleId1]
+
+rec8 :: Record
+rec8 = Record [ mkRecId sampleId1, mkStrField "someDate" "2017-01-13T02:09:05.000Z" ]
 
 res1 :: ValidationResult
 res1 = ValidationErrors [mkRecId "Field is required"]
@@ -208,6 +212,14 @@ res6 =
     , ["c" =: [mkFloatField "$lt" 2.4]]
     ]
   ]
+
+res8 :: RecordData Field
+res8 =
+  Record
+    [ mkObjId sampleId1
+    , "someDate" =: date "2017-01-13T02:09:05.000Z"
+    , updatedAtLabel =: date dateReplacement
+    ]
 
 queryRes1 :: Document
 queryRes1 =

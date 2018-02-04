@@ -44,7 +44,7 @@ feedDefinition =
   Map.fromList
     [ mkOptDef' "author"
     , mkOptDef' "data"
-    , mkOptDef' "date"
+    , mkDateDef' "date"
     , mkOptDef' "description"
     , mkReqDef "failedAttempts" (0 :: Int)
     , mkOptDef' "favicon"
@@ -53,8 +53,8 @@ feedDefinition =
     , mkOptDef' "guid"
     , mkOptDef' "image"
     , mkOptDef' "language"
-    , mkOptDef' "lastPostDate"
-    , mkOptDef' "lastReadDate"
+    , mkDateDef' "lastPostDate"
+    , mkDateDef' "lastReadDate"
     , mkOptDef' "lastReadStatus"
     , mkOptDef' "link"
     , mkReqDef "postCount" (0 :: Int)
@@ -80,14 +80,14 @@ postDefinition =
   Map.fromList
     [ mkOptDef' "author"
     , mkOptDef' "comments"
-    , mkOptDef' "date"
+    , mkDateDef' "date"
     , mkOptDef' "description"
     , mkIdDef "feedId"
     , mkReqDef' "guid"
     , mkOptDef' "image"
     , mkOptDef' "inlineStatus"
     , mkReqDef' "link"
-    , mkOptDef' "pubdate"
+    , mkDateDef' "pubdate"
     , mkOptDef' "source"
     , mkOptDef' "summary"
     , mkOptDef' "title"

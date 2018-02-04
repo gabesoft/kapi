@@ -1,15 +1,22 @@
-function updateDates() {
+// updateDates('lastPostDate');
+// updateDates('lastReadDate');
+
+function updateDates(dateField) {
   var ops = [];
-  var feeds = db.feeds.find({
-    lastPostDate :  { '$exists':  true,  '$type' :  2 }
-  });
+  var query = {};
+
+  query[dateField] = { '$exists':  true,  '$type' :  2 };
+
+  var feeds = db.feeds.find(query);
 
   feeds.forEach(function(feed) {
-    var date = new ISODate(feed.lastPostDate);
+    var updateValue = {};
+    updateValue[dateField] = new ISODate(feed[dateField]);
+
     ops.push({
       updateOne : {
         filter : { _id:  feed._id },
-        update : { '$set':  { lastPostDate :  date } }
+        update : { '$set':  updateValue }
       }
     });
 

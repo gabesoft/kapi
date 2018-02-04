@@ -29,6 +29,7 @@ module Persistence.MongoDB
   , validateRecordHasId
   ) where
 
+import Control.Applicative ((<|>))
 import Control.Exception.Lifted (handleJust)
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Control
@@ -38,6 +39,8 @@ import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as T
+import Data.Time (UTCTime(..), parseTimeM, defaultTimeLocale, rfc822DateFormat)
+import Data.Time.ISO8601
 import Database.MongoDB
 import Network.Socket (HostName, PortNumber)
 import Parsers.Filter (parse)
@@ -213,18 +216,27 @@ mkInDocument def isNew = fmap (recordToDocument def) . setTimestamp isNew
 -- Convert a BSON 'Document' to a 'Record'
 documentToRecord :: RecordDefinition -> Document -> Record
 documentToRecord def document =
-  foldr mapIdToRecId (Record document) (idLabel : getIdLabels def)
+  foldr mapUTCTimeToDate record (getDateLabels def)
+  where
+    record = foldr mapIdToRecId (Record document) (idLabel : getIdLabels def)
 
 -- ^
 -- Convert a 'Record' to a BSON 'Document'
 recordToDocument :: RecordDefinition -> Record -> Document
-recordToDocument def record =
-  getDocument (foldr mapIdToObjId record $ idLabel : getIdLabels def)
+recordToDocument def record = getDocument datesMapped
+  where
+    idsMapped = foldr mapIdToObjId record $ idLabel : getIdLabels def
+    datesMapped = foldr mapDateToUTCTime idsMapped $ getDateLabels def
 
 -- ^
 -- Get the labels of all fields of type 'ObjectId' in a 'RecordDefinition'
 getIdLabels :: RecordDefinition -> [Label]
 getIdLabels = Map.keys . Map.filter isObjectId . recordFields
+
+-- ^
+-- Get the labels of all date fields in a 'RecordDefinition'
+getDateLabels :: RecordDefinition -> [Label]
+getDateLabels = Map.keys . Map.filter isJsDate . recordFields
 
 -- ^
 -- Get a query for finding one record by id
@@ -247,6 +259,21 @@ recIdToObjId :: RecordId -> Maybe Value
 recIdToObjId rid = ObjId <$> readMaybe (T.unpack rid)
 
 -- ^
+-- Parse an RFC822 date into a 'UTCTime' object
+parseRFC822 :: String -> Maybe UTCTime
+parseRFC822 = parseTimeM True defaultTimeLocale rfc822DateFormat
+
+-- ^
+-- Parse an Javascript date into a 'UTCTime' object
+parseJsDate :: String -> Maybe UTCTime
+parseJsDate input = parseISO8601 input <|> parseRFC822 input
+
+-- ^
+-- Convert a Javascript date into 'Text'
+formatJsDate :: UTCTime -> Maybe Text
+formatJsDate = Just . T.pack . formatISO8601Javascript
+
+-- ^
 -- Convert an object id value to a record id
 objIdToRecId :: Value -> Maybe RecordId
 objIdToRecId (ObjId v) = Just $ T.pack (show v)
@@ -261,6 +288,14 @@ mapIdToRecId name = modField name (>>= objIdToRecId)
 -- Convert the id within a record to an 'ObjectId'
 mapIdToObjId :: Label -> Record -> Record
 mapIdToObjId name = modField name (>>= recIdToObjId)
+
+-- ^
+-- Convert a date field in string format into a 'UTCTime' format
+mapDateToUTCTime :: Label -> Record -> Record
+mapDateToUTCTime name = modField name (>>= parseJsDate)
+
+mapUTCTimeToDate :: Label -> Record -> Record
+mapUTCTimeToDate name = modField name (>>= formatJsDate)
 
 -- ^
 -- Validate that a record has a valid id field
@@ -309,9 +344,7 @@ mkIntField = (=:)
 -- ^
 -- Convert a filter query to a 'Document' and convert all id fields to ObjectId
 queryToDoc :: RecordDefinition -> Text -> Either String Document
-queryToDoc def xs = do
-  q <- queryToDoc' xs
-  return (convertIds def q)
+queryToDoc def xs = convertIds def <$> queryToDoc' xs
 
 -- ^
 -- Convert a filter query to a 'Document'
