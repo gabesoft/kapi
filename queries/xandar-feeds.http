@@ -6,7 +6,7 @@
 # variables
 :date := (shell-command-to-string "echo -n (date +%Y-%m-%d-%M-%s)")
 :host = 127.0.0.1:8001
-:path = lono/feeds
+:path = xandar/feeds
 :json = application/json
 
 #
@@ -73,7 +73,7 @@ DELETE http://:host/:path/non-existent
 #
 # Delete an existent feed
 #
-DELETE http://:host/:path/5a75383b598418d14300001c 
+DELETE http://:host/:path/5a75383b598418d14300001c
 
 #
 # Create a single feed
